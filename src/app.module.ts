@@ -11,6 +11,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { StackhrAdminModule } from './stackhr-admin/stackhr-admin.module';
 import { AuditModule } from './audit/audit.module';
 import { PrismaModule } from './database/prisma.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PrismaModule } from './database/prisma.module';
     NotificationsModule,
     StackhrAdminModule,
     AuditModule,
+    OnboardingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

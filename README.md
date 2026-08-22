@@ -33,6 +33,10 @@ To configure local development, copy `.env.example` to `.env` and adjust the
 values as needed. `FRONTEND_URL` controls the origin allowed by the backend's
 CORS configuration.
 
+Transactional email is sent through SendByte using `SENDBYTE_API_KEY` and
+defaults to `StackHR <noreply@stackhr.app>`. The existing `SENDBYTE_KEY` name
+is also supported for local compatibility.
+
 ### Authentication
 
 Authentication is managed by the backend using PostgreSQL-backed sessions. The

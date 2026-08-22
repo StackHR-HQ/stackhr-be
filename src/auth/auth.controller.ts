@@ -17,27 +17,43 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('business/register')
-  async registerBusiness(
+  @Post('business/signup')
+  async signupBusiness(
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.authService.signupBusiness({
+      email: String(body.email ?? ''),
+      password: String(body.password ?? ''),
+      confirmPassword: String(body.confirmPassword ?? ''),
+      organizationName: String(body.organizationName ?? ''),
+      organizationSlug:
+        body.organizationSlug === undefined
+          ? undefined
+          : String(body.organizationSlug),
+    });
+  }
+
+  @Post('business/verify-email')
+  async verifyBusinessEmail(
     @Body() body: Record<string, unknown>,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.authService.registerBusiness(
-      {
-        name: String(body.name ?? ''),
-        email: String(body.email ?? ''),
-        password: String(body.password ?? ''),
-        organizationName: String(body.organizationName ?? ''),
-        organizationSlug:
-          body.organizationSlug === undefined
-            ? undefined
-            : String(body.organizationSlug),
-      },
+    const result = await this.authService.verifyBusinessEmail(
+      String(body.email ?? ''),
+      String(body.code ?? ''),
       this.sessionOptions(request),
     );
-
     this.authService.setSessionCookie(response, result.token);
-    return { user: result.user };
+    return {
+      user: result.user,
+      onboarding: result.onboarding,
+    };
+  }
+
+  @Post('business/resend-verification')
+  resendBusinessVerification(@Body() body: Record<string, unknown>) {
+    return this.authService.resendBusinessVerification(String(body.email ?? ''));
   }
 
   @Post('business/login')

@@ -13,6 +13,7 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
+import { EmailService } from '../notifications/email.service';
 import {
   SESSION_COOKIE_NAME,
   SESSION_DURATION_MS,
@@ -23,10 +24,10 @@ import {
 } from './auth.constants';
 import type { AuthenticatedUser } from './auth.types';
 
-interface RegisterBusinessInput {
-  name: string;
+interface SignupBusinessInput {
   email: string;
   password: string;
+  confirmPassword: string;
   organizationName: string;
   organizationSlug?: string;
 }
@@ -52,12 +53,22 @@ interface UserRecord {
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
-  async registerBusiness(input: RegisterBusinessInput, options: SessionOptions) {
-    const name = this.requiredString(input.name, 'name');
+  async signupBusiness(input: SignupBusinessInput): Promise<{
+    email: string;
+    expiresAt: Date;
+    devCode?: string;
+  }> {
     const email = this.normalizeEmail(input.email);
     const password = this.validatePassword(input.password);
+    if (password !== input.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
     const organizationName = this.requiredString(
       input.organizationName,
       'organizationName',
@@ -84,7 +95,7 @@ export class AuthService {
       await transaction.user.create({
         data: {
           id: userId,
-          name,
+          name: organizationName,
           email,
           passwordHash,
           userType: USER_TYPES.BUSINESS,
@@ -108,22 +119,73 @@ export class AuthService {
           organizationId,
           userId,
           role: USER_ROLES.BUSINESS_OWNER,
-          createdAt: new Date(),
         },
       });
     });
 
-    const user = this.toAuthenticatedUser({
-      id: userId,
-      name,
-      email,
-      userType: USER_TYPES.BUSINESS,
-      role: USER_ROLES.BUSINESS_OWNER,
-      memberships: [{ organizationId }],
+    return this.issueEmailVerification(email);
+  }
+
+  async verifyBusinessEmail(
+    emailInput: string,
+    codeInput: string,
+    options: SessionOptions,
+  ) {
+    const email = this.normalizeEmail(emailInput);
+    const code = this.validateVerificationCode(codeInput);
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { memberships: { select: { organizationId: true } } },
     });
+
+    if (!user || user.userType !== USER_TYPES.BUSINESS) {
+      throw new BadRequestException('The verification request is invalid');
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestException('This email is already verified');
+    }
+
+    const verification = await this.prisma.verification.findFirst({
+      where: { identifier: email, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!verification || !this.matchesVerificationCode(email, code, verification.value)) {
+      throw new BadRequestException('The verification code is invalid or expired');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified: true },
+      }),
+      this.prisma.verification.delete({ where: { id: verification.id } }),
+    ]);
+
+    const authenticatedUser = this.toAuthenticatedUser(user);
     const token = await this.createSession(user.id, options);
 
-    return { user, token };
+    return {
+      user: { ...authenticatedUser },
+      token,
+      onboarding: {
+        organizationId: authenticatedUser.organizationId,
+        nextStep: 'COMPANY_INFO',
+      },
+    };
+  }
+
+  async resendBusinessVerification(emailInput: string) {
+    const email = this.normalizeEmail(emailInput);
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    if (!user || user.userType !== USER_TYPES.BUSINESS || user.emailVerified) {
+      return { accepted: true, email };
+    }
+
+    const verification = await this.issueEmailVerification(email);
+    return { accepted: true, ...verification };
   }
 
   async loginBusiness(input: LoginInput, options: SessionOptions) {
@@ -259,6 +321,10 @@ export class AuthService {
       throw new UnauthorizedException('This account is not available');
     }
 
+    if (userType === USER_TYPES.BUSINESS && !user.emailVerified) {
+      throw new UnauthorizedException('Please verify your email before signing in');
+    }
+
     const token = await this.createSession(user.id, options);
     return { user: this.toAuthenticatedUser(user), token };
   }
@@ -278,6 +344,65 @@ export class AuthService {
     });
 
     return token;
+  }
+
+  private async issueEmailVerification(email: string) {
+    const code = this.generateVerificationCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await this.prisma.verification.deleteMany({
+      where: { identifier: email },
+    });
+    await this.prisma.verification.create({
+      data: {
+        id: randomUUID(),
+        identifier: email,
+        value: this.hashVerificationCode(email, code),
+        expiresAt,
+      },
+    });
+
+    const apiKey = process.env.SENDBYTE_API_KEY ?? process.env.SENDBYTE_KEY;
+    if (apiKey) {
+      await this.emailService.send({
+        to: email,
+        subject: 'Verify your StackHR email',
+        text: `Your StackHR verification code is ${code}. It expires in 10 minutes.`,
+        html: `<p>Your StackHR verification code is <strong>${code}</strong>.</p><p>It expires in 10 minutes.</p>`,
+        idempotencyKey: `business-signup-verification:${email}:${expiresAt.getTime()}`,
+      });
+      return { email, expiresAt };
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      throw new BadRequestException('Email verification is not configured');
+    }
+
+    return { email, expiresAt, devCode: code };
+  }
+
+  private generateVerificationCode(): string {
+    return String(Math.floor(100000 + Math.random() * 900000));
+  }
+
+  private validateVerificationCode(value: string): string {
+    if (!/^\d{6}$/.test(value)) {
+      throw new BadRequestException('Verification code must be 6 digits');
+    }
+    return value;
+  }
+
+  private hashVerificationCode(email: string, code: string): string {
+    return createHash('sha256')
+      .update(`${email}:${code}:${process.env.AUTH_SECRET ?? 'development-only-secret'}`)
+      .digest('hex');
+  }
+
+  private matchesVerificationCode(email: string, code: string, digest: string): boolean {
+    return timingSafeEqual(
+      Buffer.from(this.hashVerificationCode(email, code), 'hex'),
+      Buffer.from(digest, 'hex'),
+    );
   }
 
   private toAuthenticatedUser(user: UserRecord): AuthenticatedUser {
