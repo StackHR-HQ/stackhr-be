@@ -33,6 +33,27 @@ To configure local development, copy `.env.example` to `.env` and adjust the
 values as needed. `FRONTEND_URL` controls the origin allowed by the backend's
 CORS configuration.
 
+### Authentication
+
+Authentication is managed by the backend using PostgreSQL-backed sessions. The
+API supports an HTTP-only `stackhr_session` cookie and `Authorization: Bearer`
+tokens. Routes are available under `/v1/api/auth`:
+
+```text
+POST /v1/api/auth/business/register
+POST /v1/api/auth/business/login
+POST /v1/api/auth/admin/login
+GET  /v1/api/auth/me
+POST /v1/api/auth/logout
+GET  /v1/api/stackhr-admin/me
+```
+
+Business registration creates the initial organization and makes the user its
+business owner. StackHR admin accounts are not publicly registered; configure
+`STACKHR_ADMIN_EMAIL`, `STACKHR_ADMIN_PASSWORD`, and optionally
+`STACKHR_ADMIN_NAME` to bootstrap the first platform admin during application
+startup.
+
 ## Project setup
 
 ```bash

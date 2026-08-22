@@ -10,9 +10,11 @@ import { BillingModule } from './billing/billing.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { StackhrAdminModule } from './stackhr-admin/stackhr-admin.module';
 import { AuditModule } from './audit/audit.module';
+import { PrismaModule } from './database/prisma.module';
 
 @Module({
   imports: [
+    PrismaModule,
     AuthModule,
     OrganizationsModule,
     EmployeesModule,

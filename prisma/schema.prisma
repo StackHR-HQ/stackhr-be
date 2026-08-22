@@ -14,38 +14,42 @@ datasource db {
 }
 
 model User {
-  id            String       @id
-  name          String
-  email         String
-  emailVerified Boolean      @default(false)
-  image         String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  role          String?
-  banned        Boolean?     @default(false)
-  banReason     String?
-  banExpires    DateTime?
-  sessions      Session[]
-  accounts      Account[]
-  members       Member[]
-  invitations   Invitation[]
+  id                 String         @id
+  name               String
+  email              String
+  emailVerified      Boolean        @default(false)
+  image              String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  role               String?
+  passwordHash       String?
+  userType           String         @default("BUSINESS")
+  banned             Boolean?       @default(false)
+  banReason          String?
+  banExpires         DateTime?
+  sessions           Session[]
+  accounts           Account[]
+  memberships        Member[]
+  invitations        Invitation[]
+  organizationsOwned Organization[] @relation("OrganizationOwner")
 
   @@unique([email])
   @@map("user")
 }
 
 model Session {
-  id                   String   @id
+  id                   String    @id
   expiresAt            DateTime
   token                String
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
   ipAddress            String?
   userAgent            String?
   userId               String
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   activeOrganizationId String?
   impersonatedBy       String?
+  revokedAt            DateTime?
 
   @@unique([token])
   @@index([userId])
@@ -91,10 +95,13 @@ model Organization {
   logo        String?
   createdAt   DateTime
   metadata    String?
+  ownerId     String?
+  owner       User?        @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   members     Member[]
   invitations Invitation[]
 
   @@unique([slug])
+  @@index([ownerId])
   @@map("organization")
 }
 

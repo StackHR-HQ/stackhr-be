@@ -3,11 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    // Better Auth handles the raw request body itself; this module re-adds
-    // the default body parsers for every other (non-auth) route.
-    bodyParser: false,
-  });
+  const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('v1/api');
 

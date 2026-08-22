@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-`stackhr-be` is the backend for **StackHR** — an HR/payroll/spend management platform for African SMEs ("BambooHR + Rippling + Bujeti for African SMEs"). The repo currently contains only the unmodified NestJS starter scaffold (`AppController`/`AppService`/`AppModule`) — real domain modules have not been built yet. Use `StackHR-MVP-Technical-Specification-aligned.md` at the repo root for full product/domain context (roles, payroll architecture, MVP scope, roadmap) before designing new modules.
+`stackhr-be` is the backend for **StackHR** — an HR/payroll/spend management platform for African SMEs ("BambooHR + Rippling + Bujeti for African SMEs"). It serves both business users and StackHR platform administrators. Use `StackHR-MVP-Technical-Specification-aligned.md` at the repo root for full product/domain context (roles, payroll architecture, MVP scope, roadmap) before designing new modules.
 
-Note: that spec describes an existing separate production app (React+Vite frontend, NeonDB, BetterAuth, Vercel). The skills installed in this repo (`better-auth`, `supabase-postgres`, `supabase-server`) indicate this backend is being built against **Supabase** (Postgres + auth), not NeonDB directly — confirm the intended stack with the user before assuming parity with the spec's "Current Stack" table.
+Note: that spec describes an existing separate production app. This backend currently uses NestJS, Prisma 7, and PostgreSQL. Authentication is implemented in this repository with password hashing, database-backed sessions, HTTP-only cookies, and bearer tokens; Better Auth is not used.
 
 ## Commands
 
@@ -37,8 +37,8 @@ This repo ships project-level skills under `.agents/skills/` (tracked in `skills
 
 - **nestjs-best-practices** — before writing/reviewing any Nest module, controller, service, guard, or DI wiring.
 - **supabase-postgres-best-practices** — before any schema/migration/RLS/index/SQL work, even a one-column change.
-- **supabase-server** — before writing server-side code that creates Supabase clients or verifies inbound auth (uses the `auth: 'user'|'publishable'|'secret'|'none'` API, not legacy `anon`/`service_role` keys).
-- **better-auth-best-practices** — if/when Better Auth is wired into this backend.
+- **supabase-server** — only if Supabase server clients or Supabase auth are introduced; current auth is first-party.
+- **better-auth-best-practices** — not used; authentication is implemented in-house.
 - **tdd** — this repo follows red-green TDD: confirm test seams with the user before writing tests, one seam/test/implementation per cycle, no bulk test-then-implement.
 
 ## Domain context to carry into design decisions
