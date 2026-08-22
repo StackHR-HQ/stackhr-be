@@ -25,6 +25,14 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+StackHR's backend API runs locally on `http://localhost:3001` by default. The
+versioned API base URL is `http://localhost:3001/v1/api`. The frontend is
+expected to run on `http://localhost:3000`.
+
+To configure local development, copy `.env.example` to `.env` and adjust the
+values as needed. `FRONTEND_URL` controls the origin allowed by the backend's
+CORS configuration.
+
 ## Project setup
 
 ```bash
