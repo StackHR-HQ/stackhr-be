@@ -43,6 +43,45 @@ StackHR MVP & Technical Product Specification Page 1
 
 Attendance tracking was scoped out entirely and is not in MVP. 
 
+**Backend Product Boundary**
+
+The StackHR backend serves two connected product surfaces:
+
+1\. **Business Workspace** — the multi-tenant workspace used by onboarded businesses and their users.
+2\. **StackHR Admin** — the internal platform-operations workspace used by StackHR staff to manage onboarded businesses and platform operations.
+
+These are separate authorization contexts. Business users operate within one organization tenant. StackHR platform users operate across the platform only through explicitly granted platform permissions. A StackHR platform user is not a business Admin, and a business Admin never receives platform-wide access.
+
+**Business Workspace**
+
+Business roles are Business Admin / HR, Manager, and Employee. Business users may access only data belonging to their organization, subject to role, permission, resource-ownership, and workflow rules.
+
+**StackHR Admin Workspace**
+
+StackHR platform roles are separate from business roles and may include Platform Super Admin, Platform Operations, Platform Support, Platform Billing, and Platform Compliance. Platform permissions must be action-specific, such as `platform.businesses.read`, `platform.businesses.update_status`, `platform.billing.read`, `platform.audit.read`, and `platform.support.access`.
+
+StackHR Admin capabilities include business search and review, onboarding status, activation, suspension, reactivation, subscription and billing oversight, operational support, platform configuration, and platform-level audit review. Cross-tenant access must be explicitly authorized, logged, attributable to the platform user, and time-bounded where appropriate.
+
+**Business Lifecycle and Support Access**
+
+The backend must represent at least pending onboarding, active, suspended, and deactivated business states. Lifecycle transitions require platform permissions and audit records containing the actor, target organization, previous state, new state, reason, and timestamp. Suspension or deactivation must not silently delete business data.
+
+Support access is not unrestricted impersonation. Any support-access mechanism must record the platform actor, target organization, purpose, start time, expiry, and actions taken. Destructive or financially sensitive actions require stronger authorization than read-only investigation.
+
+**Backend Module Boundaries**
+
+The initial modular-monolith boundaries are `auth`, `organizations`, `people`, `payroll`, `spend`, `billing`, `notifications`, `audit`, and `stackhr-admin`. Business and platform domains may share infrastructure, but their controllers, authorization rules, data-access boundaries, and audit requirements must remain explicit and testable.
+
+**Authorization and Data Access Contract**
+
+Authorization has two planes: the tenant plane evaluates organization membership and business permissions; the platform plane evaluates StackHR platform roles and permissions. Platform access is not an organization membership and must not bypass audit requirements.
+
+Organization-owned records must include `org_id` or be reachable only through an `org_id`-scoped parent. Platform-owned records, including platform users, platform permissions, support sessions, business lifecycle events, and platform audit events, must be modeled separately. Database-level tenant isolation is mandatory; application guards are an additional layer, not a replacement for database protections.
+
+**Backend Stack Decision**
+
+Before implementing persistence or authentication in `stackhr-be`, confirm whether the backend uses NeonDB or Supabase PostgreSQL and whether Better Auth is the identity provider. The confirmed database, authentication, storage, email, payments, queue, and deployment choices must be recorded here and reflected in environment and deployment documentation.
+
 **3\. Current Implemented Functionality (as of Aug 11, 2026\)** 
 
 **People Operations** 
@@ -215,6 +254,8 @@ Environment variables are managed through the deployment environment for BetterA
 
 • Team management supports assigning/managing these roles and permissions. 
 
+These roles apply only within a business organization. They do not grant access to StackHR Admin operations. Platform roles and permissions are separate from organization membership roles and must be enforced independently.
+
 StackHR MVP & Technical Product Specification
 
 Page 5   
@@ -234,6 +275,8 @@ Page 5
 
 7\. **Billing** → trial start → payment setup → recurring charge (Anchor) → renewal/downgrade. 
 
+8\. **StackHR business operations** → business onboarding review → activation → operational monitoring → suspension, reactivation, or deactivation when authorized → audit history.
+
 **Planned future payslip flow:** Payroll Approved → Generate Payslip → Save to Employee Account → Notify Employee → Email Payslip (moving away from email-only distribution; employees should access payslip history from their account). 
 
 **9\. Database / Domain Structure** 
@@ -247,6 +290,10 @@ Page 5
 • Tables: subscriptions, expense\_claims, reimbursements, salary\_advances, plus core employee/org/payroll tables (\~29 tables total under RLS). 
 
 • No full ERD is maintained in documentation; recommend generating one directly from the current PostgreSQL schema for onboarding/reference rather than reconstructing it from notes. 
+
+• Platform-owned data must be separated conceptually and, where appropriate, physically from tenant-owned data. Expected platform entities include platform users, platform roles and permissions, business lifecycle events, support-access sessions, and platform audit events.
+
+• Cross-tenant queries are privileged platform operations, not ordinary business queries. They must use dedicated platform data-access paths with explicit permissions and audit events.
 
 **10\. Current Technical Debt** 
 
@@ -307,4 +354,4 @@ StackHR MVP & Technical Product Specification Page 6
 
 • **Stage 2 — Growth:** Database indexing, query optimization, RLS performance, background jobs, scheduled jobs, caching where justified, observability, load testing, better audit infrastructure. 
 
-Page 7 
+Page 7
