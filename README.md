@@ -44,7 +44,10 @@ API supports an HTTP-only `stackhr_session` cookie and `Authorization: Bearer`
 tokens. Routes are available under `/v1/api/auth`:
 
 ```text
+POST /v1/api/auth/business/signup
 POST /v1/api/auth/business/register
+POST /v1/api/auth/business/verify-email
+POST /v1/api/auth/business/resend-verification
 POST /v1/api/auth/business/login
 POST /v1/api/auth/admin/login
 GET  /v1/api/auth/me
@@ -57,6 +60,10 @@ business owner. StackHR admin accounts are not publicly registered; configure
 `STACKHR_ADMIN_EMAIL`, `STACKHR_ADMIN_PASSWORD`, and optionally
 `STACKHR_ADMIN_NAME` to bootstrap the first platform admin during application
 startup.
+
+Business signup and onboarding endpoint contracts are documented in
+`docs/business-signup-api.md`. Add new endpoint request and response contracts
+there whenever the API grows.
 
 ## Project setup
 

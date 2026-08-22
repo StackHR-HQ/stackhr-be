@@ -48,9 +48,9 @@ export class EmailService {
       }),
     });
 
-    const body = (await response.json().catch(() => null)) as
-      | SendByteResponse
-      | null;
+    const body = (await response
+      .json()
+      .catch(() => null)) as SendByteResponse | null;
 
     if (!response.ok) {
       throw new ServiceUnavailableException(

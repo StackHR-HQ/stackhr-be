@@ -30,6 +30,10 @@ interface EmployeeInput {
   managerId?: string;
 }
 
+interface CsvEmployeeInput extends Omit<EmployeeInput, 'managerId'> {
+  managerEmail?: string;
+}
+
 @Injectable()
 export class OnboardingService {
   constructor(private readonly prisma: PrismaService) {}
@@ -78,7 +82,9 @@ export class OnboardingService {
         where: { id: employee.managerId, organizationId },
       });
       if (!manager) {
-        throw new BadRequestException('managerId must belong to this organization');
+        throw new BadRequestException(
+          'managerId must belong to this organization',
+        );
       }
     }
 
@@ -144,17 +150,119 @@ export class OnboardingService {
     };
   }
 
+  async importEmployees(user: AuthenticatedUser, csv: string) {
+    const organizationId = this.requireOrganization(user);
+    const rows = this.parseCsv(csv);
+    if (!rows.length) {
+      throw new BadRequestException(
+        'csv must contain at least one employee row',
+      );
+    }
+
+    const normalizedRows = rows.map((row) =>
+      this.normalizeCsvEmployee({
+        fullName: row.fullName,
+        email: row.email,
+        department: row.department,
+        jobTitle: row.jobTitle,
+        employmentType: row.employmentType,
+        salary: Number(row.salary),
+        startDate: row.startDate,
+        managerEmail: row.managerEmail,
+      }),
+    );
+    const emails = normalizedRows.map((row) => row.email);
+    if (new Set(emails).size !== emails.length) {
+      throw new ConflictException('CSV contains duplicate employee emails');
+    }
+
+    const existingEmployees = await this.prisma.employee.findMany({
+      where: { organizationId, email: { in: emails } },
+      select: { email: true },
+    });
+    if (existingEmployees.length) {
+      throw new ConflictException(
+        `Employees already exist: ${existingEmployees.map((employee) => employee.email).join(', ')}`,
+      );
+    }
+
+    const createdEmployees = await this.prisma.$transaction(
+      async (transaction) => {
+        const createdIds: string[] = [];
+        for (const row of normalizedRows) {
+          const created = await transaction.employee.create({
+            data: {
+              id: randomUUID(),
+              organizationId,
+              fullName: row.fullName,
+              email: row.email,
+              department: row.department,
+              jobTitle: row.jobTitle,
+              employmentType: row.employmentType,
+              salaryAmount: row.salary,
+              startDate: row.startDate,
+            },
+          });
+          createdIds.push(created.id);
+        }
+
+        const allEmployees = await transaction.employee.findMany({
+          where: { organizationId },
+          select: { id: true, email: true },
+        });
+        const employeeByEmail = new Map(
+          allEmployees.map((employee) => [employee.email, employee.id]),
+        );
+
+        for (const [index, row] of normalizedRows.entries()) {
+          if (row.managerEmail) {
+            const managerId = employeeByEmail.get(row.managerEmail);
+            if (!managerId) {
+              throw new BadRequestException(
+                `managerEmail does not match an employee: ${row.managerEmail}`,
+              );
+            }
+            if (managerId === createdIds[index]) {
+              throw new BadRequestException(
+                'An employee cannot be their own manager',
+              );
+            }
+            await transaction.employee.update({
+              where: { id: createdIds[index] },
+              data: { managerId },
+            });
+          }
+        }
+
+        return createdIds;
+      },
+    );
+
+    const employees = await this.prisma.employee.findMany({
+      where: { id: { in: createdEmployees } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return {
+      employees,
+      onboarding: await this.getStatus(user),
+    };
+  }
+
   private requireOrganization(user: AuthenticatedUser): string {
+    const allowedRoles: string[] = [
+      USER_ROLES.BUSINESS_OWNER,
+      USER_ROLES.BUSINESS_ADMIN,
+      USER_ROLES.HR_ADMIN,
+    ];
     if (
       user.userType !== 'BUSINESS' ||
       !user.organizationId ||
-      ![
-        USER_ROLES.BUSINESS_OWNER,
-        USER_ROLES.BUSINESS_ADMIN,
-        USER_ROLES.HR_ADMIN,
-      ].includes(user.role)
+      !allowedRoles.includes(user.role)
     ) {
-      throw new BadRequestException('A business administrator session is required');
+      throw new BadRequestException(
+        'A business administrator session is required',
+      );
     }
     return user.organizationId;
   }
@@ -180,16 +288,117 @@ export class OnboardingService {
       email,
       department: this.requiredString(input.department, 'department'),
       jobTitle: this.requiredString(input.jobTitle, 'jobTitle'),
-      employmentType: this.requiredString(input.employmentType, 'employmentType'),
+      employmentType: this.requiredString(
+        input.employmentType,
+        'employmentType',
+      ),
       salary,
       startDate: parsedStartDate,
       managerId: this.optionalString(input.managerId),
     };
   }
 
-  private validateChoice(value: string, choices: string[], field: string): string {
+  private normalizeCsvEmployee(input: CsvEmployeeInput) {
+    const normalized = this.normalizeEmployeeInput(input);
+    return {
+      ...normalized,
+      managerEmail: this.optionalString(input.managerEmail)?.toLowerCase(),
+    };
+  }
+
+  private parseCsv(csv: string): Array<Record<string, string>> {
+    if (!csv.trim()) {
+      throw new BadRequestException('csv is required');
+    }
+
+    const lines = csv
+      .trim()
+      .split(/\r?\n/)
+      .filter((line) => line.trim());
+    if (lines.length < 2) {
+      throw new BadRequestException(
+        'csv must include a header and at least one row',
+      );
+    }
+
+    const headers = this.parseCsvLine(lines[0]).map((header) =>
+      this.canonicalCsvHeader(header),
+    );
+    const requiredHeaders = [
+      'fullName',
+      'email',
+      'department',
+      'jobTitle',
+      'employmentType',
+      'salary',
+      'startDate',
+    ];
+    for (const header of requiredHeaders) {
+      if (!headers.includes(header)) {
+        throw new BadRequestException(`csv is missing the ${header} column`);
+      }
+    }
+
+    return lines.slice(1).map((line) => {
+      const values = this.parseCsvLine(line);
+      return Object.fromEntries(
+        headers.map((header, index) => [header, values[index] ?? '']),
+      );
+    });
+  }
+
+  private parseCsvLine(line: string): string[] {
+    const values: string[] = [];
+    let value = '';
+    let insideQuotes = false;
+
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index];
+      const nextCharacter = line[index + 1];
+      if (character === '"' && insideQuotes && nextCharacter === '"') {
+        value += '"';
+        index += 1;
+      } else if (character === '"') {
+        insideQuotes = !insideQuotes;
+      } else if (character === ',' && !insideQuotes) {
+        values.push(value.trim());
+        value = '';
+      } else {
+        value += character;
+      }
+    }
+    values.push(value.trim());
+    return values;
+  }
+
+  private canonicalCsvHeader(header: string): string {
+    const normalized = header
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_-]+/g, '');
+    const aliases: Record<string, string> = {
+      fullname: 'fullName',
+      email: 'email',
+      department: 'department',
+      jobtitle: 'jobTitle',
+      employmenttype: 'employmentType',
+      salary: 'salary',
+      salaryamount: 'salary',
+      startdate: 'startDate',
+      manageremail: 'managerEmail',
+    };
+    return aliases[normalized] ?? header.trim();
+  }
+
+  private validateChoice(
+    value: string,
+    choices: string[],
+    field: string,
+  ): string {
     if (!choices.includes(value)) {
-      throw new BadRequestException(`${field} must be one of: ${choices.join(', ')}`);
+      throw new BadRequestException(
+        `${field} must be one of: ${choices.join(', ')}`,
+      );
     }
     return value;
   }

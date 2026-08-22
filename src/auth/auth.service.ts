@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
@@ -28,7 +29,7 @@ interface SignupBusinessInput {
   email: string;
   password: string;
   confirmPassword: string;
-  organizationName: string;
+  companyName: string;
   organizationSlug?: string;
 }
 
@@ -52,11 +53,15 @@ interface UserRecord {
 }
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.ensureConfiguredAdmin();
+  }
 
   async signupBusiness(input: SignupBusinessInput): Promise<{
     email: string;
@@ -70,12 +75,14 @@ export class AuthService {
     }
 
     const organizationName = this.requiredString(
-      input.organizationName,
-      'organizationName',
+      input.companyName,
+      'companyName',
     );
     const slug = this.slugify(input.organizationSlug || organizationName);
 
-    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
     if (existingUser) {
       throw new ConflictException('An account with this email already exists');
     }
@@ -84,7 +91,9 @@ export class AuthService {
       where: { slug },
     });
     if (existingOrganization) {
-      throw new ConflictException('An organization with this slug already exists');
+      throw new ConflictException(
+        'An organization with this slug already exists',
+      );
     }
 
     const passwordHash = await this.hashPassword(password);
@@ -119,6 +128,7 @@ export class AuthService {
           organizationId,
           userId,
           role: USER_ROLES.BUSINESS_OWNER,
+          createdAt: new Date(),
         },
       });
     });
@@ -151,8 +161,13 @@ export class AuthService {
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!verification || !this.matchesVerificationCode(email, code, verification.value)) {
-      throw new BadRequestException('The verification code is invalid or expired');
+    if (
+      !verification ||
+      !this.matchesVerificationCode(email, code, verification.value)
+    ) {
+      throw new BadRequestException(
+        'The verification code is invalid or expired',
+      );
     }
 
     await this.prisma.$transaction([
@@ -313,7 +328,10 @@ export class AuthService {
       include: { memberships: { select: { organizationId: true } } },
     });
 
-    if (!user?.passwordHash || !(await this.verifyPassword(password, user.passwordHash))) {
+    if (
+      !user?.passwordHash ||
+      !(await this.verifyPassword(password, user.passwordHash))
+    ) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -322,14 +340,19 @@ export class AuthService {
     }
 
     if (userType === USER_TYPES.BUSINESS && !user.emailVerified) {
-      throw new UnauthorizedException('Please verify your email before signing in');
+      throw new UnauthorizedException(
+        'Please verify your email before signing in',
+      );
     }
 
     const token = await this.createSession(user.id, options);
     return { user: this.toAuthenticatedUser(user), token };
   }
 
-  private async createSession(userId: string, options: SessionOptions): Promise<string> {
+  private async createSession(
+    userId: string,
+    options: SessionOptions,
+  ): Promise<string> {
     const token = randomBytes(32).toString('base64url');
 
     await this.prisma.session.create({
@@ -394,11 +417,17 @@ export class AuthService {
 
   private hashVerificationCode(email: string, code: string): string {
     return createHash('sha256')
-      .update(`${email}:${code}:${process.env.AUTH_SECRET ?? 'development-only-secret'}`)
+      .update(
+        `${email}:${code}:${process.env.AUTH_SECRET ?? 'development-only-secret'}`,
+      )
       .digest('hex');
   }
 
-  private matchesVerificationCode(email: string, code: string, digest: string): boolean {
+  private matchesVerificationCode(
+    email: string,
+    code: string,
+    digest: string,
+  ): boolean {
     return timingSafeEqual(
       Buffer.from(this.hashVerificationCode(email, code), 'hex'),
       Buffer.from(digest, 'hex'),
@@ -434,9 +463,20 @@ export class AuthService {
     ].join('$');
   }
 
-  private async verifyPassword(password: string, storedHash: string): Promise<boolean> {
-    const [, algorithm, n, r, p, encodedSalt, encodedHash] = storedHash.split('$');
-    if (algorithm !== 'scrypt' || !n || !r || !p || !encodedSalt || !encodedHash) {
+  private async verifyPassword(
+    password: string,
+    storedHash: string,
+  ): Promise<boolean> {
+    const [, algorithm, n, r, p, encodedSalt, encodedHash] =
+      storedHash.split('$');
+    if (
+      algorithm !== 'scrypt' ||
+      !n ||
+      !r ||
+      !p ||
+      !encodedSalt ||
+      !encodedHash
+    ) {
       return false;
     }
 
@@ -448,7 +488,9 @@ export class AuthService {
       { N: Number(n), r: Number(r), p: Number(p) },
     );
 
-    return actual.length === expected.length && timingSafeEqual(actual, expected);
+    return (
+      actual.length === expected.length && timingSafeEqual(actual, expected)
+    );
   }
 
   private hashToken(token: string): string {
@@ -467,7 +509,7 @@ export class AuthService {
           reject(error);
           return;
         }
-        resolve(derivedKey as Buffer);
+        resolve(derivedKey);
       });
     });
   }
@@ -505,7 +547,9 @@ export class AuthService {
       .slice(0, 80);
 
     if (!slug) {
-      throw new BadRequestException('organizationSlug must contain letters or numbers');
+      throw new BadRequestException(
+        'organizationSlug must contain letters or numbers',
+      );
     }
     return slug;
   }

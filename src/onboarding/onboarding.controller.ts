@@ -1,9 +1,22 @@
-import { Body, Controller, Get, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser, RequireRoles } from '../auth/auth.decorators';
 import { USER_ROLES } from '../auth/auth.constants';
-import type { AuthenticatedRequest, AuthenticatedUser } from '../auth/auth.types';
+import { RolesGuard } from '../auth/roles.guard';
+import type {
+  AuthenticatedRequest,
+  AuthenticatedUser,
+} from '../auth/auth.types';
 import { OnboardingService } from './onboarding.service';
+import { readOptionalString, readString } from '../common/input';
 
 const BUSINESS_ADMIN_ROLES = [
   USER_ROLES.BUSINESS_OWNER,
@@ -12,7 +25,7 @@ const BUSINESS_ADMIN_ROLES = [
 ];
 
 @Controller('onboarding')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, RolesGuard)
 export class OnboardingController {
   constructor(private readonly onboardingService: OnboardingService) {}
 
@@ -28,16 +41,13 @@ export class OnboardingController {
     @Body() body: Record<string, unknown>,
   ) {
     return this.onboardingService.updateCompanyInfo(user, {
-      companyName: String(body.companyName ?? ''),
-      industry: String(body.industry ?? ''),
-      companySize: String(body.companySize ?? ''),
-      currency: body.currency === undefined ? undefined : String(body.currency),
-      payrollFrequency:
-        body.payrollFrequency === undefined
-          ? undefined
-          : String(body.payrollFrequency),
-      taxId: body.taxId === undefined ? undefined : String(body.taxId),
-      logo: body.logo === undefined ? undefined : String(body.logo),
+      companyName: readString(body.companyName),
+      industry: readString(body.industry),
+      companySize: readString(body.companySize),
+      currency: readOptionalString(body.currency),
+      payrollFrequency: readOptionalString(body.payrollFrequency),
+      taxId: readOptionalString(body.taxId),
+      logo: readOptionalString(body.logo),
     });
   }
 
@@ -48,14 +58,23 @@ export class OnboardingController {
     @Body() body: Record<string, unknown>,
   ) {
     return this.onboardingService.addEmployee(user, {
-      fullName: String(body.fullName ?? ''),
-      email: String(body.email ?? ''),
-      department: String(body.department ?? ''),
-      jobTitle: String(body.jobTitle ?? ''),
-      employmentType: String(body.employmentType ?? ''),
+      fullName: readString(body.fullName),
+      email: readString(body.email),
+      department: readString(body.department),
+      jobTitle: readString(body.jobTitle),
+      employmentType: readString(body.employmentType),
       salary: Number(body.salary),
-      startDate: String(body.startDate ?? ''),
-      managerId: body.managerId === undefined ? undefined : String(body.managerId),
+      startDate: readString(body.startDate),
+      managerId: readOptionalString(body.managerId),
     });
+  }
+
+  @Post('employees/import')
+  @RequireRoles(...BUSINESS_ADMIN_ROLES)
+  importEmployees(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.onboardingService.importEmployees(user, readString(body.csv));
   }
 }

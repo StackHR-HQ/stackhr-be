@@ -83,11 +83,15 @@ describe('EmailService', () => {
       html: '<p>Test</p>',
     });
 
-    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
-      headers: expect.objectContaining({
-        Authorization: 'Bearer legacy-api-key',
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.sendbyte.africa/v1/emails',
+      expect.objectContaining({
+        headers: {
+          Authorization: 'Bearer legacy-api-key',
+          'Content-Type': 'application/json',
+        },
       }),
-    });
+    );
   });
 
   it('rejects when no SendByte API key is configured', async () => {

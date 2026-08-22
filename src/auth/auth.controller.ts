@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { readOptionalString, readString } from '../common/input';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import type { AuthenticatedRequest } from './auth.types';
@@ -18,18 +19,13 @@ export class AuthController {
 
   @Post('business/register')
   @Post('business/signup')
-  async signupBusiness(
-    @Body() body: Record<string, unknown>,
-  ) {
+  async signupBusiness(@Body() body: Record<string, unknown>) {
     return this.authService.signupBusiness({
-      email: String(body.email ?? ''),
-      password: String(body.password ?? ''),
-      confirmPassword: String(body.confirmPassword ?? ''),
-      organizationName: String(body.organizationName ?? ''),
-      organizationSlug:
-        body.organizationSlug === undefined
-          ? undefined
-          : String(body.organizationSlug),
+      email: readString(body.email),
+      password: readString(body.password),
+      confirmPassword: readString(body.confirmPassword),
+      companyName: readString(body.companyName ?? body.organizationName),
+      organizationSlug: readOptionalString(body.organizationSlug),
     });
   }
 
@@ -40,8 +36,8 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authService.verifyBusinessEmail(
-      String(body.email ?? ''),
-      String(body.code ?? ''),
+      readString(body.email),
+      readString(body.code),
       this.sessionOptions(request),
     );
     this.authService.setSessionCookie(response, result.token);
@@ -53,7 +49,7 @@ export class AuthController {
 
   @Post('business/resend-verification')
   resendBusinessVerification(@Body() body: Record<string, unknown>) {
-    return this.authService.resendBusinessVerification(String(body.email ?? ''));
+    return this.authService.resendBusinessVerification(readString(body.email));
   }
 
   @Post('business/login')
@@ -64,8 +60,8 @@ export class AuthController {
   ) {
     const result = await this.authService.loginBusiness(
       {
-        email: String(body.email ?? ''),
-        password: String(body.password ?? ''),
+        email: readString(body.email),
+        password: readString(body.password),
       },
       this.sessionOptions(request),
     );
@@ -82,8 +78,8 @@ export class AuthController {
   ) {
     const result = await this.authService.loginStackhrAdmin(
       {
-        email: String(body.email ?? ''),
-        password: String(body.password ?? ''),
+        email: readString(body.email),
+        password: readString(body.password),
       },
       this.sessionOptions(request),
     );

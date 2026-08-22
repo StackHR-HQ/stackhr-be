@@ -1,4 +1,8 @@
-import { createParamDecorator, ExecutionContext, SetMetadata } from '@nestjs/common';
+import {
+  createParamDecorator,
+  ExecutionContext,
+  SetMetadata,
+} from '@nestjs/common';
 import type { AuthenticatedRequest } from './auth.types';
 
 export const AUTH_ROLES_KEY = 'auth_roles';
