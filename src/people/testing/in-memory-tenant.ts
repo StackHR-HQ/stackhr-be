@@ -76,8 +76,7 @@ function sortRows(rows: Row[], orderBy?: OrderBy): Row[] {
       const [field, direction] = Object.entries(order)[0];
       const value = (row: Row) =>
         (row[field] instanceof Date ? row[field].getTime() : row[field]) as
-          | number
-          | string;
+          number | string;
       const left = value(a);
       const right = value(b);
       if (left === right) continue;
