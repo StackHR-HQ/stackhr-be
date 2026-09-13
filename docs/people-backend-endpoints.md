@@ -6,13 +6,13 @@ The current People flow needs **13 read endpoints and 3 mutation endpoints** to 
 
 ## Scope and source of truth
 
-| Section | Screens covered |
-| --- | --- |
-| Employees | Directory, status tabs, search, employee profile and its ten tabs |
-| Leave | Requests, calendar, types, policies, balances |
-| Documents | Company documents, employee documents, templates, upload |
-| Organization | Departments, teams, reporting structure, org chart |
-| Onboarding | Company setup link and department defaults, employee progress, templates, checklist |
+| Section      | Screens covered                                                                     |
+| ------------ | ----------------------------------------------------------------------------------- |
+| Employees    | Directory, status tabs, search, employee profile and its ten tabs                   |
+| Leave        | Requests, calendar, types, policies, balances                                       |
+| Documents    | Company documents, employee documents, templates, upload                            |
+| Organization | Departments, teams, reporting structure, org chart                                  |
+| Onboarding   | Company setup link and department defaults, employee progress, templates, checklist |
 
 Implementation references:
 
@@ -43,39 +43,41 @@ These permissions are requirements to confirm against the backend's role model, 
 
 The current adapter sends no query parameters and expects complete collections. Employee search, status counts, document search, calendar filtering and organization trees are calculated in the browser. Do not silently paginate these responses: that would produce incomplete counts, missing reports and partial calendars.
 
-For a later pagination contract, add explicit `page`, `pageSize` (proposed default 25, maximum 100), `sort` and filter parameters, returning `{ items, page, pageSize, total }`, and migrate the adapters/hooks at the same time. Employee status counts must cover the entire authorized filtered population, not just a page. Org charts and selector data need complete authorized datasets or dedicated hierarchy/lookup reads. This migration is outside the 16-endpoint minimum.
+`GET /people/employees` supports opt-in offset pagination and filtering. Supplying any of `page`, `pageSize`, `search`, or `employmentStatus` returns `{ items, page, pageSize, total }`; the defaults are `page=1` and `pageSize=25`, with a maximum page size of 100. Search is case-insensitive across full name, email, and job title. `employmentStatus` accepts `active`, `pending_invitation`, `onboarding`, or `offboarding`. Results are stably ordered by full name then ID.
+
+Calls without these parameters retain the current bare-array response for the existing frontend. The frontend must migrate its adapter before it sends query parameters, and it must obtain organization-wide status counts separately if it needs counts unaffected by pagination. Org charts and selectors continue to require a complete authorized collection or dedicated lookup endpoints.
 
 ## 1. Employees
 
-| Status | Method and path | Purpose / response |
-| --- | --- | --- |
-| Declared | `GET /people/employees` | Directory, status counts, manager/direct-report lookup, employee selectors and organization views. Returns `EmployeeSummary[]`. |
-| Declared | `GET /people/employees/{employeeId}` | All employee profile tabs. Returns `EmployeeDetail`; `404` when unavailable. |
+| Status   | Method and path                      | Purpose / response                                                                                                              |
+| -------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Declared | `GET /people/employees`              | Directory, status counts, manager/direct-report lookup, employee selectors and organization views. Returns `EmployeeSummary[]`. |
+| Declared | `GET /people/employees/{employeeId}` | All employee profile tabs. Returns `EmployeeDetail`; `404` when unavailable.                                                    |
 
 `EmployeeSummary` fields:
 
-| Field | Type / meaning |
-| --- | --- |
+| Field                                                                   | Type / meaning                                                       |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | `id`, `fullName`, `email`, `avatarInitials`, `jobTitle`, `departmentId` | Strings; `departmentId` references a department in this organization |
-| `managerId` | Employee ID or `null` for a root employee |
-| `employmentType` | `Full-time`, `Part-time`, `Contract`, `Intern` |
-| `employmentStatus` | `active`, `pending_invitation`, `onboarding`, `offboarding` |
-| `startDate` | Date-only string |
+| `managerId`                                                             | Employee ID or `null` for a root employee                            |
+| `employmentType`                                                        | `Full-time`, `Part-time`, `Contract`, `Intern`                       |
+| `employmentStatus`                                                      | `active`, `pending_invitation`, `onboarding`, `offboarding`          |
+| `startDate`                                                             | Date-only string                                                     |
 
 `EmployeeDetail` includes every summary field plus:
 
-| Field | Required shape / consuming tabs |
-| --- | --- |
-| `workLocation` | String; overview and employment |
-| `personalInfo` | Strings: `dateOfBirth`, `gender`, `maritalStatus`, `nationality`, `phone`, `address`, `emergencyContactName`, `emergencyContactPhone`, `emergencyContactRelationship` |
-| `compensation` | `salary: number`, `currency: string`, `payFrequency: string`, `bankName: string`, `bankAccountLast4: string` |
-| `leaveBalance` | `{ type, totalDays, usedDays }[]`; day counts are numbers |
-| `leaveRequests` | `{ id, type, startDate, endDate, days, status }[]`; status is `pending`, `approved` or `rejected` |
-| `documents` | `{ id, name, category, uploadedAt, fileSize }[]`; all strings, including formatted `fileSize` |
-| `payslips` | `{ id, periodLabel, payDate, netPay, currency, status }[]`; numeric `netPay`, status `paid` or `processing` |
-| `expenses` | `{ id, date, category, description, amount, currency, status }[]`; numeric `amount`, status `pending`, `approved` or `rejected` |
-| `salaryAdvances` | `{ id, requestedAt, amount, currency, repaymentMonths, status }[]`; numeric amount/months; status `pending`, `approved`, `rejected`, `disbursed` or `repaid` |
-| `activity` | `{ id, description, timestamp }[]` |
+| Field            | Required shape / consuming tabs                                                                                                                                       |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workLocation`   | String; overview and employment                                                                                                                                       |
+| `personalInfo`   | Strings: `dateOfBirth`, `gender`, `maritalStatus`, `nationality`, `phone`, `address`, `emergencyContactName`, `emergencyContactPhone`, `emergencyContactRelationship` |
+| `compensation`   | `salary: number`, `currency: string`, `payFrequency: string`, `bankName: string`, `bankAccountLast4: string`                                                          |
+| `leaveBalance`   | `{ type, totalDays, usedDays }[]`; day counts are numbers                                                                                                             |
+| `leaveRequests`  | `{ id, type, startDate, endDate, days, status }[]`; status is `pending`, `approved` or `rejected`                                                                     |
+| `documents`      | `{ id, name, category, uploadedAt, fileSize }[]`; all strings, including formatted `fileSize`                                                                         |
+| `payslips`       | `{ id, periodLabel, payDate, netPay, currency, status }[]`; numeric `netPay`, status `paid` or `processing`                                                           |
+| `expenses`       | `{ id, date, category, description, amount, currency, status }[]`; numeric `amount`, status `pending`, `approved` or `rejected`                                       |
+| `salaryAdvances` | `{ id, requestedAt, amount, currency, repaymentMonths, status }[]`; numeric amount/months; status `pending`, `approved`, `rejected`, `disbursed` or `repaid`          |
+| `activity`       | `{ id, description, timestamp }[]`                                                                                                                                    |
 
 Return empty arrays for sections with no records. Current monetary fields are displayed directly as currency amounts; the proposed compatibility contract uses major currency units, with exact decimal/minor-unit storage internally. Do not expose full bank account details through `bankAccountLast4`.
 
@@ -85,12 +87,12 @@ Future server filters: `search` over name/email/job title, `employmentStatus`, `
 
 ## 2. Leave
 
-| Status | Method and path | Purpose / response |
-| --- | --- | --- |
-| Declared | `GET /people/leave/requests` | Requests table and calendar. Returns `LeaveRequestWithEmployee[]`. |
-| Declared | `GET /people/leave/types` | Leave type catalog. Returns `LeaveType[]`. |
-| Declared | `GET /people/leave/policies` | Policy cards. Returns `LeavePolicy[]`. |
-| Declared | `GET /people/leave/balances` | Employee balances table. Returns `EmployeeLeaveBalanceRow[]`. |
+| Status   | Method and path                                     | Purpose / response                                                                                                                         |
+| -------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Declared | `GET /people/leave/requests`                        | Requests table and calendar. Returns `LeaveRequestWithEmployee[]`.                                                                         |
+| Declared | `GET /people/leave/types`                           | Leave type catalog. Returns `LeaveType[]`.                                                                                                 |
+| Declared | `GET /people/leave/policies`                        | Policy cards. Returns `LeavePolicy[]`.                                                                                                     |
+| Declared | `GET /people/leave/balances`                        | Employee balances table. Returns `EmployeeLeaveBalanceRow[]`.                                                                              |
 | Proposed | `PATCH /people/leave/requests/{requestId}/decision` | Persist Approve/Reject buttons. Body `{ "status": "approved" }` or `{ "status": "rejected" }`; returns updated `LeaveRequestWithEmployee`. |
 
 Response models:
@@ -126,12 +128,12 @@ Decision requirements:
 
 ## 3. Documents
 
-| Status | Method and path | Purpose / response |
-| --- | --- | --- |
-| Declared | `GET /people/documents/company` | Company documents table. Returns `CompanyDocument[]`. |
-| Declared | `GET /people/documents/employees` | Employee documents table/search. Returns `EmployeeDocumentRow[]`. |
-| Declared | `GET /people/documents/templates` | Template catalog. Returns `DocumentTemplate[]`. |
-| Proposed | `POST /people/documents` | Persist Upload Document. Multipart body below; returns `201` with the saved document. |
+| Status   | Method and path                   | Purpose / response                                                                    |
+| -------- | --------------------------------- | ------------------------------------------------------------------------------------- |
+| Declared | `GET /people/documents/company`   | Company documents table. Returns `CompanyDocument[]`.                                 |
+| Declared | `GET /people/documents/employees` | Employee documents table/search. Returns `EmployeeDocumentRow[]`.                     |
+| Declared | `GET /people/documents/templates` | Template catalog. Returns `DocumentTemplate[]`.                                       |
+| Proposed | `POST /people/documents`          | Persist Upload Document. Multipart body below; returns `201` with the saved document. |
 
 Response models:
 
@@ -141,13 +143,13 @@ Response models:
 
 Upload request uses `multipart/form-data`:
 
-| Field | Required | Validation |
-| --- | --- | --- |
-| `file` | Yes | PDF, DOCX, JPG/JPEG or PNG; UI promises up to 10 MB. Proposed exact limit: 10,000,000 bytes; validate actual content and MIME type server-side. |
-| `name` | Yes | Nonempty trimmed document name |
-| `category` | Yes | `Policy`, `Contract`, `Identification`, `Compliance`, `Compensation`, `Other` |
-| `scope` | Yes | `company` or `employee` |
-| `employeeId` | For employee scope | Required for `employee`; omitted for `company`; validate same-organization employee and uploader access |
+| Field        | Required           | Validation                                                                                                                                      |
+| ------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `file`       | Yes                | PDF, DOCX, JPG/JPEG or PNG; UI promises up to 10 MB. Proposed exact limit: 10,000,000 bytes; validate actual content and MIME type server-side. |
+| `name`       | Yes                | Nonempty trimmed document name                                                                                                                  |
+| `category`   | Yes                | `Policy`, `Contract`, `Identification`, `Compliance`, `Compensation`, `Other`                                                                   |
+| `scope`      | Yes                | `company` or `employee`                                                                                                                         |
+| `employeeId` | For employee scope | Required for `employee`; omitted for `company`; validate same-organization employee and uploader access                                         |
 
 The frontend maps its `assignTo = company` selector value to company scope; other selections map to employee scope plus `employeeId`. Proposed response is `{ scope: "company", document: CompanyDocument }` or `{ scope: "employee", document: EmployeeDocumentRow }`.
 
@@ -159,11 +161,11 @@ Future filters: `search`, `category`, `employeeId`. Current lists and template c
 
 ## 4. Organization
 
-| Status | Method and path | Purpose / response |
-| --- | --- | --- |
-| Declared | `GET /people/departments` | Department cards, profile labels and onboarding defaults. Returns `Department[]`. |
-| Declared | `GET /people/teams` | Team cards and membership. Returns `Team[]`. |
-| Reused | `GET /people/employees` | Headcount, department members, team lead/member names, reporting tree and org chart. |
+| Status   | Method and path           | Purpose / response                                                                   |
+| -------- | ------------------------- | ------------------------------------------------------------------------------------ |
+| Declared | `GET /people/departments` | Department cards, profile labels and onboarding defaults. Returns `Department[]`.    |
+| Declared | `GET /people/teams`       | Team cards and membership. Returns `Team[]`.                                         |
+| Reused   | `GET /people/employees`   | Headcount, department members, team lead/member names, reporting tree and org chart. |
 
 - `Department`: `{ id: string, name: string, headEmployeeId: string }`.
 - `Team`: `{ id: string, name: string, description: string, leadEmployeeId: string, memberIds: string[] }`.
@@ -174,12 +176,12 @@ Future filters: `search`, `category`, `employeeId`. Current lists and template c
 
 ## 5. Onboarding
 
-| Status | Method and path | Purpose / response |
-| --- | --- | --- |
-| Declared | `GET /people/onboarding/templates` | Template cards, department defaults and checklist definitions. Returns `OnboardingTemplate[]`. |
-| Declared | `GET /people/onboarding/employees` | Employee onboarding progress and selected checklist. Returns `EmployeeOnboardingRow[]`. |
+| Status   | Method and path                                                      | Purpose / response                                                                                                           |
+| -------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Declared | `GET /people/onboarding/templates`                                   | Template cards, department defaults and checklist definitions. Returns `OnboardingTemplate[]`.                               |
+| Declared | `GET /people/onboarding/employees`                                   | Employee onboarding progress and selected checklist. Returns `EmployeeOnboardingRow[]`.                                      |
 | Proposed | `PATCH /people/onboarding/employees/{employeeId}/checklist/{itemId}` | Persist checkbox changes. Body `{ "completed": true }` or `{ "completed": false }`; returns updated `EmployeeOnboardingRow`. |
-| Reused | `GET /people/departments` | Names for template assignments and department defaults. |
+| Reused   | `GET /people/departments`                                            | Names for template assignments and department defaults.                                                                      |
 
 - `OnboardingTemplate`: `{ id, name, departmentIds: string[], checklist: [{ id, label, stage }] }`.
 - `EmployeeOnboardingRow`: `{ employeeId, employeeName, avatarInitials, jobTitle, startDate, templateId, completedItemIds: string[] }`.
@@ -231,12 +233,12 @@ The read service currently switches between mocks and the real adapter using `VI
 
 Add mutation methods and query hooks for the three proposed writes. Replace the local `resolvedIds` in Leave, the simulated document upload, and checklist `useState` persistence with these calls. Disable pending actions, display API errors, and roll back optimistic changes on failure.
 
-| Successful action | Query keys to invalidate/refetch |
-| --- | --- |
-| Leave decision | `['people', 'leave', 'requests']`, `['people', 'leave', 'balances']`, `['people', 'employees', employeeId]` |
-| Document upload | `['people', 'documents', 'company']` or `['people', 'documents', 'employees']`; employee detail when assigned |
-| Checklist update | `['people', 'onboarding', 'employees']` and employee detail for activity |
-| Company setup | People employee/department/team and onboarding collections; authenticated organization/setup state |
+| Successful action | Query keys to invalidate/refetch                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------- |
+| Leave decision    | `['people', 'leave', 'requests']`, `['people', 'leave', 'balances']`, `['people', 'employees', employeeId]`   |
+| Document upload   | `['people', 'documents', 'company']` or `['people', 'documents', 'employees']`; employee detail when assigned |
+| Checklist update  | `['people', 'onboarding', 'employees']` and employee detail for activity                                      |
+| Company setup     | People employee/department/team and onboarding collections; authenticated organization/setup state            |
 
 Backend/frontend acceptance checks:
 
@@ -252,18 +254,18 @@ Backend/frontend acceptance checks:
 
 These proposed routes are planning candidates, not approved contracts or prerequisites for the current screens. Define payloads and transitions when those interfaces are designed.
 
-| Capability | Candidate endpoints |
-| --- | --- |
-| Create/update employees | `POST /people/employees`, `PATCH /people/employees/{employeeId}` |
-| Invite/resend invite | `POST /people/employees/{employeeId}/invitations`; apply deduplication and resend limits |
-| Submit/cancel leave | `POST /people/leave/requests`, `POST /people/leave/requests/{requestId}/cancel`; cancellation needs a new status and balance reversal rules |
-| Manage leave configuration | `POST/PATCH /people/leave/types[/{typeId}]`, `POST/PATCH /people/leave/policies[/{policyId}]`; create uses collection path, update uses ID path |
-| Audited balance adjustments | `POST /people/leave/balances/adjustments` |
-| Document retrieval/management | `GET /people/documents/{documentId}/download`, `PATCH/DELETE /people/documents/{documentId}` |
-| Manage document templates | `POST /people/documents/templates`, `PATCH /people/documents/templates/{templateId}` |
-| Manage departments/teams | `POST /people/departments`, `PATCH /people/departments/{departmentId}`, `POST /people/teams`, `PATCH /people/teams/{teamId}` |
-| Reporting-line changes | Reuse employee update with `managerId`; enforce cycle detection |
-| Assign onboarding template | `POST /people/onboarding/employees` with employee and template assignment |
-| Manage onboarding templates | `POST /people/onboarding/templates`, `PATCH /people/onboarding/templates/{templateId}` with revision handling |
+| Capability                    | Candidate endpoints                                                                                                                             |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create/update employees       | `POST /people/employees`, `PATCH /people/employees/{employeeId}`                                                                                |
+| Invite/resend invite          | `POST /people/employees/{employeeId}/invitations`; apply deduplication and resend limits                                                        |
+| Submit/cancel leave           | `POST /people/leave/requests`, `POST /people/leave/requests/{requestId}/cancel`; cancellation needs a new status and balance reversal rules     |
+| Manage leave configuration    | `POST/PATCH /people/leave/types[/{typeId}]`, `POST/PATCH /people/leave/policies[/{policyId}]`; create uses collection path, update uses ID path |
+| Audited balance adjustments   | `POST /people/leave/balances/adjustments`                                                                                                       |
+| Document retrieval/management | `GET /people/documents/{documentId}/download`, `PATCH/DELETE /people/documents/{documentId}`                                                    |
+| Manage document templates     | `POST /people/documents/templates`, `PATCH /people/documents/templates/{templateId}`                                                            |
+| Manage departments/teams      | `POST /people/departments`, `PATCH /people/departments/{departmentId}`, `POST /people/teams`, `PATCH /people/teams/{teamId}`                    |
+| Reporting-line changes        | Reuse employee update with `managerId`; enforce cycle detection                                                                                 |
+| Assign onboarding template    | `POST /people/onboarding/employees` with employee and template assignment                                                                       |
+| Manage onboarding templates   | `POST /people/onboarding/templates`, `PATCH /people/onboarding/templates/{templateId}` with revision handling                                   |
 
 Offboarding execution, employee deletion, invitation acceptance, leave accrual/carryover rules, partial-day leave and signature workflows need their own product contracts. The presence of a status label or display card does not establish those workflows.

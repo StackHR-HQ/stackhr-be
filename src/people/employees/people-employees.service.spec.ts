@@ -38,6 +38,68 @@ describe('PeopleEmployeesService', () => {
         },
       ]);
     });
+
+    it('returns a stable, filtered page when a directory query is supplied', async () => {
+      fake.seed('employee', [
+        employeeRow({
+          id: 'emp_zoe',
+          fullName: 'Zoe Admin',
+          email: 'zoe@acme.test',
+        }),
+        employeeRow({
+          id: 'emp_ada',
+          fullName: 'Ada Okafor',
+          email: 'ada@acme.test',
+          jobTitle: 'Software Engineer',
+        }),
+        employeeRow({
+          id: 'emp_bert',
+          fullName: 'Bert Tester',
+          email: 'bert@acme.test',
+          status: 'ONBOARDING',
+        }),
+        employeeRow({
+          id: 'emp_other',
+          organizationId: ORG_B,
+          fullName: 'Ada Elsewhere',
+        }),
+      ]);
+
+      await expect(
+        service.listEmployees(adminUser(), {
+          page: '1',
+          pageSize: '1',
+          search: 'ada',
+        }),
+      ).resolves.toEqual({
+        items: [
+          expect.objectContaining({ id: 'emp_ada', fullName: 'Ada Okafor' }),
+        ],
+        page: 1,
+        pageSize: 1,
+        total: 1,
+      });
+      await expect(
+        service.listEmployees(adminUser(), { employmentStatus: 'onboarding' }),
+      ).resolves.toEqual({
+        items: [expect.objectContaining({ id: 'emp_bert' })],
+        page: 1,
+        pageSize: 25,
+        total: 1,
+      });
+    });
+
+    it('rejects malformed or unsupported pagination and filter values', () => {
+      expect(() => service.listEmployees(adminUser(), { page: '0' })).toThrow(
+        'page must be between 1 and 1',
+      );
+      expect(() =>
+        service.listEmployees(adminUser(), { pageSize: '101' }),
+      ).toThrow('pageSize must be between 1 and 100');
+      expect(() =>
+        service.listEmployees(adminUser(), { employmentStatus: 'terminated' }),
+      ).toThrow('employmentStatus must be one of');
+    });
   });
 
   describe('getEmployee', () => {

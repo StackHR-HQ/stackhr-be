@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import type { Prisma } from '../../../generated/prisma/client';
 import type { AuthenticatedUser } from '../../auth/auth.types';
 import { requirePeopleOrganization } from '../common/people-access';
 import {
@@ -24,19 +29,144 @@ export interface EmployeeSummary {
   startDate: string;
 }
 
+export interface PaginatedEmployeeDirectory {
+  items: EmployeeSummary[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+interface EmployeeDirectoryQuery {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  employmentStatus?: string;
+  paginated: boolean;
+}
+
+const EMPLOYMENT_STATUSES = new Set([
+  'active',
+  'pending_invitation',
+  'onboarding',
+  'offboarding',
+]);
+
 @Injectable()
 export class PeopleEmployeesService {
   constructor(private readonly tenant: TenantPrismaService) {}
 
-  listEmployees(user: AuthenticatedUser): Promise<EmployeeSummary[]> {
+  listEmployees(
+    user: AuthenticatedUser,
+    rawQuery: Record<string, unknown> = {},
+  ): Promise<EmployeeSummary[] | PaginatedEmployeeDirectory> {
     const organizationId = requirePeopleOrganization(user);
+    const query = this.parseDirectoryQuery(rawQuery);
+    const where: Prisma.EmployeeWhereInput = {
+      organizationId,
+      ...(query.employmentStatus
+        ? { status: query.employmentStatus.toUpperCase() }
+        : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { fullName: { contains: query.search, mode: 'insensitive' } },
+              { email: { contains: query.search, mode: 'insensitive' } },
+              { jobTitle: { contains: query.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
     return this.tenant.run(organizationId, async (client) => {
-      const employees = await client.employee.findMany({
-        where: { organizationId },
+      const employeeQuery: Prisma.EmployeeFindManyArgs = {
+        where,
         orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
-      });
-      return employees.map((employee) => toEmployeeSummary(employee));
+      };
+
+      if (!query.paginated) {
+        const employees = await client.employee.findMany(employeeQuery);
+        return employees.map((employee) => toEmployeeSummary(employee));
+      }
+
+      const [employees, total] = await Promise.all([
+        client.employee.findMany({
+          ...employeeQuery,
+          skip: (query.page! - 1) * query.pageSize!,
+          take: query.pageSize!,
+        }),
+        client.employee.count({ where }),
+      ]);
+      return {
+        items: employees.map((employee) => toEmployeeSummary(employee)),
+        page: query.page!,
+        pageSize: query.pageSize!,
+        total,
+      };
     });
+  }
+
+  private parseDirectoryQuery(
+    rawQuery: Record<string, unknown>,
+  ): EmployeeDirectoryQuery {
+    const queryKeys = ['page', 'pageSize', 'search', 'employmentStatus'];
+    const paginated = queryKeys.some((key) => rawQuery[key] !== undefined);
+    if (!paginated) return { paginated: false };
+
+    const page = this.parsePositiveInteger(rawQuery.page ?? '1', 'page', 1);
+    const pageSize = this.parsePositiveInteger(
+      rawQuery.pageSize ?? '25',
+      'pageSize',
+      100,
+    );
+    const search = this.parseOptionalString(rawQuery.search, 'search', 200);
+    const employmentStatus = this.parseOptionalString(
+      rawQuery.employmentStatus,
+      'employmentStatus',
+      32,
+    )?.toLowerCase();
+
+    if (employmentStatus && !EMPLOYMENT_STATUSES.has(employmentStatus)) {
+      throw new BadRequestException(
+        'employmentStatus must be one of: active, pending_invitation, onboarding, offboarding',
+      );
+    }
+
+    return { page, pageSize, search, employmentStatus, paginated: true };
+  }
+
+  private parsePositiveInteger(
+    value: unknown,
+    field: string,
+    maximum: number,
+  ): number {
+    if (typeof value !== 'string' || !/^\d+$/.test(value)) {
+      throw new BadRequestException(`${field} must be a positive integer`);
+    }
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > maximum) {
+      throw new BadRequestException(
+        `${field} must be between 1 and ${maximum}`,
+      );
+    }
+    return parsed;
+  }
+
+  private parseOptionalString(
+    value: unknown,
+    field: string,
+    maximumLength: number,
+  ): string | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value !== 'string') {
+      throw new BadRequestException(`${field} must be a string`);
+    }
+    const normalized = value.trim();
+    if (normalized.length > maximumLength) {
+      throw new BadRequestException(
+        `${field} must be at most ${maximumLength} characters`,
+      );
+    }
+    return normalized || undefined;
   }
 
   getEmployee(user: AuthenticatedUser, employeeId: string) {

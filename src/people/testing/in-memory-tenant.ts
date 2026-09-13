@@ -57,12 +57,27 @@ function flattenWhere(where: Where = {}): Where {
 }
 
 function matches(row: Row, where: Where = {}): boolean {
-  return Object.entries(flattenWhere(where)).every(([key, condition]) => {
+  const flattened = flattenWhere(where);
+  if (
+    Array.isArray(flattened.OR) &&
+    !(flattened.OR as Where[]).some((condition) => matches(row, condition))
+  ) {
+    return false;
+  }
+  delete flattened.OR;
+  return Object.entries(flattened).every(([key, condition]) => {
     if (isPlainObject(condition) && 'in' in condition) {
       return (condition.in as unknown[]).some((value) => same(row[key], value));
     }
     if (isPlainObject(condition) && 'not' in condition) {
       return !same(row[key], condition.not);
+    }
+    if (isPlainObject(condition) && 'contains' in condition) {
+      const value = String(row[key] ?? '');
+      const search = String(condition.contains);
+      return condition.mode === 'insensitive'
+        ? value.toLowerCase().includes(search.toLowerCase())
+        : value.includes(search);
     }
     return same(row[key], condition);
   });
@@ -103,12 +118,23 @@ class InMemoryModel {
 
   constructor(private readonly keyFields: string[]) {}
 
-  findMany(args: { where?: Where; orderBy?: OrderBy } = {}) {
+  findMany(
+    args: {
+      where?: Where;
+      orderBy?: OrderBy;
+      skip?: number;
+      take?: number;
+    } = {},
+  ) {
+    const offset = args.skip ?? 0;
+    const limit = args.take === undefined ? undefined : offset + args.take;
     return Promise.resolve(
       sortRows(
         this.rows.filter((row) => matches(row, args.where)),
         args.orderBy,
-      ).map((row) => ({ ...row })),
+      )
+        .slice(offset, limit)
+        .map((row) => ({ ...row })),
     );
   }
 
