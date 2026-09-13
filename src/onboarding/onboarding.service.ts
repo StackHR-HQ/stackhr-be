@@ -1,15 +1,17 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import type { Prisma } from '../../generated/prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
 import { USER_ROLES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
-interface CompanyInfoInput {
+export interface CompanyInfoInput {
   companyName: string;
   industry: string;
   companySize: string;
@@ -17,9 +19,13 @@ interface CompanyInfoInput {
   payrollFrequency?: string;
   taxId?: string;
   logo?: string;
+  logoDataUrl?: string;
 }
 
-interface EmployeeInput {
+export interface EmployeeInput {
+  id?: string;
+  managerName?: string;
+  managerEmail?: string;
   fullName: string;
   email: string;
   department: string;
@@ -30,31 +36,34 @@ interface EmployeeInput {
   managerId?: string;
 }
 
-interface CsvEmployeeInput extends Omit<EmployeeInput, 'managerId'> {
-  managerEmail?: string;
-}
-
 @Injectable()
 export class OnboardingService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async updateCompanyInfo(user: AuthenticatedUser, input: CompanyInfoInput) {
+  async updateCompanyInfo(
+    user: AuthenticatedUser,
+    input: CompanyInfoInput,
+    db: Prisma.TransactionClient = this.prisma,
+  ) {
     const organizationId = this.requireOrganization(user);
     const companyName = this.requiredString(input.companyName, 'companyName');
     const industry = this.requiredString(input.industry, 'industry');
     const companySize = this.requiredString(input.companySize, 'companySize');
     const currency = this.validateChoice(
       input.currency ?? 'NGN',
-      ['NGN', 'USD', 'GBP', 'EUR'],
+      ['NGN', 'USD', 'GHS', 'KES', 'ZAR', 'GBP', 'EUR'],
       'currency',
     );
     const payrollFrequency = this.validateChoice(
-      input.payrollFrequency ?? 'MONTHLY',
+      (input.payrollFrequency ?? 'MONTHLY')
+        .trim()
+        .toUpperCase()
+        .replace(/[\s_-]+/g, ''),
       ['MONTHLY', 'BIWEEKLY', 'WEEKLY'],
       'payrollFrequency',
     );
 
-    const organization = await this.prisma.organization.update({
+    const organization = await db.organization.update({
       where: { id: organizationId },
       data: {
         name: companyName,
@@ -63,69 +72,63 @@ export class OnboardingService {
         currency,
         payrollFrequency,
         taxId: this.optionalString(input.taxId),
-        logo: this.optionalString(input.logo),
+        logo: this.normalizeLogo(input),
       },
     });
 
     return {
       organization,
-      onboarding: await this.getStatus(user),
+      onboarding: await this.getStatus(user, db),
     };
   }
 
   async addEmployee(user: AuthenticatedUser, input: EmployeeInput) {
-    const organizationId = this.requireOrganization(user);
-    const employee = this.normalizeEmployeeInput(input);
-
-    if (employee.managerId) {
-      const manager = await this.prisma.employee.findFirst({
-        where: { id: employee.managerId, organizationId },
-      });
-      if (!manager) {
-        throw new BadRequestException(
-          'managerId must belong to this organization',
-        );
-      }
-    }
-
-    const existing = await this.prisma.employee.findUnique({
-      where: {
-        organizationId_email: {
-          organizationId,
-          email: employee.email,
-        },
-      },
+    return this.prisma.$transaction(async (db) => {
+      const employees = await this.createEmployees(user, [input], db);
+      return {
+        employee: employees[0],
+        onboarding: await this.getStatus(user, db),
+      };
     });
-    if (existing) {
-      throw new ConflictException('An employee with this email already exists');
-    }
-
-    const created = await this.prisma.employee.create({
-      data: {
-        id: randomUUID(),
-        organizationId,
-        fullName: employee.fullName,
-        email: employee.email,
-        department: employee.department,
-        jobTitle: employee.jobTitle,
-        employmentType: employee.employmentType,
-        salaryAmount: employee.salary,
-        startDate: employee.startDate,
-        managerId: employee.managerId,
-      },
-    });
-
-    return {
-      employee: created,
-      onboarding: await this.getStatus(user),
-    };
   }
 
-  async getStatus(user: AuthenticatedUser) {
+  async complete(
+    user: AuthenticatedUser,
+    companyInfo: CompanyInfoInput,
+    employees: EmployeeInput[],
+  ) {
+    this.requireOrganization(user);
+    if (!employees.length || employees.length > 1000) {
+      throw new BadRequestException(
+        'employees must contain between 1 and 1000 rows',
+      );
+    }
+    return this.prisma.$transaction(
+      async (db) => {
+        const { organization } = await this.updateCompanyInfo(
+          user,
+          companyInfo,
+          db,
+        );
+        const created = await this.createEmployees(user, employees, db);
+        return {
+          organization,
+          employees: created,
+          onboarding: await this.getStatus(user, db),
+        };
+      },
+      { timeout: 30000 },
+    );
+  }
+
+  async getStatus(
+    user: AuthenticatedUser,
+    db: Prisma.TransactionClient = this.prisma,
+  ) {
     const organizationId = this.requireOrganization(user);
     const [organization, employeeCount] = await Promise.all([
-      this.prisma.organization.findUnique({ where: { id: organizationId } }),
-      this.prisma.employee.count({ where: { organizationId } }),
+      db.organization.findUnique({ where: { id: organizationId } }),
+      db.employee.count({ where: { organizationId } }),
     ]);
 
     if (!organization) {
@@ -151,102 +154,174 @@ export class OnboardingService {
   }
 
   async importEmployees(user: AuthenticatedUser, csv: string) {
-    const organizationId = this.requireOrganization(user);
-    const rows = this.parseCsv(csv);
-    if (!rows.length) {
-      throw new BadRequestException(
-        'csv must contain at least one employee row',
-      );
-    }
+    const rows = this.parseCsv(csv).map((row) => ({
+      fullName: row.fullName,
+      email: row.email,
+      department: row.department,
+      jobTitle: row.jobTitle,
+      employmentType: row.employmentType,
+      salary: Number(row.salary),
+      startDate: row.startDate,
+      managerEmail: row.managerEmail,
+      managerName: row.managerName,
+    }));
+    return this.prisma.$transaction(
+      async (db) => ({
+        employees: await this.createEmployees(user, rows, db),
+        onboarding: await this.getStatus(user, db),
+      }),
+      { timeout: 30000 },
+    );
+  }
 
-    const normalizedRows = rows.map((row) =>
-      this.normalizeCsvEmployee({
+  private async createEmployees(
+    user: AuthenticatedUser,
+    inputs: EmployeeInput[],
+    db: Prisma.TransactionClient,
+  ) {
+    const organizationId = this.requireOrganization(user);
+    if (!inputs.length || inputs.length > 1000)
+      throw new BadRequestException(
+        'employees must contain between 1 and 1000 rows',
+      );
+    const rows = inputs.map((input) => ({
+      ...this.normalizeEmployeeInput(input),
+      id: randomUUID(),
+      localId: this.optionalString(input.id),
+      managerName: this.optionalString(input.managerName),
+      managerEmail: this.optionalString(input.managerEmail)?.toLowerCase(),
+    }));
+    const emails = rows.map((row) => row.email);
+    const localIds = rows.flatMap((row) => (row.localId ? [row.localId] : []));
+    if (new Set(emails).size !== emails.length)
+      throw new ConflictException('Duplicate employee emails');
+    if (new Set(localIds).size !== localIds.length)
+      throw new BadRequestException('Duplicate employee draft IDs');
+    const existing = await db.employee.findMany({
+      where: { organizationId },
+      select: { id: true, email: true, fullName: true, managerId: true },
+    });
+    if (existing.some((employee) => emails.includes(employee.email)))
+      throw new ConflictException('An employee with this email already exists');
+    if (existing.some((employee) => localIds.includes(employee.id)))
+      throw new BadRequestException(
+        'Draft IDs must not collide with existing employee IDs',
+      );
+    const candidates = [...existing, ...rows];
+    const byLocalId = new Map(
+      rows.filter((row) => row.localId).map((row) => [row.localId!, row.id]),
+    );
+    const managers = new Map(
+      existing.map((employee) => [employee.id, employee.managerId]),
+    );
+    const data = rows.map((row) => {
+      let managerId: string | undefined;
+      if (row.managerId) {
+        managerId =
+          byLocalId.get(row.managerId) ??
+          existing.find((employee) => employee.id === row.managerId)?.id;
+        if (!managerId)
+          throw new BadRequestException(
+            'managerId must identify an employee in this organization or submission',
+          );
+      } else if (row.managerEmail) {
+        managerId = candidates.find(
+          (employee) => employee.email === row.managerEmail,
+        )?.id;
+        if (!managerId)
+          throw new BadRequestException(
+            `Unknown managerEmail: ${row.managerEmail}`,
+          );
+      } else if (row.managerName) {
+        const matches = candidates.filter(
+          (employee) =>
+            employee.fullName.toLowerCase() === row.managerName!.toLowerCase(),
+        );
+        if (matches.length !== 1)
+          throw new BadRequestException(
+            `managerName must match exactly one employee: ${row.managerName}`,
+          );
+        managerId = matches[0].id;
+      }
+      if (managerId === row.id)
+        throw new BadRequestException(
+          'An employee cannot be their own manager',
+        );
+      managers.set(row.id, managerId ?? null);
+      return {
+        id: row.id,
+        organizationId,
         fullName: row.fullName,
         email: row.email,
         department: row.department,
         jobTitle: row.jobTitle,
         employmentType: row.employmentType,
-        salary: Number(row.salary),
+        salaryAmount: row.salary,
         startDate: row.startDate,
-        managerEmail: row.managerEmail,
-      }),
-    );
-    const emails = normalizedRows.map((row) => row.email);
-    if (new Set(emails).size !== emails.length) {
-      throw new ConflictException('CSV contains duplicate employee emails');
-    }
-
-    const existingEmployees = await this.prisma.employee.findMany({
-      where: { organizationId, email: { in: emails } },
-      select: { email: true },
+        managerId,
+      };
     });
-    if (existingEmployees.length) {
-      throw new ConflictException(
-        `Employees already exist: ${existingEmployees.map((employee) => employee.email).join(', ')}`,
-      );
+    for (const row of data) {
+      const visited = new Set<string>();
+      let current: string | null | undefined = row.id;
+      while (current) {
+        if (visited.has(current))
+          throw new BadRequestException(
+            'Employee manager relationships must not contain a cycle',
+          );
+        visited.add(current);
+        current = managers.get(current);
+      }
     }
-
-    const createdEmployees = await this.prisma.$transaction(
-      async (transaction) => {
-        const createdIds: string[] = [];
-        for (const row of normalizedRows) {
-          const created = await transaction.employee.create({
-            data: {
-              id: randomUUID(),
-              organizationId,
-              fullName: row.fullName,
-              email: row.email,
-              department: row.department,
-              jobTitle: row.jobTitle,
-              employmentType: row.employmentType,
-              salaryAmount: row.salary,
-              startDate: row.startDate,
-            },
-          });
-          createdIds.push(created.id);
-        }
-
-        const allEmployees = await transaction.employee.findMany({
-          where: { organizationId },
-          select: { id: true, email: true },
-        });
-        const employeeByEmail = new Map(
-          allEmployees.map((employee) => [employee.email, employee.id]),
+    // Insert every draft before linking managers, including managers later in the list.
+    try {
+      await db.employee.createMany({
+        data: data.map((row) => ({ ...row, managerId: null })),
+      });
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'An employee with this email already exists',
         );
-
-        for (const [index, row] of normalizedRows.entries()) {
-          if (row.managerEmail) {
-            const managerId = employeeByEmail.get(row.managerEmail);
-            if (!managerId) {
-              throw new BadRequestException(
-                `managerEmail does not match an employee: ${row.managerEmail}`,
-              );
-            }
-            if (managerId === createdIds[index]) {
-              throw new BadRequestException(
-                'An employee cannot be their own manager',
-              );
-            }
-            await transaction.employee.update({
-              where: { id: createdIds[index] },
-              data: { managerId },
-            });
-          }
-        }
-
-        return createdIds;
-      },
-    );
-
-    const employees = await this.prisma.employee.findMany({
-      where: { id: { in: createdEmployees } },
+      }
+      throw error;
+    }
+    for (const row of data) {
+      if (row.managerId)
+        await db.employee.update({
+          where: { id: row.id },
+          data: { managerId: row.managerId },
+        });
+    }
+    return db.employee.findMany({
+      where: { organizationId, id: { in: data.map((row) => row.id) } },
       orderBy: { createdAt: 'asc' },
     });
+  }
 
-    return {
-      employees,
-      onboarding: await this.getStatus(user),
-    };
+  private normalizeLogo(input: CompanyInfoInput): string | undefined {
+    const dataUrl = this.optionalString(input.logoDataUrl);
+    if (!dataUrl) return this.optionalString(input.logo);
+    const match =
+      /^data:image\/[a-zA-Z0-9.+-]+;base64,([A-Za-z0-9+/]+={0,2})$/.exec(
+        dataUrl,
+      );
+    if (
+      !match ||
+      Buffer.from(match[1], 'base64').toString('base64') !== match[1]
+    ) {
+      throw new BadRequestException(
+        'logoDataUrl must be a base64 image data URL',
+      );
+    }
+    if (Buffer.byteLength(match[1], 'base64') > 2 * 1024 * 1024)
+      throw new BadRequestException('Company logo must be at most 2 MiB');
+    return dataUrl;
   }
 
   private requireOrganization(user: AuthenticatedUser): string {
@@ -260,7 +335,7 @@ export class OnboardingService {
       !user.organizationId ||
       !allowedRoles.includes(user.role)
     ) {
-      throw new BadRequestException(
+      throw new ForbiddenException(
         'A business administrator session is required',
       );
     }
@@ -269,8 +344,10 @@ export class OnboardingService {
 
   private normalizeEmployeeInput(input: EmployeeInput) {
     const salary = Number(input.salary);
-    if (!Number.isSafeInteger(salary) || salary <= 0) {
-      throw new BadRequestException('salary must be a positive whole number');
+    if (!Number.isSafeInteger(salary) || salary <= 0 || salary > 2147483647) {
+      throw new BadRequestException(
+        'salary must be a positive whole number no greater than 2147483647',
+      );
     }
 
     const parsedStartDate = new Date(input.startDate);
@@ -288,21 +365,16 @@ export class OnboardingService {
       email,
       department: this.requiredString(input.department, 'department'),
       jobTitle: this.requiredString(input.jobTitle, 'jobTitle'),
-      employmentType: this.requiredString(
-        input.employmentType,
+      employmentType: this.validateChoice(
+        this.requiredString(input.employmentType, 'employmentType')
+          .toUpperCase()
+          .replace(/[\s-]+/g, '_'),
+        ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERN'],
         'employmentType',
       ),
       salary,
       startDate: parsedStartDate,
       managerId: this.optionalString(input.managerId),
-    };
-  }
-
-  private normalizeCsvEmployee(input: CsvEmployeeInput) {
-    const normalized = this.normalizeEmployeeInput(input);
-    return {
-      ...normalized,
-      managerEmail: this.optionalString(input.managerEmail)?.toLowerCase(),
     };
   }
 
@@ -386,6 +458,8 @@ export class OnboardingService {
       salaryamount: 'salary',
       startdate: 'startDate',
       manageremail: 'managerEmail',
+      manager: 'managerName',
+      managername: 'managerName',
     };
     return aliases[normalized] ?? header.trim();
   }

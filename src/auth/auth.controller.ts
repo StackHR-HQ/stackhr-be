@@ -17,8 +17,7 @@ import type { AuthenticatedRequest } from './auth.types';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('business/register')
-  @Post('business/signup')
+  @Post(['business/register', 'business/signup'])
   async signupBusiness(@Body() body: Record<string, unknown>) {
     return this.authService.signupBusiness({
       email: readString(body.email),
@@ -42,7 +41,8 @@ export class AuthController {
     );
     this.authService.setSessionCookie(response, result.token);
     return {
-      user: result.user,
+      user: this.authService.toFrontendUser(result.user),
+      token: result.token,
       onboarding: result.onboarding,
     };
   }
@@ -62,12 +62,16 @@ export class AuthController {
       {
         email: readString(body.email),
         password: readString(body.password),
+        orgSlug: readOptionalString(body.orgSlug),
       },
       this.sessionOptions(request),
     );
 
     this.authService.setSessionCookie(response, result.token);
-    return { user: result.user };
+    return {
+      user: this.authService.toFrontendUser(result.user),
+      token: result.token,
+    };
   }
 
   @Post('admin/login')
@@ -85,7 +89,10 @@ export class AuthController {
     );
 
     this.authService.setSessionCookie(response, result.token);
-    return { user: result.user };
+    return {
+      user: this.authService.toFrontendUser(result.user),
+      token: result.token,
+    };
   }
 
   @UseGuards(AuthGuard)
@@ -105,7 +112,7 @@ export class AuthController {
   @UseGuards(AuthGuard)
   @Get('me')
   getCurrentUser(@Req() request: AuthenticatedRequest) {
-    return { user: request.user };
+    return { user: this.authService.toFrontendUser(request.user!) };
   }
 
   private sessionOptions(request: Request) {

@@ -13,8 +13,9 @@ Create workspace → Verify email → Company info → Add first employee → Da
 ```
 
 All request and response bodies below use JSON unless stated otherwise. The
-backend sets an HTTP-only `stackhr_session` cookie after successful email
-verification. The frontend must send cookies on cross-origin requests with
+backend returns a `token` and sets an HTTP-only `stackhr_session` cookie after
+successful email verification or login. Use `Authorization: Bearer <token>`
+or the cookie for authenticated requests. The frontend must send cookies on cross-origin requests with
 `credentials: 'include'`.
 
 ## 1. Create workspace
@@ -94,12 +95,16 @@ Content-Type: application/json
 
 ```json
 {
+  "token": "session-token",
   "user": {
     "id": "user-uuid",
     "name": "Acme Inc.",
     "email": "testing@gmail.com",
     "userType": "BUSINESS",
-    "role": "BUSINESS_OWNER",
+    "role": "admin",
+    "backendRole": "BUSINESS_OWNER",
+    "orgSlug": "acme-inc",
+    "orgName": "Acme Inc.",
     "organizationId": "organization-uuid"
   },
   "onboarding": {
@@ -156,6 +161,7 @@ Content-Type: application/json
 
 ```json
 {
+  "orgSlug": "acme-inc",
   "email": "testing@gmail.com",
   "password": "correct horse battery staple"
 }
@@ -165,12 +171,16 @@ Content-Type: application/json
 
 ```json
 {
+  "token": "session-token",
   "user": {
     "id": "user-uuid",
     "name": "Acme Inc.",
     "email": "testing@gmail.com",
     "userType": "BUSINESS",
-    "role": "BUSINESS_OWNER",
+    "role": "admin",
+    "backendRole": "BUSINESS_OWNER",
+    "orgSlug": "acme-inc",
+    "orgName": "Acme Inc.",
     "organizationId": "organization-uuid"
   }
 }
@@ -178,6 +188,13 @@ Content-Type: application/json
 
 Unverified business accounts receive `401 Unauthorized` until email
 verification is completed.
+
+`orgSlug` is optional for existing email-only clients. When supplied, it must
+match a workspace the user belongs to; otherwise login returns `401`.
+The selected workspace is retained in the session. Business response roles
+are `admin`, `manager`, or `employee`; `backendRole` preserves the detailed
+role used by backend authorization. Owners, business admins, and HR admins
+map to `admin`. Platform-admin roles retain their existing uppercase values.
 
 ## 5. StackHR admin login
 
@@ -203,12 +220,16 @@ Content-Type: application/json
 
 ```json
 {
+  "token": "session-token",
   "user": {
     "id": "admin-uuid",
     "name": "StackHR Admin",
     "email": "admin@stackhr.app",
     "userType": "STACKHR_ADMIN",
     "role": "STACKHR_ADMIN",
+    "backendRole": "STACKHR_ADMIN",
+    "orgSlug": null,
+    "orgName": null,
     "organizationId": null
   }
 }
@@ -232,7 +253,10 @@ Cookie: stackhr_session=<session-token>
     "name": "Acme Inc.",
     "email": "testing@gmail.com",
     "userType": "BUSINESS",
-    "role": "BUSINESS_OWNER",
+    "role": "admin",
+    "backendRole": "BUSINESS_OWNER",
+    "orgSlug": "acme-inc",
+    "orgName": "Acme Inc.",
     "organizationId": "organization-uuid"
   }
 }
@@ -285,9 +309,15 @@ Cookie: stackhr_session=<session-token>
 }
 ```
 
-`taxId` and `logo` are optional. Supported currencies are `NGN`, `USD`, `GBP`,
-and `EUR`. Supported payroll frequencies are `MONTHLY`, `BIWEEKLY`, and
-`WEEKLY`.
+`taxId`, `logo`, and `logoDataUrl` are optional. `name` is accepted as an
+alias for `companyName`. A nonempty `logoDataUrl` takes precedence over
+`logo`; it must be a base64 image data URL of at most 2 MiB decoded. It is
+stored directly in the existing `logo` field; no hosted upload is required.
+The JSON request body limit is 4 MiB.
+
+Supported currencies are `NGN`, `USD`, `GHS`, `KES`, `ZAR`, `GBP`, and `EUR`.
+Payroll frequency accepts `Monthly`, `Bi-weekly`, `Weekly`, and the existing
+`MONTHLY`, `BIWEEKLY`, `WEEKLY` values. Stored and returned values are uppercase.
 
 ### Response `200 OK`
 
@@ -342,9 +372,14 @@ Cookie: stackhr_session=<session-token>
 }
 ```
 
+`employmentType` accepts `Full-time`, `Part-time`, `Contract`, and `Intern`
+(case-insensitive), as well as `FULL_TIME`, `PART_TIME`, `CONTRACT`, and `INTERN`.
+Stored and returned values use the uppercase form.
+
 `managerId` is optional and must refer to an employee in the same
-organization. `salary` is stored as a whole-number amount in the
-organization's configured currency.
+organization. `managerName` or `managerEmail` can also identify a manager;
+name matching is case-insensitive and must be unambiguous. `salary` is stored as a whole-number amount in the
+organization's configured currency, from 1 through 2147483647.
 
 ### Response `201 Created`
 
@@ -400,11 +435,12 @@ Required columns:
 fullName,email,department,jobTitle,employmentType,salary,startDate
 ```
 
-Optional column:
-
-```text
-managerEmail
-```
+Optional manager columns: `managerEmail`, `manager`, `manager name`, or
+`managerName`. The last three identify a manager by full name. The manager
+may already exist in the workspace or appear anywhere in the submitted CSV.
+Unknown or ambiguous managers, self-references, and management cycles return
+`400`; the entire import rolls back. If multiple manager fields are supplied,
+`managerEmail` takes precedence over the name. Imports allow 1–1000 rows.
 
 ### Response `201 Created`
 
@@ -457,6 +493,75 @@ Cookie: stackhr_session=<session-token>
   "nextStep": "DASHBOARD"
 }
 ```
+
+## 13. Complete onboarding in one request
+
+The frontend can keep company and employee drafts locally until Review, then
+save everything in one transaction. Existing step-by-step endpoints remain
+available.
+
+```http
+POST /v1/api/onboarding/complete
+Authorization: Bearer <session-token>
+Content-Type: application/json
+```
+
+```json
+{
+  "companyInfo": {
+    "name": "Acme Inc.",
+    "industry": "Technology",
+    "companySize": "11-50",
+    "taxId": "TIN 12345678-0001",
+    "currency": "NGN",
+    "payrollFrequency": "Monthly"
+  },
+  "employees": [
+    {
+      "id": "local-ada",
+      "fullName": "Ada Obi",
+      "email": "ada@company.com",
+      "department": "Engineering",
+      "jobTitle": "Software Engineer",
+      "employmentType": "Full-time",
+      "salary": 450000,
+      "startDate": "2026-08-22",
+      "managerId": "local-manager",
+      "source": "manual"
+    },
+    {
+      "id": "local-manager",
+      "fullName": "Chidi Obi",
+      "email": "chidi@company.com",
+      "department": "Engineering",
+      "jobTitle": "Engineering Manager",
+      "employmentType": "Full-time",
+      "salary": 650000,
+      "startDate": "2026-08-22",
+      "source": "csv"
+    }
+  ]
+}
+```
+
+`companyInfo.logoDataUrl` may contain a real base64 image, for example a
+browser FileReader result. The employee list must contain 1–1000 drafts.
+Draft `id` values are optional but must be unique when supplied. New database
+UUIDs are generated; `managerId` can reference another draft ID or an existing
+employee in this workspace. Draft IDs must not collide with existing IDs.
+`managerName` and `managerEmail` are also accepted. Resolution precedence is
+`managerId`, then `managerEmail`, then `managerName`. `source` is accepted but
+not persisted. Unknown or ambiguous managers, self-references, cycles, and
+invalid fields reject the entire save, including the company update.
+
+Response: `201 Created` with `{ organization, employees, onboarding }`.
+`organization` and `employees` use the same persisted shapes as the individual
+endpoints, with generated employee IDs and resolved manager IDs. `onboarding`
+contains `complete: true` and `nextStep: "DASHBOARD"` on success.
+
+Duplicate employee emails return `409`. This is a create operation, not an
+upsert: resubmitting successfully saved employees also returns `409`.
+The endpoint requires a business owner, business admin, or HR admin session.
 
 ## Error responses
 

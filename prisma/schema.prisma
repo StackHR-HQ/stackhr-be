@@ -34,6 +34,7 @@ model User {
   organizationsOwned Organization[] @relation("OrganizationOwner")
 
   @@unique([email])
+  @@index([userType])
   @@map("user")
 }
 
@@ -89,23 +90,38 @@ model Verification {
 }
 
 model Organization {
-  id               String       @id
-  name             String
-  slug             String
-  logo             String?
-  industry         String?
-  companySize      String?
-  currency         String       @default("NGN")
-  payrollFrequency String       @default("MONTHLY")
-  taxId            String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  metadata         String?
-  ownerId          String?
-  owner            User?        @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  members          Member[]
-  invitations      Invitation[]
-  employees        Employee[]
+  id                   String                         @id
+  name                 String
+  slug                 String
+  logo                 String?
+  industry             String?
+  companySize          String?
+  currency             String                         @default("NGN")
+  payrollFrequency     String                         @default("MONTHLY")
+  taxId                String?
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
+  metadata             String?
+  ownerId              String?
+  owner                User?                          @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  members              Member[]
+  invitations          Invitation[]
+  employees            Employee[]
+  departments          Department[]
+  teams                Team[]
+  teamMembers          TeamMember[]
+  leaveTypes           LeaveType[]
+  leavePolicies        LeavePolicy[]
+  leaveRequests        LeaveRequest[]
+  leaveBalances        LeaveBalance[]
+  documents            Document[]
+  documentTemplates    DocumentTemplate[]
+  onboardingTemplates  OnboardingTemplate[]
+  onboardingDefaults   OnboardingTemplateDepartment[]
+  onboardingItems      OnboardingChecklistItem[]
+  employeeOnboardings  EmployeeOnboarding[]
+  onboardingCompletion OnboardingItemCompletion[]
+  auditEvents          AuditEvent[]
 
   @@unique([slug])
   @@index([ownerId])
@@ -113,26 +129,52 @@ model Organization {
 }
 
 model Employee {
-  id             String       @id
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  fullName       String
-  email          String
-  department     String
-  jobTitle       String
-  employmentType String
-  salaryAmount   Int
-  startDate      DateTime
-  managerId      String?
-  manager        Employee?    @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
-  directReports  Employee[]   @relation("EmployeeManager")
-  status         String       @default("PENDING_INVITATION")
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id                           String              @id
+  organizationId               String
+  organization                 Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fullName                     String
+  email                        String
+  // Free-text department name kept for the onboarding API; departmentId is canonical.
+  department                   String
+  departmentId                 String?
+  departmentRef                Department?         @relation("EmployeeDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
+  jobTitle                     String
+  employmentType               String
+  salaryAmount                 Int
+  startDate                    DateTime
+  managerId                    String?
+  manager                      Employee?           @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
+  directReports                Employee[]          @relation("EmployeeManager")
+  status                       String              @default("PENDING_INVITATION")
+  workLocation                 String              @default("")
+  dateOfBirth                  DateTime?           @db.Date
+  gender                       String?
+  maritalStatus                String?
+  nationality                  String?
+  phone                        String?
+  address                      String?
+  emergencyContactName         String?
+  emergencyContactPhone        String?
+  emergencyContactRelationship String?
+  bankName                     String?
+  // Only the last four digits are stored here; full account details belong to payroll.
+  bankAccountLast4             String?
+  createdAt                    DateTime            @default(now())
+  updatedAt                    DateTime            @updatedAt
+  departmentsHeaded            Department[]        @relation("DepartmentHead")
+  teamsLed                     Team[]              @relation("TeamLead")
+  teamMemberships              TeamMember[]
+  leaveRequests                LeaveRequest[]
+  leaveBalances                LeaveBalance[]
+  documents                    Document[]
+  onboarding                   EmployeeOnboarding?
 
   @@unique([organizationId, email])
+  @@unique([organizationId, id])
   @@index([organizationId, status])
   @@index([managerId])
+  @@index([departmentId])
+  @@map("employee")
 }
 
 model Member {
@@ -164,4 +206,265 @@ model Invitation {
   @@index([organizationId])
   @@index([email])
   @@map("invitation")
+}
+
+model Department {
+  id                  String                         @id
+  organizationId      String
+  organization        Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name                String
+  headEmployeeId      String?
+  head                Employee?                      @relation("DepartmentHead", fields: [headEmployeeId], references: [id], onDelete: SetNull)
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
+  employees           Employee[]                     @relation("EmployeeDepartment")
+  onboardingDefaults  OnboardingTemplateDepartment[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, id])
+  @@index([headEmployeeId])
+  @@map("department")
+}
+
+model Team {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String       @default("")
+  leadEmployeeId String?
+  lead           Employee?    @relation("TeamLead", fields: [leadEmployeeId], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  members        TeamMember[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId])
+  @@index([leadEmployeeId])
+  @@map("team")
+}
+
+model TeamMember {
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  teamId         String
+  team           Team         @relation(fields: [organizationId, teamId], references: [organizationId, id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee     @relation(fields: [organizationId, employeeId], references: [organizationId, id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@id([teamId, employeeId])
+  @@index([organizationId])
+  @@index([employeeId])
+  @@map("team_member")
+}
+
+model LeaveType {
+  id             String         @id
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  defaultDays    Int
+  paid           Boolean
+  tone           String         @default("neutral")
+  description    String         @default("")
+  position       Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  requests       LeaveRequest[]
+  balances       LeaveBalance[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, id])
+  @@map("leave_type")
+}
+
+model LeavePolicy {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  description    String
+  position       Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@map("leave_policy")
+}
+
+model LeaveRequest {
+  id              String       @id
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee     @relation(fields: [organizationId, employeeId], references: [organizationId, id], onDelete: Cascade)
+  leaveTypeId     String
+  leaveType       LeaveType    @relation(fields: [organizationId, leaveTypeId], references: [organizationId, id], onDelete: Restrict)
+  startDate       DateTime     @db.Date
+  endDate         DateTime     @db.Date
+  days            Int
+  status          String       @default("PENDING")
+  reason          String?
+  decidedByUserId String?
+  decidedAt       DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId, status])
+  @@index([employeeId])
+  @@index([leaveTypeId])
+  @@map("leave_request")
+}
+
+model LeaveBalance {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee     @relation(fields: [organizationId, employeeId], references: [organizationId, id], onDelete: Cascade)
+  leaveTypeId    String
+  leaveType      LeaveType    @relation(fields: [organizationId, leaveTypeId], references: [organizationId, id], onDelete: Restrict)
+  year           Int
+  totalDays      Int
+  usedDays       Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@index([organizationId])
+  @@index([leaveTypeId])
+  @@map("leave_balance")
+}
+
+model Document {
+  id               String       @id
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scope            String
+  employeeId       String?
+  employee         Employee?    @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  name             String
+  category         String
+  visibility       String       @default("All employees")
+  storageKey       String
+  fileName         String
+  mimeType         String
+  sizeBytes        Int
+  uploadedByUserId String
+  createdAt        DateTime     @default(now())
+
+  @@index([organizationId, scope])
+  @@index([employeeId])
+  @@map("document")
+}
+
+model DocumentTemplate {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  category       String
+  description    String       @default("")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@map("document_template")
+}
+
+model OnboardingTemplate {
+  id             String                         @id
+  organizationId String
+  organization   Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  revision       Int                            @default(1)
+  createdAt      DateTime                       @default(now())
+  items          OnboardingChecklistItem[]
+  departments    OnboardingTemplateDepartment[]
+  assignments    EmployeeOnboarding[]
+
+  @@unique([organizationId, id])
+  @@map("onboarding_template")
+}
+
+model OnboardingTemplateDepartment {
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  templateId     String
+  template       OnboardingTemplate @relation(fields: [organizationId, templateId], references: [organizationId, id], onDelete: Cascade)
+  departmentId   String
+  department     Department         @relation(fields: [organizationId, departmentId], references: [organizationId, id], onDelete: Cascade)
+
+  @@id([templateId, departmentId])
+  // At most one default template per department.
+  @@unique([departmentId])
+  @@index([organizationId])
+  @@map("onboarding_template_department")
+}
+
+model OnboardingChecklistItem {
+  id             String                     @id
+  organizationId String
+  organization   Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  templateId     String
+  template       OnboardingTemplate         @relation(fields: [organizationId, templateId], references: [organizationId, id], onDelete: Cascade)
+  label          String
+  stage          String
+  position       Int
+  completions    OnboardingItemCompletion[]
+
+  @@unique([organizationId, id])
+  @@index([templateId])
+  @@map("onboarding_checklist_item")
+}
+
+model EmployeeOnboarding {
+  employeeId     String                     @id
+  organizationId String
+  organization   Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee       Employee                   @relation(fields: [organizationId, employeeId], references: [organizationId, id], onDelete: Cascade)
+  templateId     String
+  template       OnboardingTemplate         @relation(fields: [organizationId, templateId], references: [organizationId, id], onDelete: Restrict)
+  assignedAt     DateTime                   @default(now())
+  completions    OnboardingItemCompletion[]
+
+  @@unique([organizationId, employeeId])
+  @@index([templateId])
+  @@map("employee_onboarding")
+}
+
+model OnboardingItemCompletion {
+  organizationId    String
+  organization      Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employeeId        String
+  onboarding        EmployeeOnboarding      @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  itemId            String
+  item              OnboardingChecklistItem @relation(fields: [organizationId, itemId], references: [organizationId, id], onDelete: Restrict)
+  completedByUserId String
+  completedAt       DateTime                @default(now())
+
+  @@id([employeeId, itemId])
+  @@index([organizationId])
+  @@index([itemId])
+  @@map("onboarding_item_completion")
+}
+
+model AuditEvent {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorUserId    String
+  action         String
+  targetType     String
+  targetId       String
+  // Employee the event concerns, used for the profile activity feed. No FK so history survives.
+  employeeId     String?
+  description    String
+  changes        Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([employeeId, createdAt])
+  @@map("audit_event")
 }

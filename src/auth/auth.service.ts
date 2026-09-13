@@ -36,6 +36,7 @@ interface SignupBusinessInput {
 interface LoginInput {
   email: string;
   password: string;
+  orgSlug?: string;
 }
 
 interface SessionOptions {
@@ -49,7 +50,11 @@ interface UserRecord {
   email: string;
   userType: string;
   role: string | null;
-  memberships: Array<{ organizationId: string }>;
+  memberships: Array<{
+    organizationId: string;
+    role: string;
+    organization: { name: string; slug: string };
+  }>;
 }
 
 @Injectable()
@@ -145,7 +150,15 @@ export class AuthService implements OnModuleInit {
     const code = this.validateVerificationCode(codeInput);
     const user = await this.prisma.user.findUnique({
       where: { email },
-      include: { memberships: { select: { organizationId: true } } },
+      include: {
+        memberships: {
+          select: {
+            organizationId: true,
+            role: true,
+            organization: { select: { name: true, slug: true } },
+          },
+        },
+      },
     });
 
     if (!user || user.userType !== USER_TYPES.BUSINESS) {
@@ -179,7 +192,11 @@ export class AuthService implements OnModuleInit {
     ]);
 
     const authenticatedUser = this.toAuthenticatedUser(user);
-    const token = await this.createSession(user.id, options);
+    const token = await this.createSession(
+      user.id,
+      options,
+      authenticatedUser.organizationId,
+    );
 
     return {
       user: { ...authenticatedUser },
@@ -223,7 +240,15 @@ export class AuthService implements OnModuleInit {
       where: { token: this.hashToken(token) },
       include: {
         user: {
-          include: { memberships: { select: { organizationId: true } } },
+          include: {
+            memberships: {
+              select: {
+                organizationId: true,
+                role: true,
+                organization: { select: { name: true, slug: true } },
+              },
+            },
+          },
         },
       },
     });
@@ -237,7 +262,14 @@ export class AuthService implements OnModuleInit {
       return null;
     }
 
-    return this.toAuthenticatedUser(session.user);
+    if (
+      session.activeOrganizationId &&
+      !session.user.memberships.some(
+        (member) => member.organizationId === session.activeOrganizationId,
+      )
+    )
+      return null;
+    return this.toAuthenticatedUser(session.user, session.activeOrganizationId);
   }
 
   getTokenFromRequest(request: Request): string | null {
@@ -325,7 +357,15 @@ export class AuthService implements OnModuleInit {
     const password = this.validatePassword(input.password);
     const user = await this.prisma.user.findFirst({
       where: { email, userType },
-      include: { memberships: { select: { organizationId: true } } },
+      include: {
+        memberships: {
+          select: {
+            organizationId: true,
+            role: true,
+            organization: { select: { name: true, slug: true } },
+          },
+        },
+      },
     });
 
     if (
@@ -345,13 +385,32 @@ export class AuthService implements OnModuleInit {
       );
     }
 
-    const token = await this.createSession(user.id, options);
-    return { user: this.toAuthenticatedUser(user), token };
+    const membership =
+      input.orgSlug === undefined
+        ? user.memberships[0]
+        : user.memberships.find(
+            (member) =>
+              member.organization.slug === input.orgSlug?.trim().toLowerCase(),
+          );
+    if (userType === USER_TYPES.BUSINESS && !membership) {
+      throw new UnauthorizedException('Invalid workspace, email or password');
+    }
+    const authenticatedUser = this.toAuthenticatedUser(
+      user,
+      membership?.organizationId,
+    );
+    const token = await this.createSession(
+      user.id,
+      options,
+      authenticatedUser.organizationId,
+    );
+    return { user: authenticatedUser, token };
   }
 
   private async createSession(
     userId: string,
     options: SessionOptions,
+    organizationId: string | null,
   ): Promise<string> {
     const token = randomBytes(32).toString('base64url');
 
@@ -360,6 +419,7 @@ export class AuthService implements OnModuleInit {
         id: randomUUID(),
         token: this.hashToken(token),
         userId,
+        activeOrganizationId: organizationId,
         expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
         ipAddress: options.ipAddress,
         userAgent: options.userAgent,
@@ -434,14 +494,45 @@ export class AuthService implements OnModuleInit {
     );
   }
 
-  private toAuthenticatedUser(user: UserRecord): AuthenticatedUser {
+  toFrontendUser(user: AuthenticatedUser) {
+    const businessRoles: Partial<Record<UserRole, string>> = {
+      BUSINESS_OWNER: 'admin',
+      BUSINESS_ADMIN: 'admin',
+      HR_ADMIN: 'admin',
+      MANAGER: 'manager',
+      EMPLOYEE: 'employee',
+    };
+    const role =
+      user.userType === USER_TYPES.STACKHR_ADMIN
+        ? user.role
+        : (businessRoles[user.role] ?? 'employee');
+    return {
+      ...user,
+      role,
+      backendRole: user.role,
+      orgSlug: user.orgSlug ?? null,
+      orgName: user.orgName ?? null,
+    };
+  }
+
+  private toAuthenticatedUser(
+    user: UserRecord,
+    organizationId?: string | null,
+  ): AuthenticatedUser {
+    const member = organizationId
+      ? user.memberships.find(
+          (entry) => entry.organizationId === organizationId,
+        )
+      : user.memberships[0];
     return {
       id: user.id,
       name: user.name,
       email: user.email,
       userType: user.userType as UserType,
-      role: (user.role ?? USER_ROLES.EMPLOYEE) as UserRole,
-      organizationId: user.memberships[0]?.organizationId ?? null,
+      role: (member?.role ?? user.role ?? USER_ROLES.EMPLOYEE) as UserRole,
+      organizationId: member?.organizationId ?? null,
+      orgSlug: member?.organization.slug ?? null,
+      orgName: member?.organization.name ?? null,
     };
   }
 
@@ -467,7 +558,7 @@ export class AuthService implements OnModuleInit {
     password: string,
     storedHash: string,
   ): Promise<boolean> {
-    const [, algorithm, n, r, p, encodedSalt, encodedHash] =
+    const [algorithm, n, r, p, encodedSalt, encodedHash] =
       storedHash.split('$');
     if (
       algorithm !== 'scrypt' ||
