@@ -97,8 +97,11 @@ model Organization {
   companySize      String?
   currency         String       @default("NGN")
   payrollFrequency String       @default("MONTHLY")
-  taxId            String?
-  createdAt        DateTime     @default(now())
+  taxId                       String?
+  pensionEmployeeRateOverride Float?
+  pensionEmployerRateOverride Float?
+  pensionBasisOverride        String?
+  createdAt                   DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   metadata         String?
   ownerId          String?
@@ -106,6 +109,18 @@ model Organization {
   members          Member[]
   invitations      Invitation[]
   employees        Employee[]
+  approvalRequests ApprovalRequest[]
+  leaveTypes       LeaveType[]
+  leavePolicies    LeavePolicy[]
+  leaveBalances    LeaveBalance[]
+  leaveRequests    LeaveRequest[]
+  expenses         Expense[]
+  reimbursements   Reimbursement[]
+  salaryAdvances   SalaryAdvance[]
+  compensationRecords CompensationRecord[]
+  payrollRuns      PayrollRun[]
+  payrollItems     PayrollItem[]
+  payslips         Payslip[]
 
   @@unique([slug])
   @@index([ownerId])
@@ -126,7 +141,17 @@ model Employee {
   managerId      String?
   manager        Employee?    @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
   directReports  Employee[]   @relation("EmployeeManager")
+  leaveBalances  LeaveBalance[]
+  leaveRequests  LeaveRequest[]
+  expenses       Expense[]
+  reimbursements Reimbursement[]
+  salaryAdvances SalaryAdvance[]
+  compensationRecords CompensationRecord[]
+  payrollItems   PayrollItem[]
+  payslips       Payslip[]
   status         String       @default("PENDING_INVITATION")
+  declaredRent   Int          @default(0)
+  nhfOptIn       Boolean      @default(false)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -165,3 +190,319 @@ model Invitation {
   @@index([email])
   @@map("invitation")
 }
+
+model AuditLog {
+  id             String   @id
+  organizationId String?
+  actorId        String?
+  action         String
+  resource       String
+  resourceId     String?
+  payload        String?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([actorId])
+  @@map("audit_log")
+}
+
+model ApprovalRequest {
+  id              String       @id
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type            String
+  subjectTable    String
+  subjectId       String
+  requesterId     String
+  approverId      String?
+  status          String       @default("PENDING")
+  amountSnapshot  Int?
+  metadata        String?
+  stage           Int          @default(1)
+  submittedAt     DateTime     @default(now())
+  decidedAt       DateTime?
+  rejectionReason String?
+
+  @@index([organizationId, status])
+  @@index([requesterId])
+  @@index([approverId])
+  @@index([subjectTable, subjectId])
+  @@map("approval_request")
+}
+
+model LeaveType {
+  id               String         @id
+  organizationId   String
+  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name             String
+  description      String?
+  daysPerYear      Int
+  paid             Boolean        @default(true)
+  requiresApproval Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  leaveBalances    LeaveBalance[]
+  leaveRequests    LeaveRequest[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("leave_type")
+}
+
+model LeavePolicy {
+  id                 String       @id
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name               String
+  accrualFrequency   String       @default("ANNUAL")
+  carryForwardDays   Int          @default(0)
+  maxConsecutiveDays Int?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@map("leave_policy")
+}
+
+model LeaveBalance {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId    String
+  leaveType      LeaveType    @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  allocatedDays  Int
+  usedDays       Int          @default(0)
+  pendingDays    Int          @default(0)
+  remainingDays  Int
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, employeeId, leaveTypeId])
+  @@index([organizationId, employeeId])
+  @@map("leave_balance")
+}
+
+model LeaveRequest {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId    String
+  leaveType      LeaveType    @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  startDate      DateTime
+  endDate        DateTime
+  totalDays      Int
+  reason         String?
+  status         String       @default("PENDING")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, status])
+  @@index([employeeId])
+  @@map("leave_request")
+}
+
+model Expense {
+  id             String          @id
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  category       String
+  amount         Int
+  currency       String          @default("NGN")
+  description    String?
+  receiptUrl     String?
+  status         String          @default("PENDING")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  reimbursements Reimbursement[]
+
+  @@index([organizationId, status])
+  @@index([employeeId])
+  @@map("expense")
+}
+
+model Reimbursement {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  expenseId      String?
+  expense        Expense?     @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  amount         Int
+  currency       String       @default("NGN")
+  status         String       @default("PENDING")
+  paidAt         DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, status])
+  @@index([employeeId])
+  @@map("reimbursement")
+}
+
+model SalaryAdvance {
+  id               String       @id
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employeeId       String
+  employee         Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  amount           Int
+  repaymentMonths  Int          @default(1)
+  monthlyDeduction Int
+  reason           String?
+  status           String       @default("PENDING")
+  disbursedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([organizationId, status])
+  @@index([employeeId])
+  @@map("salary_advance")
+}
+
+model CompensationRecord {
+  id                 String       @id
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employeeId         String
+  employee           Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  effectiveFrom      DateTime     @default(now())
+  effectiveTo        DateTime?
+  basicSalary        Int
+  housingAllowance   Int          @default(0)
+  transportAllowance Int          @default(0)
+  otherAllowances    Int          @default(0)
+  currency           String       @default("NGN")
+  paymentFrequency   String       @default("MONTHLY")
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([organizationId, employeeId])
+  @@index([employeeId, effectiveTo])
+  @@map("compensation_record")
+}
+
+model PayrollRun {
+  id             String        @id
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  periodMonth    Int
+  periodYear     Int
+  title          String
+  status         String        @default("DRAFT")
+  totalGross     Int           @default(0)
+  totalTax       Int           @default(0)
+  totalPension   Int           @default(0)
+  totalNet       Int           @default(0)
+  approvedAt     DateTime?
+  executedAt     DateTime?
+  reconciledAt   DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  items          PayrollItem[]
+  payslips       Payslip[]
+
+  @@unique([organizationId, periodYear, periodMonth])
+  @@index([organizationId, status])
+  @@map("payroll_run")
+}
+
+model PayrollItem {
+  id                 String       @id
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payrollRunId       String
+  payrollRun         PayrollRun   @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employeeId         String
+  employee           Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  basicSalary        Int
+  housingAllowance   Int          @default(0)
+  transportAllowance Int          @default(0)
+  otherAllowances    Int          @default(0)
+  grossSalary        Int
+  taxDeduction             Int          @default(0)
+  pensionDeduction         Int          @default(0)
+  employerPensionDeduction Int          @default(0)
+  nhfDeduction             Int          @default(0)
+  rentReliefApplied        Int          @default(0)
+  otherDeductions          Int          @default(0)
+  netSalary                Int
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+
+  @@index([organizationId, payrollRunId])
+  @@index([employeeId])
+  @@map("payroll_item")
+}
+
+model Payslip {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payrollRunId   String
+  payrollRun     PayrollRun   @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  periodMonth    Int
+  periodYear     Int
+  grossSalary    Int
+  netSalary      Int
+  breakdownJson  String
+  generatedAt    DateTime     @default(now())
+
+  @@index([organizationId, employeeId])
+  @@index([payrollRunId])
+  @@map("payslip")
+}
+
+model TaxRuleSet {
+  id                   String    @id
+  country              String    @default("NG")
+  name                 String
+  effectiveFrom        DateTime
+  effectiveTo          DateTime?
+  isDefault            Boolean   @default(true)
+  rentReliefPercentage Float     @default(0.20)
+  rentReliefCap        Int       @default(500000)
+  pensionEmployeeRate  Float     @default(0.08)
+  pensionEmployerRate  Float     @default(0.10)
+  pensionBasisFields   String    @default("BASIC,HOUSING,TRANSPORT")
+  nhfRate              Float     @default(0.025)
+  nhfBasisField        String    @default("BASIC")
+  taxFreeThreshold     Int       @default(800000)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  taxRules             TaxRule[]
+
+  @@index([country, effectiveFrom])
+  @@map("tax_rule_set")
+}
+
+model TaxRule {
+  id           String     @id
+  taxRuleSetId String
+  taxRuleSet   TaxRuleSet @relation(fields: [taxRuleSetId], references: [id], onDelete: Cascade)
+  bandOrder    Int
+  bandName     String
+  lowerLimit   Int
+  upperLimit   Int?
+  taxRate      Float
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([taxRuleSetId, bandOrder])
+  @@map("tax_rule")
+}
+
+
+
+
+

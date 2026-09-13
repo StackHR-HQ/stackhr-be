@@ -18,8 +18,12 @@
     <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
   <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
 </p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+
+<p align="center">
+  <a href="https://github.com/StackHR-HQ/stackhr-be/actions/workflows/ci.yml" target="_blank">
+    <img src="https://github.com/StackHR-HQ/stackhr-be/actions/workflows/ci.yml/badge.svg" alt="StackHR Backend CI Status" />
+  </a>
+</p>
 
 ## Description
 
@@ -36,6 +40,21 @@ CORS configuration.
 Transactional email is sent through SendByte using `SENDBYTE_API_KEY` and
 defaults to `StackHR <noreply@stackhr.app>`. The existing `SENDBYTE_KEY` name
 is also supported for local compatibility.
+
+### Docker & Local Database Setup
+
+To containerize the application and start a local PostgreSQL database with development (`stackhr_dev`) and isolated test (`stackhr_test`) databases:
+
+```bash
+# Start PostgreSQL database and StackHR API via Docker Compose
+docker compose up -d --build
+
+# Run database migrations against local dev DB
+npx prisma db push
+
+# Run tests against local test DB
+DATABASE_URL="postgresql://postgres:postgrespassword@localhost:5432/stackhr_test?schema=public" npm test
+```
 
 ### Authentication
 

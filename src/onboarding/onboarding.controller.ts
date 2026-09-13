@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Patch,
   Post,
   Req,
@@ -16,7 +17,11 @@ import type {
   AuthenticatedUser,
 } from '../auth/auth.types';
 import { OnboardingService } from './onboarding.service';
-import { readOptionalString, readString } from '../common/input';
+import { UpdateCompanyDto } from './dto/update-company.dto';
+import { AddEmployeeDto } from './dto/add-employee.dto';
+import { ImportEmployeesDto } from './dto/import-employees.dto';
+import { CreateOnboardingTemplateDto } from './dto/create-template.dto';
+import { UpdateChecklistTaskDto } from './dto/update-checklist-task.dto';
 
 const BUSINESS_ADMIN_ROLES = [
   USER_ROLES.BUSINESS_OWNER,
@@ -38,43 +43,63 @@ export class OnboardingController {
   @RequireRoles(...BUSINESS_ADMIN_ROLES)
   updateCompany(
     @CurrentUser() user: AuthenticatedUser,
-    @Body() body: Record<string, unknown>,
+    @Body() dto: UpdateCompanyDto,
   ) {
-    return this.onboardingService.updateCompanyInfo(user, {
-      companyName: readString(body.companyName),
-      industry: readString(body.industry),
-      companySize: readString(body.companySize),
-      currency: readOptionalString(body.currency),
-      payrollFrequency: readOptionalString(body.payrollFrequency),
-      taxId: readOptionalString(body.taxId),
-      logo: readOptionalString(body.logo),
-    });
+    return this.onboardingService.updateCompanyInfo(user, dto);
   }
 
   @Post('employees')
   @RequireRoles(...BUSINESS_ADMIN_ROLES)
   addEmployee(
     @CurrentUser() user: AuthenticatedUser,
-    @Body() body: Record<string, unknown>,
+    @Body() dto: AddEmployeeDto,
   ) {
-    return this.onboardingService.addEmployee(user, {
-      fullName: readString(body.fullName),
-      email: readString(body.email),
-      department: readString(body.department),
-      jobTitle: readString(body.jobTitle),
-      employmentType: readString(body.employmentType),
-      salary: Number(body.salary),
-      startDate: readString(body.startDate),
-      managerId: readOptionalString(body.managerId),
-    });
+    return this.onboardingService.addEmployee(user, dto);
   }
 
   @Post('employees/import')
   @RequireRoles(...BUSINESS_ADMIN_ROLES)
   importEmployees(
     @CurrentUser() user: AuthenticatedUser,
-    @Body() body: Record<string, unknown>,
+    @Body() dto: ImportEmployeesDto,
   ) {
-    return this.onboardingService.importEmployees(user, readString(body.csv));
+    return this.onboardingService.importEmployees(user, dto.csv);
+  }
+
+  @Get('templates')
+  getTemplates(@CurrentUser() user: AuthenticatedUser) {
+    return this.onboardingService.getTemplates(user);
+  }
+
+  @Post('templates')
+  @RequireRoles(...BUSINESS_ADMIN_ROLES)
+  saveTemplate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateOnboardingTemplateDto,
+  ) {
+    return this.onboardingService.saveTemplate(user, dto);
+  }
+
+  @Get('checklists/:employeeId')
+  getEmployeeChecklist(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('employeeId') employeeId: string,
+  ) {
+    return this.onboardingService.getEmployeeChecklist(user, employeeId);
+  }
+
+  @Patch('checklists/:employeeId/tasks/:taskId')
+  updateChecklistTask(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('employeeId') employeeId: string,
+    @Param('taskId') taskId: string,
+    @Body() dto: UpdateChecklistTaskDto,
+  ) {
+    return this.onboardingService.updateChecklistTask(
+      user,
+      employeeId,
+      taskId,
+      dto.completed,
+    );
   }
 }

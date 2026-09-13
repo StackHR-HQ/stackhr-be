@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   OnModuleInit,
   UnauthorizedException,
@@ -13,6 +14,7 @@ import {
   scrypt,
   timingSafeEqual,
 } from 'node:crypto';
+import * as argon2 from 'argon2';
 import { PrismaService } from '../database/prisma.service';
 import { EmailService } from '../notifications/email.service';
 import {
@@ -119,6 +121,18 @@ export class AuthService implements OnModuleInit {
           slug,
           ownerId: userId,
           createdAt: new Date(),
+          metadata: JSON.stringify({
+            approvalConfig: {
+              defaultStages: 1,
+              types: [
+                'LEAVE',
+                'EXPENSE',
+                'REIMBURSEMENT',
+                'SALARY_ADVANCE',
+                'PAYROLL',
+              ],
+            },
+          }),
         },
       });
 
@@ -237,7 +251,49 @@ export class AuthService implements OnModuleInit {
       return null;
     }
 
-    return this.toAuthenticatedUser(session.user);
+    return this.toAuthenticatedUser(session.user, session.activeOrganizationId);
+  }
+
+  async switchOrganization(
+    token: string,
+    targetOrganizationId: string,
+  ): Promise<{ user: AuthenticatedUser }> {
+    const session = await this.prisma.session.findUnique({
+      where: { token: this.hashToken(token) },
+      include: {
+        user: {
+          include: { memberships: { select: { organizationId: true } } },
+        },
+      },
+    });
+
+    if (
+      !session ||
+      session.revokedAt ||
+      session.expiresAt <= new Date() ||
+      session.user.banned
+    ) {
+      throw new UnauthorizedException('Session is invalid or expired');
+    }
+
+    const isMember = session.user.memberships.some(
+      (m) => m.organizationId === targetOrganizationId,
+    );
+
+    if (!isMember) {
+      throw new ForbiddenException(
+        'You are not a member of the target organization',
+      );
+    }
+
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: { activeOrganizationId: targetOrganizationId },
+    });
+
+    return {
+      user: this.toAuthenticatedUser(session.user, targetOrganizationId),
+    };
   }
 
   getTokenFromRequest(request: Request): string | null {
@@ -434,36 +490,42 @@ export class AuthService implements OnModuleInit {
     );
   }
 
-  private toAuthenticatedUser(user: UserRecord): AuthenticatedUser {
+  private toAuthenticatedUser(
+    user: UserRecord,
+    activeOrganizationId?: string | null,
+  ): AuthenticatedUser {
+    const selectedOrgId =
+      activeOrganizationId ?? user.memberships[0]?.organizationId ?? null;
+
     return {
       id: user.id,
       name: user.name,
       email: user.email,
       userType: user.userType as UserType,
       role: (user.role ?? USER_ROLES.EMPLOYEE) as UserRole,
-      organizationId: user.memberships[0]?.organizationId ?? null,
+      organizationId: selectedOrgId,
     };
   }
 
   private async hashPassword(password: string): Promise<string> {
-    const salt = randomBytes(16);
-    const derivedKey = await this.deriveKey(password, salt, 64, {
-      N: 16384,
-      r: 8,
-      p: 1,
-    });
-
-    return [
-      'scrypt',
-      '16384',
-      '8',
-      '1',
-      salt.toString('base64url'),
-      derivedKey.toString('base64url'),
-    ].join('$');
+    return argon2.hash(password, { type: argon2.argon2id });
   }
 
   private async verifyPassword(
+    password: string,
+    storedHash: string,
+  ): Promise<boolean> {
+    if (storedHash.startsWith('scrypt$')) {
+      return this.verifyScryptPassword(password, storedHash);
+    }
+    try {
+      return await argon2.verify(storedHash, password);
+    } catch {
+      return false;
+    }
+  }
+
+  private async verifyScryptPassword(
     password: string,
     storedHash: string,
   ): Promise<boolean> {

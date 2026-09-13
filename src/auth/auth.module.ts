@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { RolesGuard } from './roles.guard';
 import { NotificationsModule } from '../notifications/notifications.module';
 
+@Global()
 @Module({
   imports: [NotificationsModule],
   controllers: [AuthController],

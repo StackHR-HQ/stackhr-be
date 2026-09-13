@@ -249,6 +249,187 @@ export class OnboardingService {
     };
   }
 
+  async getTemplates(user: AuthenticatedUser) {
+    const organizationId = this.requireOrganization(user);
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+    });
+
+    let templates: any[] = [];
+    if (org?.metadata) {
+      try {
+        const parsed = JSON.parse(org.metadata);
+        if (Array.isArray(parsed.onboardingTemplates)) {
+          templates = parsed.onboardingTemplates;
+        }
+      } catch {
+        // metadata not JSON
+      }
+    }
+
+    if (templates.length === 0) {
+      templates = [
+        {
+          department: 'General',
+          title: 'Standard Employee Onboarding',
+          tasks: [
+            {
+              id: 'task-1',
+              title: 'Complete personal details & emergency contacts',
+              required: true,
+            },
+            {
+              id: 'task-2',
+              title: 'Submit tax identification & pension details',
+              required: true,
+            },
+            {
+              id: 'task-3',
+              title: 'Review company policy handbook',
+              required: true,
+            },
+          ],
+        },
+        {
+          department: 'Engineering',
+          title: 'Engineering Onboarding',
+          tasks: [
+            {
+              id: 'task-eng-1',
+              title: 'Setup workstation and developer environment',
+              required: true,
+            },
+            {
+              id: 'task-eng-2',
+              title: 'Grant GitHub & AWS repository permissions',
+              required: true,
+            },
+            {
+              id: 'task-eng-3',
+              title: 'Complete architecture overview walkthrough',
+              required: false,
+            },
+          ],
+        },
+      ];
+    }
+
+    return { templates };
+  }
+
+  async saveTemplate(user: AuthenticatedUser, dto: any) {
+    const organizationId = this.requireOrganization(user);
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+    });
+
+    let metadataObj: any = {};
+    if (org?.metadata) {
+      try {
+        metadataObj = JSON.parse(org.metadata);
+      } catch {
+        metadataObj = {};
+      }
+    }
+
+    const currentTemplates: any[] = metadataObj.onboardingTemplates ?? [];
+    const index = currentTemplates.findIndex(
+      (t) => t.department.toLowerCase() === dto.department.toLowerCase(),
+    );
+
+    const formattedTemplate = {
+      department: dto.department,
+      title: dto.title,
+      tasks: dto.tasks.map((task: any, idx: number) => ({
+        id: task.id ?? `task-${dto.department.toLowerCase()}-${idx + 1}`,
+        title: task.title,
+        description: task.description ?? null,
+        required: task.required ?? true,
+      })),
+    };
+
+    if (index >= 0) {
+      currentTemplates[index] = formattedTemplate;
+    } else {
+      currentTemplates.push(formattedTemplate);
+    }
+
+    metadataObj.onboardingTemplates = currentTemplates;
+
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        metadata: JSON.stringify(metadataObj),
+      },
+    });
+
+    return {
+      message: 'Onboarding template saved successfully',
+      template: formattedTemplate,
+    };
+  }
+
+  async getEmployeeChecklist(user: AuthenticatedUser, employeeId: string) {
+    const organizationId = this.requireOrganization(user);
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: employeeId, organizationId },
+    });
+
+    if (!employee) {
+      throw new NotFoundException(`Employee with ID "${employeeId}" not found`);
+    }
+
+    const { templates } = await this.getTemplates(user);
+    const deptTemplate =
+      templates.find(
+        (t) => t.department.toLowerCase() === employee.department.toLowerCase(),
+      ) ??
+      templates.find((t) => t.department.toLowerCase() === 'general') ??
+      templates[0];
+
+    const checklistTasks = (deptTemplate?.tasks ?? []).map((t: any) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description ?? null,
+      required: t.required ?? true,
+      completed: false,
+      completedAt: null,
+    }));
+
+    return {
+      employeeId: employee.id,
+      employeeName: employee.fullName,
+      department: employee.department,
+      templateTitle: deptTemplate?.title ?? 'Default Onboarding',
+      checklist: checklistTasks,
+    };
+  }
+
+  async updateChecklistTask(
+    user: AuthenticatedUser,
+    employeeId: string,
+    taskId: string,
+    completed: boolean,
+  ) {
+    const checklistData = await this.getEmployeeChecklist(user, employeeId);
+    const task = checklistData.checklist.find((t: any) => t.id === taskId);
+
+    if (!task) {
+      throw new NotFoundException(
+        `Task with ID "${taskId}" not found in employee checklist`,
+      );
+    }
+
+    task.completed = completed;
+    task.completedAt = completed ? new Date().toISOString() : null;
+
+    return {
+      message: `Task ${completed ? 'marked completed' : 'uncompleted'}`,
+      employeeId,
+      task,
+    };
+  }
+
   private requireOrganization(user: AuthenticatedUser): string {
     const allowedRoles: string[] = [
       USER_ROLES.BUSINESS_OWNER,
