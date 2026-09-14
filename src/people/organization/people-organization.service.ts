@@ -5,12 +5,14 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import type { AuthenticatedUser } from '../../auth/auth.types';
+import type { Prisma } from '../../../generated/prisma/client';
 import { requirePeopleOrganization } from '../common/people-access';
 import {
   TenantPrismaService,
   type TenantClient,
 } from '../tenant/tenant-prisma.service';
 import type { DepartmentDto } from './dto/department.dto';
+import type { TeamDto } from './dto/team.dto';
 
 // Mirrors the database's normalized unique index so callers get a 409, not a 500.
 const normalizeDepartmentName = (name: string) =>
@@ -278,6 +280,208 @@ export class PeopleOrganizationService {
           .filter((member) => member.teamId === team.id)
           .map((member) => member.employeeId),
       }));
+    });
+  }
+
+  createTeam(user: AuthenticatedUser, input: TeamDto) {
+    const organizationId = requirePeopleOrganization(user);
+    return this.tenant.run(organizationId, async (client) => {
+      await this.assertValidTeam(client, organizationId, input);
+      const team = await client.team.create({
+        data: {
+          organizationId,
+          name: input.name,
+          description: input.description ?? '',
+          leadEmployeeId: input.leadEmployeeId ?? null,
+        },
+      });
+      await client.teamMember.createMany({
+        data: input.memberIds.map((employeeId) => ({
+          organizationId,
+          teamId: team.id,
+          employeeId,
+        })),
+      });
+      await this.recordTeamAudit(client, organizationId, user.id, team.id, {
+        action: 'created',
+        before: null,
+        after: {
+          name: team.name,
+          description: team.description,
+          leadEmployeeId: team.leadEmployeeId,
+          memberIds: input.memberIds,
+        },
+      });
+      return this.toTeam(team, input.memberIds);
+    });
+  }
+
+  updateTeam(user: AuthenticatedUser, teamId: string, input: TeamDto) {
+    const organizationId = requirePeopleOrganization(user);
+    return this.tenant.run(organizationId, async (client) => {
+      const existing = await client.team.findFirst({
+        where: { id: teamId, organizationId },
+      });
+      if (!existing) throw new NotFoundException('Team was not found');
+      await this.assertValidTeam(client, organizationId, input, teamId);
+      const currentMembers = await client.teamMember.findMany({
+        where: { organizationId, teamId },
+        select: { employeeId: true },
+      });
+      const currentIds = currentMembers.map((member) => member.employeeId);
+      const team = await client.team.update({
+        where: { id: teamId },
+        data: {
+          name: input.name,
+          description: input.description ?? '',
+          leadEmployeeId: input.leadEmployeeId ?? null,
+        },
+      });
+      await client.teamMember.deleteMany({ where: { organizationId, teamId } });
+      if (input.memberIds.length) {
+        await client.teamMember.createMany({
+          data: input.memberIds.map((employeeId) => ({
+            organizationId,
+            teamId,
+            employeeId,
+          })),
+        });
+      }
+      await this.recordTeamAudit(client, organizationId, user.id, teamId, {
+        action: 'updated',
+        before: {
+          name: existing.name,
+          description: existing.description,
+          leadEmployeeId: existing.leadEmployeeId,
+          memberIds: currentIds,
+        },
+        after: {
+          name: team.name,
+          description: team.description,
+          leadEmployeeId: team.leadEmployeeId,
+          memberIds: input.memberIds,
+        },
+      });
+      return this.toTeam(team, input.memberIds);
+    });
+  }
+
+  deleteTeam(user: AuthenticatedUser, teamId: string) {
+    const organizationId = requirePeopleOrganization(user);
+    return this.tenant.run(organizationId, async (client) => {
+      const existing = await client.team.findFirst({
+        where: { id: teamId, organizationId },
+      });
+      if (!existing) throw new NotFoundException('Team was not found');
+      const members = await client.teamMember.findMany({
+        where: { organizationId, teamId },
+        select: { employeeId: true },
+      });
+      await client.team.delete({ where: { id: teamId } });
+      await this.recordTeamAudit(client, organizationId, user.id, teamId, {
+        action: 'deleted',
+        before: {
+          name: existing.name,
+          description: existing.description,
+          leadEmployeeId: existing.leadEmployeeId,
+          memberIds: members.map((member) => member.employeeId),
+        },
+        after: null,
+      });
+    });
+  }
+
+  private async assertValidTeam(
+    client: TenantClient,
+    organizationId: string,
+    input: TeamDto,
+    teamId?: string,
+  ) {
+    const teams = await client.team.findMany({
+      where: { organizationId },
+      select: { id: true, name: true },
+    });
+    const normalized = normalizeDepartmentName(input.name);
+    if (
+      teams.some(
+        (team) =>
+          team.id !== teamId &&
+          normalizeDepartmentName(team.name) === normalized,
+      )
+    ) {
+      throw new ConflictException({
+        code: 'CONFLICT',
+        message: 'A team with this name already exists',
+      });
+    }
+    if (
+      input.leadEmployeeId &&
+      !input.memberIds.includes(input.leadEmployeeId)
+    ) {
+      throw new UnprocessableEntityException({
+        code: 'VALIDATION_ERROR',
+        message: 'The team lead must be one of its members',
+        fields: { leadEmployeeId: 'Lead must be a member' },
+      });
+    }
+    const employees = await client.employee.findMany({
+      where: { organizationId, id: { in: input.memberIds }, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    if (employees.length !== input.memberIds.length) {
+      throw new UnprocessableEntityException({
+        code: 'VALIDATION_ERROR',
+        message:
+          'Every team member must be an active employee in this organization',
+        fields: { memberIds: 'Unknown or inactive employee' },
+      });
+    }
+  }
+
+  private toTeam(
+    team: {
+      id: string;
+      name: string;
+      description: string;
+      leadEmployeeId: string | null;
+    },
+    memberIds: string[],
+  ) {
+    return {
+      id: team.id,
+      name: team.name,
+      description: team.description,
+      leadEmployeeId: team.leadEmployeeId ?? '',
+      memberIds,
+    };
+  }
+
+  private async recordTeamAudit(
+    client: TenantClient,
+    organizationId: string,
+    actorUserId: string,
+    teamId: string,
+    change: {
+      action: 'created' | 'updated' | 'deleted';
+      before: unknown;
+      after: unknown;
+    },
+  ) {
+    await client.auditEvent.create({
+      data: {
+        organizationId,
+        actorUserId,
+        action: `team.${change.action}`,
+        targetType: 'team',
+        targetId: teamId,
+        employeeId: null,
+        description: `Team ${change.action}`,
+        changes: {
+          before: change.before,
+          after: change.after,
+        } as Prisma.InputJsonValue,
+        createdAt: new Date(),
+      },
     });
   }
 }

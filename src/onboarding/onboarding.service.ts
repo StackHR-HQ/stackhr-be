@@ -22,14 +22,26 @@ function splitFullName(fullName: string) {
 }
 
 export interface CompanyInfoInput {
-  companyName: string;
-  industry: string;
-  companySize: string;
+  companyName?: string;
+  industry?: string;
+  companySize?: string;
   currency?: string;
   payrollFrequency?: string;
   taxId?: string;
   logo?: string;
   logoDataUrl?: string;
+  registrationNumber?: string;
+  businessType?: string;
+  website?: string;
+  foundedYear?: number;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  primaryColor?: string;
+  accentColor?: string;
 }
 
 export interface EmployeeInput {
@@ -67,24 +79,41 @@ export class OnboardingService {
     user: AuthenticatedUser,
     input: CompanyInfoInput,
     db: Prisma.TransactionClient = this.prisma,
+    options: { partial?: boolean } = {},
   ) {
     const organizationId = this.requireOrganization(user);
-    const companyName = this.requiredString(input.companyName, 'companyName');
-    const industry = this.requiredString(input.industry, 'industry');
-    const companySize = this.requiredString(input.companySize, 'companySize');
+    const existing = options.partial
+      ? await db.organization.findUnique({ where: { id: organizationId } })
+      : null;
+    if (options.partial && !existing) {
+      throw new NotFoundException('Organization was not found');
+    }
+    const companyName = this.requiredString(
+      input.companyName ?? existing?.name,
+      'companyName',
+    );
+    const industry = this.requiredString(
+      input.industry ?? existing?.industry ?? undefined,
+      'industry',
+    );
+    const companySize = this.requiredString(
+      input.companySize ?? existing?.companySize ?? undefined,
+      'companySize',
+    );
     const currency = this.validateChoice(
-      input.currency ?? 'NGN',
+      input.currency ?? existing?.currency ?? 'NGN',
       ['NGN', 'USD', 'GHS', 'KES', 'ZAR', 'GBP', 'EUR'],
       'currency',
     );
     const payrollFrequency = this.validateChoice(
-      (input.payrollFrequency ?? 'MONTHLY')
+      (input.payrollFrequency ?? existing?.payrollFrequency ?? 'MONTHLY')
         .trim()
         .toUpperCase()
         .replace(/[\s_-]+/g, ''),
       ['MONTHLY', 'BIWEEKLY', 'WEEKLY'],
       'payrollFrequency',
     );
+    const foundedYear = this.optionalFoundedYear(input.foundedYear);
 
     const organization = await db.organization.update({
       where: { id: organizationId },
@@ -94,8 +123,24 @@ export class OnboardingService {
         companySize,
         currency,
         payrollFrequency,
-        taxId: this.optionalString(input.taxId),
-        logo: this.normalizeLogo(input),
+        taxId:
+          this.optionalString(input.taxId) ??
+          (options.partial ? existing?.taxId : undefined),
+        logo:
+          this.normalizeLogo(input) ??
+          (options.partial ? existing?.logo : undefined),
+        registrationNumber: this.optionalString(input.registrationNumber),
+        businessType: this.optionalString(input.businessType),
+        website: this.optionalString(input.website),
+        foundedYear,
+        addressLine1: this.optionalString(input.addressLine1),
+        addressLine2: this.optionalString(input.addressLine2),
+        city: this.optionalString(input.city),
+        state: this.optionalString(input.state),
+        country: this.optionalString(input.country),
+        postalCode: this.optionalString(input.postalCode),
+        primaryColor: this.optionalColor(input.primaryColor, 'primaryColor'),
+        accentColor: this.optionalColor(input.accentColor, 'accentColor'),
       },
     });
 
@@ -381,6 +426,26 @@ export class OnboardingService {
     return dataUrl;
   }
 
+  private optionalFoundedYear(value: number | undefined): number | undefined {
+    if (value === undefined) return undefined;
+    const currentYear = new Date().getUTCFullYear();
+    if (!Number.isInteger(value) || value < 1800 || value > currentYear) {
+      throw new BadRequestException(
+        `foundedYear must be an integer between 1800 and ${currentYear}`,
+      );
+    }
+    return value;
+  }
+
+  private optionalColor(value: string | undefined, field: string) {
+    const color = this.optionalString(value);
+    if (color === undefined) return undefined;
+    if (!/^#[0-9a-f]{6}$/i.test(color)) {
+      throw new BadRequestException(`${field} must be a 6-digit hex color`);
+    }
+    return color.toUpperCase();
+  }
+
   private requireOrganization(user: AuthenticatedUser): string {
     const allowedRoles: string[] = [
       USER_ROLES.BUSINESS_OWNER,
@@ -534,7 +599,7 @@ export class OnboardingService {
     return value;
   }
 
-  private requiredString(value: string, field: string): string {
+  private requiredString(value: string | undefined, field: string): string {
     if (typeof value !== 'string' || !value.trim()) {
       throw new BadRequestException(`${field} is required`);
     }

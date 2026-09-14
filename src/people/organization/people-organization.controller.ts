@@ -19,6 +19,7 @@ import { PEOPLE_ADMIN_ROLES } from '../common/people-access';
 import { PeopleExceptionFilter } from '../common/people-exception.filter';
 import { createPeopleValidationPipe } from '../common/people-validation.pipe';
 import { DepartmentDto } from './dto/department.dto';
+import { TeamDto } from './dto/team.dto';
 import { PeopleOrganizationService } from './people-organization.service';
 
 @Controller('people')
@@ -64,5 +65,31 @@ export class PeopleOrganizationController {
   @Get('teams')
   listTeams(@CurrentUser() user: AuthenticatedUser) {
     return this.organizationService.listTeams(user);
+  }
+
+  @Post('teams')
+  createTeam(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(createPeopleValidationPipe()) body: TeamDto,
+  ) {
+    return this.organizationService.createTeam(user, body);
+  }
+
+  @Patch('teams/:teamId')
+  updateTeam(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('teamId') teamId: string,
+    @Body(createPeopleValidationPipe()) body: TeamDto,
+  ) {
+    return this.organizationService.updateTeam(user, teamId, body);
+  }
+
+  @Delete('teams/:teamId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteTeam(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('teamId') teamId: string,
+  ) {
+    return this.organizationService.deleteTeam(user, teamId);
   }
 }

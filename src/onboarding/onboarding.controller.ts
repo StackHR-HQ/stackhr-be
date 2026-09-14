@@ -51,6 +51,8 @@ export class OnboardingController {
     return this.onboardingService.updateCompanyInfo(
       user,
       this.companyInput(body),
+      undefined,
+      { partial: true },
     );
   }
 
@@ -98,14 +100,31 @@ export class OnboardingController {
 
   private companyInput(body: Record<string, unknown>): CompanyInfoInput {
     return {
-      companyName: readString(body.companyName ?? body.name),
-      industry: readString(body.industry),
-      companySize: readString(body.companySize),
+      companyName: readOptionalString(body.companyName ?? body.name),
+      industry: readOptionalString(body.industry),
+      companySize: readOptionalString(body.companySize),
       currency: readOptionalString(body.currency),
       payrollFrequency: readOptionalString(body.payrollFrequency),
       taxId: readOptionalString(body.taxId),
       logo: readOptionalString(body.logo),
       logoDataUrl: readOptionalString(body.logoDataUrl),
+      registrationNumber: readOptionalString(body.registrationNumber),
+      businessType: readOptionalString(body.businessType),
+      website: readOptionalString(body.website),
+      foundedYear:
+        typeof body.foundedYear === 'number'
+          ? body.foundedYear
+          : typeof body.foundedYear === 'string' && body.foundedYear.trim()
+            ? Number(body.foundedYear)
+            : undefined,
+      addressLine1: readOptionalString(body.addressLine1),
+      addressLine2: readOptionalString(body.addressLine2),
+      city: readOptionalString(body.city),
+      state: readOptionalString(body.state),
+      country: readOptionalString(body.country),
+      postalCode: readOptionalString(body.postalCode),
+      primaryColor: readOptionalString(body.primaryColor),
+      accentColor: readOptionalString(body.accentColor),
     };
   }
 

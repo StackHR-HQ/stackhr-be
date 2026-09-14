@@ -102,6 +102,18 @@ model Organization {
   currency             String                         @default("NGN")
   payrollFrequency     String                         @default("MONTHLY")
   taxId                String?
+  registrationNumber   String?
+  businessType         String?
+  website              String?
+  foundedYear          Int?
+  addressLine1         String?
+  addressLine2         String?
+  city                 String?
+  state                String?
+  country              String?
+  postalCode           String?
+  primaryColor         String?
+  accentColor          String?
   createdAt            DateTime                       @default(now())
   updatedAt            DateTime                       @updatedAt
   metadata             String?
