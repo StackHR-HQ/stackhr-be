@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -286,7 +288,7 @@ export class PeopleEmployeesService {
         });
         return {
           summary: toEmployeeSummary(employee),
-          invitation: { id: invitation.id, token },
+          invitation: { id: invitation.id, token, tokenHash },
         };
       })
       .then(async ({ summary, invitation }) => {
@@ -305,13 +307,14 @@ export class PeopleEmployeesService {
   private async deliverInvitation(
     organizationId: string,
     employee: EmployeeSummary,
-    invitation: { id: string; token: string },
+    invitation: { id: string; token: string; tokenHash: string },
   ): Promise<'SENT' | 'FAILED'> {
     try {
       await this.emailService.send({
         to: employee.email,
         ...invitationEmail(employee.fullName, invitationLink(invitation.token)),
-        idempotencyKey: `employee-invitation:${invitation.id}`,
+        // Keyed per token: retries of one send dedupe, a resend with a new token does not.
+        idempotencyKey: `employee-invitation:${invitation.id}:${invitation.tokenHash.slice(0, 16)}`,
       });
     } catch {
       return 'FAILED';
@@ -374,9 +377,52 @@ export class PeopleEmployeesService {
         }
       }
 
+      const { personal } = input;
+      const firstName = personal?.firstName ?? existing.firstName;
+      const lastName = personal?.lastName ?? existing.lastName;
+      const contact = personal?.emergencyContact;
+
       const employee = await client.employee.update({
         where: { id: employeeId },
         data: {
+          ...(personal
+            ? {
+                firstName,
+                lastName,
+                fullName: `${firstName} ${lastName}`.trim(),
+              }
+            : {}),
+          ...(personal?.phone !== undefined ? { phone: personal.phone } : {}),
+          ...(personal?.dateOfBirth !== undefined
+            ? {
+                dateOfBirth: new Date(`${personal.dateOfBirth}T00:00:00.000Z`),
+              }
+            : {}),
+          ...(personal?.gender !== undefined
+            ? { gender: personal.gender }
+            : {}),
+          ...(personal?.maritalStatus !== undefined
+            ? { maritalStatus: personal.maritalStatus }
+            : {}),
+          ...(personal?.nationality !== undefined
+            ? { nationality: personal.nationality }
+            : {}),
+          ...(personal?.address !== undefined
+            ? { address: personal.address }
+            : {}),
+          ...(contact
+            ? {
+                emergencyContactName: contact.name,
+                emergencyContactRelationship: contact.relationship,
+                emergencyContactPhone: contact.phone,
+              }
+            : {}),
+          ...(input.payment
+            ? {
+                bankName: input.payment.bankName,
+                bankAccountLast4: input.payment.accountLast4,
+              }
+            : {}),
           ...(employment?.jobTitle !== undefined
             ? { jobTitle: employment.jobTitle }
             : {}),
@@ -412,8 +458,117 @@ export class PeopleEmployeesService {
         });
       }
 
+      const changedSections = (
+        ['personal', 'employment', 'compensation', 'payment'] as const
+      ).filter((section) => input[section] !== undefined);
+      if (changedSections.length) {
+        // Section and field names only: salary and personal values stay out of history.
+        await client.auditEvent.create({
+          data: {
+            organizationId,
+            actorUserId: user.id,
+            action: 'employee.updated',
+            targetType: 'employee',
+            targetId: employeeId,
+            employeeId,
+            description: `${employee.fullName}: ${changedSections.join(' and ')} updated`,
+            changes: {
+              changedFields: changedSections.flatMap((section) =>
+                Object.keys(input[section] ?? {}).map(
+                  (field) => `${section}.${field}`,
+                ),
+              ),
+            },
+            createdAt: new Date(),
+          },
+        });
+      }
+
       return toEmployeeSummary(employee);
     });
+  }
+
+  resendInvitation(user: AuthenticatedUser, employeeId: string) {
+    const organizationId = requirePeopleOrganization(user);
+
+    return this.tenant
+      .run(organizationId, async (client) => {
+        const employee = await client.employee.findFirst({
+          where: { id: employeeId, organizationId },
+        });
+        if (!employee) {
+          throw new NotFoundException('Employee was not found');
+        }
+        if (employee.userId) {
+          throw new HttpException(
+            {
+              code: 'CONFLICT',
+              message: 'This employee has already joined StackHR',
+            },
+            HttpStatus.CONFLICT,
+          );
+        }
+
+        // A resend rotates the token, so any earlier link stops working.
+        const { token, tokenHash } = createInvitationToken();
+        const expiresAt = new Date(Date.now() + INVITATION_TTL_MS);
+        const pending = await client.invitation.findFirst({
+          where: { organizationId, employeeId, status: 'pending' },
+        });
+
+        // Limits: one send per minute and five per rolling day per employee.
+        const now = Date.now();
+        const lastSentAt = pending?.lastSentAt?.getTime();
+        const sentWithinDay =
+          lastSentAt !== undefined && now - lastSentAt < 24 * 60 * 60 * 1000;
+        const tooSoon =
+          lastSentAt !== undefined && now - lastSentAt < 60 * 1000;
+        if (tooSoon || (sentWithinDay && (pending?.sendCount ?? 0) >= 5)) {
+          throw new HttpException(
+            {
+              code: 'RATE_LIMITED',
+              message: tooSoon
+                ? 'An invitation was sent less than a minute ago'
+                : 'The daily invitation limit for this employee was reached',
+            },
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+
+        const invitation = pending
+          ? await client.invitation.update({
+              where: { id: pending.id },
+              data: {
+                tokenHash,
+                expiresAt,
+                ...(sentWithinDay ? {} : { sendCount: 0 }),
+              },
+            })
+          : await client.invitation.create({
+              data: {
+                organizationId,
+                employeeId,
+                email: employee.email,
+                role: 'EMPLOYEE',
+                status: 'pending',
+                tokenHash,
+                inviterId: user.id,
+                expiresAt,
+              },
+            });
+
+        return {
+          summary: toEmployeeSummary(employee),
+          invitation: { id: invitation.id, token, tokenHash },
+        };
+      })
+      .then(async ({ summary, invitation }) => ({
+        status: await this.deliverInvitation(
+          organizationId,
+          summary,
+          invitation,
+        ),
+      }));
   }
 
   listCompensationHistory(user: AuthenticatedUser, employeeId: string) {

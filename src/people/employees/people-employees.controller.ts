@@ -52,6 +52,14 @@ export class PeopleEmployeesController {
     return this.employeesService.updateEmployee(user, employeeId, body);
   }
 
+  @Post(':employeeId/invitations')
+  resendInvitation(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('employeeId') employeeId: string,
+  ) {
+    return this.employeesService.resendInvitation(user, employeeId);
+  }
+
   @Get(':employeeId/compensation-history')
   listCompensationHistory(
     @CurrentUser() user: AuthenticatedUser,

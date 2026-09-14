@@ -21,6 +21,8 @@ export function employeeRow(overrides: Record<string, any> = {}) {
   return {
     id: 'emp_ada',
     organizationId: ORG_A,
+    firstName: 'Ada',
+    lastName: 'Okafor',
     fullName: 'Ada Okafor',
     email: 'ada@acme.test',
     department: 'Engineering',

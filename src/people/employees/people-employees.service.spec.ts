@@ -173,7 +173,113 @@ describe('PeopleEmployeesService', () => {
     });
   });
 
+  describe('resendInvitation', () => {
+    it('refuses to invite an employee who has already joined', async () => {
+      fake.seed('employee', [
+        employeeRow({ status: 'ACTIVE', userId: 'user_ada' }),
+      ]);
+
+      await expect(
+        service.resendInvitation(adminUser(), 'emp_ada'),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(email.send).not.toHaveBeenCalled();
+    });
+
+    it('refuses a second resend within a minute and sends only one email', async () => {
+      fake.seed('employee', [employeeRow({ status: 'PENDING_INVITATION' })]);
+      await service.resendInvitation(adminUser(), 'emp_ada');
+
+      await expect(
+        service.resendInvitation(adminUser(), 'emp_ada'),
+      ).rejects.toMatchObject({ status: 429 });
+      expect(email.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('emails a fresh invitation link to an employee who has not joined yet', async () => {
+      fake.seed('employee', [employeeRow({ status: 'PENDING_INVITATION' })]);
+
+      await expect(
+        service.resendInvitation(adminUser(), 'emp_ada'),
+      ).resolves.toEqual({ status: 'SENT' });
+      expect(email.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'ada@acme.test',
+          text: expect.stringContaining(
+            'https://app.stackhr.test/accept-invitation?token=',
+          ) as unknown,
+        }),
+      );
+    });
+  });
+
   describe('updateEmployee', () => {
+    it('lets HR set masked bank metadata shown on the profile', async () => {
+      fake.seed('employee', [employeeRow()]);
+
+      await service.updateEmployee(adminUser(), 'emp_ada', {
+        payment: { bankName: 'Access Bank', accountLast4: '4321' },
+      });
+
+      await expect(
+        service.getEmployee(adminUser(), 'emp_ada'),
+      ).resolves.toMatchObject({
+        compensation: { bankName: 'Access Bank', bankAccountLast4: '4321' },
+      });
+    });
+
+    it('changes HR-managed personal details shown on the profile', async () => {
+      fake.seed('employee', [employeeRow()]);
+
+      await service.updateEmployee(adminUser(), 'emp_ada', {
+        personal: {
+          lastName: 'Okafor-Bello',
+          phone: '+2348011112222',
+          address: '12 Example Road, Lagos',
+          emergencyContact: {
+            name: 'Chidi Okafor',
+            relationship: 'SPOUSE',
+            phone: '+2348098765432',
+          },
+        },
+      });
+
+      await expect(
+        service.getEmployee(adminUser(), 'emp_ada'),
+      ).resolves.toMatchObject({
+        fullName: 'Ada Okafor-Bello',
+        personalInfo: {
+          phone: '+2348011112222',
+          address: '12 Example Road, Lagos',
+          emergencyContactName: 'Chidi Okafor',
+          emergencyContactRelationship: 'SPOUSE',
+          emergencyContactPhone: '+2348098765432',
+        },
+      });
+    });
+
+    it('records the change in the employee activity history without values', async () => {
+      fake.seed('employee', [employeeRow()]);
+
+      await service.updateEmployee(adminUser(), 'emp_ada', {
+        employment: { jobTitle: 'Staff Engineer' },
+        compensation: {
+          annualSalaryMinor: 600_000_000,
+          currency: 'NGN',
+          payFrequency: 'MONTHLY',
+          effectiveDate: '2026-11-01',
+        },
+      });
+
+      const detail = await service.getEmployee(adminUser(), 'emp_ada');
+      expect(detail.activity).toEqual([
+        {
+          id: expect.any(String) as unknown,
+          description: 'Ada Okafor: employment and compensation updated',
+          timestamp: expect.any(String) as unknown,
+        },
+      ]);
+    });
+
     it('records a salary change in compensation history from its effective date', async () => {
       fake.seed('employee', [employeeRow()]);
 
