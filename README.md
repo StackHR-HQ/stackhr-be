@@ -37,6 +37,38 @@ Transactional email is sent through SendByte using `SENDBYTE_API_KEY` and
 defaults to `StackHR <noreply@stackhr.app>`. The existing `SENDBYTE_KEY` name
 is also supported for local compatibility.
 
+For local development, use a SendByte sandbox key (`sk_test_`). Sandbox sends
+simulate the full delivery pipeline and do not require DNS setup. Before live
+sends, verify the sending domain in SendByte by publishing its SPF and DKIM
+records, then replace the key with an `sk_live_` key and set
+`SENDBYTE_FROM_EMAIL` to an address on that verified domain. The backend sends
+through `https://api.sendbyte.africa/v1/emails`, supports plain-text fallbacks,
+and forwards stable idempotency keys so retries do not duplicate messages.
+See the [SendByte quickstart](https://docs.sendbyte.africa/quickstart),
+[domain verification guide](https://docs.sendbyte.africa/guides/domains), and
+[idempotency guide](https://docs.sendbyte.africa/guides/idempotency).
+
+### Cloudflare R2 storage
+
+The document-storage adapter uses the S3-compatible API, so it supports
+Cloudflare R2 without an additional package. In Cloudflare, create a private
+R2 bucket and a bucket-scoped API token with **Object Read & Write** permission.
+Then set these deployment secrets (and local `.env` values when needed):
+
+```dotenv
+S3_BUCKET=stackhr-documents
+S3_REGION=auto
+S3_ENDPOINT=https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com
+S3_ACCESS_KEY_ID=<R2_ACCESS_KEY_ID>
+S3_SECRET_ACCESS_KEY=<R2_SECRET_ACCESS_KEY>
+S3_FORCE_PATH_STYLE=false
+```
+
+Keep the bucket private. The storage adapter uploads objects using the S3 API;
+application routes should issue time-limited download URLs rather than exposing
+the bucket or its credentials to a browser. Cloudflare documents the required
+endpoint format and S3 SDK configuration in its [R2 S3 guide](https://developers.cloudflare.com/r2/get-started/s3/) and [AWS SDK v3 example](https://developers.cloudflare.com/r2/examples/aws/aws-sdk-js-v3/).
+
 ### Authentication
 
 Authentication is managed by the backend using PostgreSQL-backed sessions. The
@@ -61,9 +93,11 @@ business owner. StackHR admin accounts are not publicly registered; configure
 `STACKHR_ADMIN_NAME` to bootstrap the first platform admin during application
 startup.
 
-Business signup and onboarding endpoint contracts are documented in
-`docs/business-signup-api.md`. Add new endpoint request and response contracts
-there whenever the API grows.
+Business signup and company onboarding endpoint contracts are documented in
+[Business Signup API](docs/business-signup-api.md). The
+[People API endpoint plan](docs/people-api.md) covers Employees, Leave, Documents,
+Organization, and employee Onboarding, distinguishing existing routes from
+proposed contracts.
 
 ## Project setup
 

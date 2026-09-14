@@ -12,6 +12,7 @@ import { StackhrAdminModule } from './stackhr-admin/stackhr-admin.module';
 import { AuditModule } from './audit/audit.module';
 import { PrismaModule } from './database/prisma.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { PeopleModule } from './people/people.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
     StackhrAdminModule,
     AuditModule,
     OnboardingModule,
+    PeopleModule,
   ],
   controllers: [AppController],
   providers: [AppService],
