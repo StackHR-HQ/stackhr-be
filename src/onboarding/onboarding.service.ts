@@ -333,13 +333,19 @@ export class OnboardingService {
           data: { managerId: persistedId(managerKey) },
         });
     }
-    return db.employee.findMany({
+    const employees = await db.employee.findMany({
       where: {
         organizationId,
         id: { in: created.map((employee) => employee.id) },
       },
       orderBy: { createdAt: 'asc' },
     });
+    // BigInt is not JSON-serializable; match the people API's salary contract.
+    return employees.map((employee) => ({
+      ...employee,
+      salary: Math.trunc(Number(employee.annualSalaryMinor) / 1200),
+      annualSalaryMinor: Number(employee.annualSalaryMinor),
+    }));
   }
 
   private normalizeLogo(input: CompanyInfoInput): string | undefined {

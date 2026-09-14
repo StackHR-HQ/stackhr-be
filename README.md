@@ -37,6 +37,17 @@ Transactional email is sent through SendByte using `SENDBYTE_API_KEY` and
 defaults to `StackHR <noreply@stackhr.app>`. The existing `SENDBYTE_KEY` name
 is also supported for local compatibility.
 
+For local development, use a SendByte sandbox key (`sk_test_`). Sandbox sends
+simulate the full delivery pipeline and do not require DNS setup. Before live
+sends, verify the sending domain in SendByte by publishing its SPF and DKIM
+records, then replace the key with an `sk_live_` key and set
+`SENDBYTE_FROM_EMAIL` to an address on that verified domain. The backend sends
+through `https://api.sendbyte.africa/v1/emails`, supports plain-text fallbacks,
+and forwards stable idempotency keys so retries do not duplicate messages.
+See the [SendByte quickstart](https://docs.sendbyte.africa/quickstart),
+[domain verification guide](https://docs.sendbyte.africa/guides/domains), and
+[idempotency guide](https://docs.sendbyte.africa/guides/idempotency).
+
 ### Cloudflare R2 storage
 
 The document-storage adapter uses the S3-compatible API, so it supports

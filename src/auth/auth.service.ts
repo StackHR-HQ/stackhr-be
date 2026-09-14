@@ -24,6 +24,7 @@ import {
   type UserType,
 } from './auth.constants';
 import type { AuthenticatedUser } from './auth.types';
+import { verificationEmail } from '../notifications/email-templates';
 
 interface SignupBusinessInput {
   email: string;
@@ -449,9 +450,7 @@ export class AuthService implements OnModuleInit {
     if (apiKey) {
       await this.emailService.send({
         to: email,
-        subject: 'Verify your StackHR email',
-        text: `Your StackHR verification code is ${code}. It expires in 10 minutes.`,
-        html: `<p>Your StackHR verification code is <strong>${code}</strong>.</p><p>It expires in 10 minutes.</p>`,
+        ...verificationEmail(code),
         idempotencyKey: `business-signup-verification:${email}:${expiresAt.getTime()}`,
       });
       return { email, expiresAt };

@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { invitationEmail as renderInvitationEmail } from '../../notifications/email-templates';
 
 export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -23,20 +24,6 @@ export function invitationLink(token: string): string {
   return `${base || DEFAULT_FRONTEND_URL}/accept-invitation?token=${token}`;
 }
 
-const HTML_ESCAPES: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  '"': '&quot;',
-  "'": '&#39;',
-};
-
-/** Employee names are HR-entered text, so they are escaped before entering HTML. */
 export function invitationEmail(fullName: string, link: string) {
-  const safeName = fullName.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]);
-  return {
-    subject: 'You have been invited to StackHR',
-    text: `Hi ${fullName}, you have been invited to join your team on StackHR. Accept your invitation: ${link} (this link expires in 7 days).`,
-    html: `<p>Hi ${safeName},</p><p>You have been invited to join your team on StackHR.</p><p><a href="${link}">Accept your invitation</a></p><p>This link expires in 7 days.</p>`,
-  };
+  return renderInvitationEmail(fullName, link);
 }
