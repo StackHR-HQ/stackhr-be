@@ -51,6 +51,203 @@ function setup() {
   return { user, prisma, service };
 }
 
+describe('employee invitations', () => {
+  const inviteToken = 'raw-invitation-token';
+  const inviteTokenHash = createHash('sha256')
+    .update(inviteToken)
+    .digest('hex');
+
+  function invitationSetup(overrides: Record<string, unknown> = {}) {
+    const invitation = {
+      id: 'invitation',
+      organizationId: 'org-a',
+      employeeId: 'emp-ada',
+      email: 'ada@acme.com',
+      status: 'pending',
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      employee: { id: 'emp-ada', fullName: 'Ada Okafor' },
+      organization: { name: 'Acme', slug: 'acme' },
+      ...overrides,
+    };
+    const prisma = {
+      // Only the stored hash finds the invitation; the raw token never does.
+      invitation: {
+        findUnique: jest.fn(({ where }: { where: { tokenHash: string } }) =>
+          Promise.resolve(
+            where.tokenHash === inviteTokenHash ? invitation : null,
+          ),
+        ),
+        update: jest.fn(),
+      },
+      user: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn(({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve({ id: 'user-ada', ...data }),
+        ),
+      },
+      member: {
+        create: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      employee: { update: jest.fn() },
+      session: { create: jest.fn() },
+      $transaction: jest.fn(),
+    };
+    // Writes inside the transaction use the same delegates, so assertions see them.
+    prisma.$transaction.mockImplementation(
+      (work: (tx: typeof prisma) => unknown) => work(prisma),
+    );
+    const service = new AuthService(
+      prisma as unknown as PrismaService,
+      {} as EmailService,
+    );
+    return { invitation, prisma, service };
+  }
+
+  describe('acceptEmployeeInvitation', () => {
+    it('rejects an existing account with the wrong password and grants nothing', async () => {
+      const { prisma, service } = invitationSetup();
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-existing',
+        name: 'Ada Okafor',
+        email: 'ada@acme.com',
+        passwordHash,
+        userType: 'BUSINESS',
+        role: 'BUSINESS_OWNER',
+        emailVerified: true,
+        banned: false,
+      });
+
+      await expect(
+        service.acceptEmployeeInvitation(
+          { token: inviteToken, password: 'wrong password long enough' },
+          {},
+        ),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(prisma.member.create).not.toHaveBeenCalled();
+      expect(prisma.employee.update).not.toHaveBeenCalled();
+      expect(prisma.invitation.update).not.toHaveBeenCalled();
+      expect(prisma.session.create).not.toHaveBeenCalled();
+    });
+
+    it('links an existing StackHR account after its password is confirmed', async () => {
+      const { prisma, service } = invitationSetup();
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-existing',
+        name: 'Ada Okafor',
+        email: 'ada@acme.com',
+        passwordHash,
+        userType: 'BUSINESS',
+        role: 'BUSINESS_OWNER',
+        emailVerified: true,
+        banned: false,
+      });
+
+      const result = await service.acceptEmployeeInvitation(
+        { token: inviteToken, password },
+        {},
+      );
+
+      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(result.user).toMatchObject({
+        id: 'user-existing',
+        role: 'EMPLOYEE',
+        organizationId: 'org-a',
+      });
+      expect(prisma.member.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          organizationId: 'org-a',
+          userId: 'user-existing',
+          role: 'EMPLOYEE',
+        }) as unknown,
+      });
+      expect(prisma.employee.update).toHaveBeenCalledWith({
+        where: { id: 'emp-ada', organizationId: 'org-a' },
+        data: { userId: 'user-existing', status: 'ONBOARDING' },
+      });
+      expect(prisma.session.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: 'user-existing',
+          activeOrganizationId: 'org-a',
+        }) as unknown,
+      });
+    });
+
+    it('creates a verified employee account, links the employee and starts onboarding', async () => {
+      const { prisma, service } = invitationSetup();
+
+      const result = await service.acceptEmployeeInvitation(
+        { token: inviteToken, password },
+        {},
+      );
+
+      expect(result.user).toMatchObject({
+        email: 'ada@acme.com',
+        role: 'EMPLOYEE',
+        organizationId: 'org-a',
+        orgSlug: 'acme',
+      });
+      expect(typeof result.token).toBe('string');
+      expect(prisma.user.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          email: 'ada@acme.com',
+          name: 'Ada Okafor',
+          emailVerified: true,
+          role: 'EMPLOYEE',
+          passwordHash: expect.stringMatching(/^scrypt\$/) as unknown,
+        }) as unknown,
+      });
+      expect(prisma.member.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          organizationId: 'org-a',
+          userId: 'user-ada',
+          role: 'EMPLOYEE',
+        }) as unknown,
+      });
+      expect(prisma.employee.update).toHaveBeenCalledWith({
+        where: { id: 'emp-ada', organizationId: 'org-a' },
+        data: { userId: 'user-ada', status: 'ONBOARDING' },
+      });
+      expect(prisma.invitation.update).toHaveBeenCalledWith({
+        where: { id: 'invitation' },
+        data: { status: 'accepted' },
+      });
+      expect(prisma.session.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: 'user-ada',
+          activeOrganizationId: 'org-a',
+        }) as unknown,
+      });
+    });
+  });
+
+  describe('previewInvitation', () => {
+    it.each([
+      ['unknown', 'some-other-token', {}],
+      ['already accepted', inviteToken, { status: 'accepted' }],
+      ['expired', inviteToken, { expiresAt: new Date(Date.now() - 1000) }],
+    ])('returns 404 for an %s invitation', async (_label, token, overrides) => {
+      const { service } = invitationSetup(overrides);
+
+      await expect(service.previewInvitation(token)).rejects.toMatchObject({
+        status: 404,
+      });
+    });
+
+    it('describes a pending invitation for the accept page', async () => {
+      const { invitation, service } = invitationSetup();
+
+      await expect(service.previewInvitation(inviteToken)).resolves.toEqual({
+        employeeName: 'Ada Okafor',
+        email: 'ada@acme.com',
+        organizationName: 'Acme',
+        expiresAt: invitation.expiresAt,
+        hasAccount: false,
+      });
+    });
+  });
+});
+
 describe('frontend authentication contract', () => {
   it('verifies a stored scrypt hash and returns the selected workspace and token with a cookie', async () => {
     const { service, prisma } = setup();

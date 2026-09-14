@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -67,6 +68,144 @@ export class AuthService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.ensureConfiguredAdmin();
+  }
+
+  /** What the accept page shows before the employee sets or confirms a password. */
+  async previewInvitation(token: string) {
+    const invitation = await this.findPendingInvitation(token);
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: invitation.email },
+    });
+
+    return {
+      employeeName: invitation.employee.fullName,
+      email: invitation.email,
+      organizationName: invitation.organization.name,
+      expiresAt: invitation.expiresAt,
+      hasAccount: Boolean(existingUser),
+    };
+  }
+
+  /**
+   * Grants an invited employee access to the self-service portal: a verified
+   * EMPLOYEE membership in the inviting organization, linked to their employee
+   * record, which moves to ONBOARDING until onboarding is completed.
+   */
+  async acceptEmployeeInvitation(
+    input: { token: string; password: string },
+    options: SessionOptions,
+  ) {
+    const invitation = await this.findPendingInvitation(input.token);
+    const password = this.validatePassword(input.password);
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: invitation.email },
+    });
+
+    // Emails are unique across StackHR, so an existing account is linked
+    // rather than duplicated, and only after its own password is confirmed.
+    if (
+      existingUser &&
+      (existingUser.banned ||
+        !existingUser.passwordHash ||
+        !(await this.verifyPassword(password, existingUser.passwordHash)))
+    ) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+    const passwordHash = existingUser
+      ? null
+      : await this.hashPassword(password);
+
+    const user = await this.prisma.$transaction(async (transaction) => {
+      const created =
+        existingUser ??
+        (await transaction.user.create({
+          data: {
+            name: invitation.employee.fullName,
+            email: invitation.email,
+            passwordHash,
+            // The emailed link proves ownership of the address.
+            emailVerified: true,
+            userType: USER_TYPES.BUSINESS,
+            role: USER_ROLES.EMPLOYEE,
+          },
+        }));
+      // Membership first: the database refuses an employee link without it.
+      const membership = await transaction.member.findFirst({
+        where: {
+          organizationId: invitation.organizationId,
+          userId: created.id,
+        },
+      });
+      if (!membership) {
+        await transaction.member.create({
+          data: {
+            organizationId: invitation.organizationId,
+            userId: created.id,
+            role: USER_ROLES.EMPLOYEE,
+            createdAt: new Date(),
+          },
+        });
+      }
+      await transaction.employee.update({
+        where: {
+          id: invitation.employee.id,
+          organizationId: invitation.organizationId,
+        },
+        data: { userId: created.id, status: 'ONBOARDING' },
+      });
+      await transaction.invitation.update({
+        where: { id: invitation.id },
+        data: { status: 'accepted' },
+      });
+      return created;
+    });
+
+    const authenticatedUser = this.toAuthenticatedUser(
+      {
+        ...user,
+        memberships: [
+          {
+            organizationId: invitation.organizationId,
+            role: USER_ROLES.EMPLOYEE,
+            organization: invitation.organization,
+          },
+        ],
+      },
+      invitation.organizationId,
+    );
+    const token = await this.createSession(
+      user.id,
+      options,
+      invitation.organizationId,
+    );
+    return { user: authenticatedUser, token };
+  }
+
+  /**
+   * Unknown, used and expired links are indistinguishable to the caller so a
+   * token cannot be probed for its state.
+   */
+  private async findPendingInvitation(token: string) {
+    const invitation =
+      typeof token === 'string' && token
+        ? await this.prisma.invitation.findUnique({
+            where: { tokenHash: this.hashToken(token) },
+            include: {
+              employee: { select: { id: true, fullName: true } },
+              organization: { select: { name: true, slug: true } },
+            },
+          })
+        : null;
+    if (
+      !invitation?.employee ||
+      invitation.status !== 'pending' ||
+      invitation.expiresAt.getTime() <= Date.now()
+    ) {
+      throw new NotFoundException(
+        'This invitation link is invalid or has expired',
+      );
+    }
+    return { ...invitation, employee: invitation.employee };
   }
 
   async signupBusiness(input: SignupBusinessInput): Promise<{
