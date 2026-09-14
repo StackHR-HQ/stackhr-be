@@ -36,6 +36,12 @@ export class OnboardingController {
     return this.onboardingService.getStatus(request.user!);
   }
 
+  @Get('company')
+  @RequireRoles(...BUSINESS_ADMIN_ROLES)
+  getCompany(@CurrentUser() user: AuthenticatedUser) {
+    return this.onboardingService.getCompanyInfo(user);
+  }
+
   @Patch('company')
   @RequireRoles(...BUSINESS_ADMIN_ROLES)
   updateCompany(

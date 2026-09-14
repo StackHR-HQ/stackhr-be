@@ -50,6 +50,19 @@ export interface EmployeeInput {
 export class OnboardingService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getCompanyInfo(user: AuthenticatedUser) {
+    const organizationId = this.requireOrganization(user);
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+    });
+
+    if (!organization) {
+      throw new NotFoundException('Organization was not found');
+    }
+
+    return organization;
+  }
+
   async updateCompanyInfo(
     user: AuthenticatedUser,
     input: CompanyInfoInput,
