@@ -1,15 +1,247 @@
 import { NotFoundException } from '@nestjs/common';
+import type { EmailService } from '../../notifications/email.service';
 import { createInMemoryTenant } from '../testing/in-memory-tenant';
 import { adminUser, employeeRow, ORG_B } from '../testing/fixtures';
 import { PeopleEmployeesService } from './people-employees.service';
 
 describe('PeopleEmployeesService', () => {
+  const originalFrontendUrl = process.env.FRONTEND_URL;
   let fake: ReturnType<typeof createInMemoryTenant>;
+  let email: { send: jest.Mock };
   let service: PeopleEmployeesService;
 
   beforeEach(() => {
+    process.env.FRONTEND_URL = 'https://app.stackhr.test';
     fake = createInMemoryTenant();
-    service = new PeopleEmployeesService(fake.tenant);
+    email = { send: jest.fn().mockResolvedValue({ id: 'email_1' }) };
+    service = new PeopleEmployeesService(
+      fake.tenant,
+      email as unknown as EmailService,
+    );
+  });
+
+  afterEach(() => {
+    if (originalFrontendUrl === undefined) {
+      delete process.env.FRONTEND_URL;
+    } else {
+      process.env.FRONTEND_URL = originalFrontendUrl;
+    }
+  });
+
+  describe('createEmployee', () => {
+    it('emails an invitation link to the new hire when requested', async () => {
+      fake.seed('department', [
+        { id: 'dep_people', organizationId: 'org_a', name: 'People' },
+      ]);
+
+      const created = await service.createEmployee(adminUser(), {
+        ...newHire(),
+        sendInvitation: true,
+      });
+
+      expect(created).toMatchObject({ invitation: { status: 'SENT' } });
+      expect(email.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'ada@example.com',
+          text: expect.stringContaining(
+            'https://app.stackhr.test/accept-invitation?token=',
+          ) as unknown,
+        }),
+      );
+    });
+
+    const newHire = (employment: Record<string, unknown> = {}) => ({
+      personal: {
+        firstName: 'Ada',
+        lastName: 'Okafor',
+        workEmail: 'Ada@Example.com',
+        phone: '+2348012345678',
+      },
+      employment: {
+        jobTitle: 'People Operations Manager',
+        departmentId: 'dep_people',
+        employmentType: 'FULL_TIME',
+        startDate: '2026-10-01',
+        workLocation: 'Lagos, Nigeria',
+        ...employment,
+      },
+      compensation: {
+        annualSalaryMinor: 1_200_000_000,
+        currency: 'NGN',
+        payFrequency: 'MONTHLY',
+      },
+      sendInvitation: false,
+    });
+
+    it('rejects a department from another organization and creates nothing', async () => {
+      fake.seed('department', [
+        { id: 'dep_other', organizationId: ORG_B, name: 'Finance' },
+      ]);
+
+      await expect(
+        service.createEmployee(
+          adminUser(),
+          newHire({ departmentId: 'dep_other' }),
+        ),
+      ).rejects.toMatchObject({
+        status: 422,
+        response: { fields: { departmentId: expect.any(String) as unknown } },
+      });
+      await expect(service.listEmployees(adminUser())).resolves.toEqual([]);
+    });
+
+    it('rejects a manager from another organization and creates nothing', async () => {
+      fake.seed('employee', [
+        employeeRow({
+          id: 'emp_other',
+          organizationId: ORG_B,
+          email: 'lead@beta.test',
+        }),
+      ]);
+
+      await expect(
+        service.createEmployee(
+          adminUser(),
+          newHire({ departmentId: undefined, managerId: 'emp_other' }),
+        ),
+      ).rejects.toMatchObject({
+        status: 422,
+        response: { fields: { managerId: expect.any(String) as unknown } },
+      });
+      await expect(service.listEmployees(adminUser())).resolves.toEqual([]);
+    });
+
+    it('records the creation in the new employee activity history', async () => {
+      fake.seed('department', [
+        { id: 'dep_people', organizationId: 'org_a', name: 'People' },
+      ]);
+
+      const created = await service.createEmployee(adminUser(), newHire());
+      const detail = await service.getEmployee(adminUser(), created.id);
+
+      expect(detail.activity).toEqual([
+        {
+          id: expect.any(String) as unknown,
+          description: 'Ada Okafor was added as People Operations Manager',
+          timestamp: expect.any(String) as unknown,
+        },
+      ]);
+    });
+
+    it('starts the employee compensation history at their start date', async () => {
+      fake.seed('department', [
+        { id: 'dep_people', organizationId: 'org_a', name: 'People' },
+      ]);
+
+      const created = await service.createEmployee(adminUser(), newHire());
+
+      await expect(
+        service.listCompensationHistory(adminUser(), created.id),
+      ).resolves.toEqual([
+        {
+          id: expect.any(String) as unknown,
+          effectiveDate: '2026-10-01',
+          annualSalaryMinor: 1_200_000_000,
+          currency: 'NGN',
+          payFrequency: 'MONTHLY',
+        },
+      ]);
+    });
+
+    it('creates an employee that then appears in the organization directory', async () => {
+      fake.seed('department', [
+        { id: 'dep_people', organizationId: 'org_a', name: 'People' },
+      ]);
+
+      const created = await service.createEmployee(adminUser(), newHire());
+
+      expect(created).toEqual({
+        id: expect.any(String) as unknown,
+        fullName: 'Ada Okafor',
+        email: 'ada@example.com',
+        avatarInitials: 'AO',
+        jobTitle: 'People Operations Manager',
+        departmentId: 'dep_people',
+        managerId: null,
+        employmentType: 'Full-time',
+        employmentStatus: 'pending_invitation',
+        startDate: '2026-10-01',
+      });
+      await expect(service.listEmployees(adminUser())).resolves.toEqual([
+        created,
+      ]);
+    });
+  });
+
+  describe('updateEmployee', () => {
+    it('records a salary change in compensation history from its effective date', async () => {
+      fake.seed('employee', [employeeRow()]);
+
+      await service.updateEmployee(adminUser(), 'emp_ada', {
+        compensation: {
+          annualSalaryMinor: 600_000_000,
+          currency: 'NGN',
+          payFrequency: 'MONTHLY',
+          effectiveDate: '2026-11-01',
+        },
+      });
+
+      await expect(
+        service.listCompensationHistory(adminUser(), 'emp_ada'),
+      ).resolves.toEqual([
+        {
+          id: expect.any(String) as unknown,
+          effectiveDate: '2026-11-01',
+          annualSalaryMinor: 600_000_000,
+          currency: 'NGN',
+          payFrequency: 'MONTHLY',
+        },
+      ]);
+    });
+
+    it('rejects a manager change that would create a reporting cycle', async () => {
+      fake.seed('employee', [
+        employeeRow({
+          id: 'emp_lead',
+          fullName: 'Lola Lead',
+          email: 'lead@acme.test',
+        }),
+        employeeRow({ managerId: 'emp_lead' }),
+      ]);
+
+      await expect(
+        service.updateEmployee(adminUser(), 'emp_lead', {
+          employment: { managerId: 'emp_ada' },
+        }),
+      ).rejects.toMatchObject({
+        status: 422,
+        response: {
+          fields: { 'employment.managerId': expect.any(String) as unknown },
+        },
+      });
+      await expect(
+        service.getEmployee(adminUser(), 'emp_lead'),
+      ).resolves.toMatchObject({ managerId: null });
+    });
+
+    it('changes employment details that are then reflected in the directory', async () => {
+      fake.seed('employee', [employeeRow()]);
+
+      const updated = await service.updateEmployee(adminUser(), 'emp_ada', {
+        employment: { jobTitle: 'Staff Engineer', workLocation: 'Abuja' },
+      });
+
+      expect(updated).toMatchObject({
+        id: 'emp_ada',
+        jobTitle: 'Staff Engineer',
+      });
+      await expect(service.listEmployees(adminUser())).resolves.toEqual([
+        expect.objectContaining({
+          id: 'emp_ada',
+          jobTitle: 'Staff Engineer',
+        }) as unknown,
+      ]);
+    });
   });
 
   describe('listEmployees', () => {
@@ -218,6 +450,7 @@ describe('PeopleEmployeesService', () => {
         },
         compensation: {
           salary: 450000,
+          annualSalaryMinor: 540000000,
           currency: 'NGN',
           payFrequency: 'Monthly',
           bankName: 'GTBank',

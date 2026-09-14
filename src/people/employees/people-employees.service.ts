@@ -2,9 +2,11 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client';
 import type { AuthenticatedUser } from '../../auth/auth.types';
+import { EmailService } from '../../notifications/email.service';
 import { requirePeopleOrganization } from '../common/people-access';
 import {
   avatarInitials,
@@ -15,6 +17,14 @@ import {
   toPayFrequency,
 } from '../common/people-mappers';
 import { TenantPrismaService } from '../tenant/tenant-prisma.service';
+import type { CreateEmployeeDto } from './dto/create-employee.dto';
+import type { UpdateEmployeeDto } from './dto/update-employee.dto';
+import {
+  createInvitationToken,
+  INVITATION_TTL_MS,
+  invitationEmail,
+  invitationLink,
+} from './employee-invitations';
 
 export interface EmployeeSummary {
   id: string;
@@ -53,7 +63,10 @@ const EMPLOYMENT_STATUSES = new Set([
 
 @Injectable()
 export class PeopleEmployeesService {
-  constructor(private readonly tenant: TenantPrismaService) {}
+  constructor(
+    private readonly tenant: TenantPrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   listEmployees(
     user: AuthenticatedUser,
@@ -169,6 +182,257 @@ export class PeopleEmployeesService {
     return normalized || undefined;
   }
 
+  createEmployee(user: AuthenticatedUser, input: CreateEmployeeDto) {
+    const organizationId = requirePeopleOrganization(user);
+    const { personal, employment, compensation } = input;
+
+    return this.tenant
+      .run(organizationId, async (client) => {
+        if (employment.departmentId) {
+          const department = await client.department.findFirst({
+            where: { id: employment.departmentId, organizationId },
+          });
+          if (!department) {
+            throw new UnprocessableEntityException({
+              code: 'VALIDATION_ERROR',
+              message: 'Department was not found in this organization',
+              fields: { departmentId: 'Unknown department' },
+            });
+          }
+        }
+
+        if (employment.managerId) {
+          const manager = await client.employee.findFirst({
+            where: { id: employment.managerId, organizationId },
+          });
+          if (!manager) {
+            throw new UnprocessableEntityException({
+              code: 'VALIDATION_ERROR',
+              message: 'Manager was not found in this organization',
+              fields: { managerId: 'Unknown manager' },
+            });
+          }
+        }
+
+        const employee = await client.employee.create({
+          data: {
+            organizationId,
+            firstName: personal.firstName,
+            lastName: personal.lastName,
+            fullName: `${personal.firstName} ${personal.lastName}`,
+            email: personal.workEmail.toLowerCase(),
+            phone: personal.phone ?? null,
+            // The department sync trigger fills the name from departmentId.
+            department: '',
+            departmentId: employment.departmentId ?? null,
+            managerId: employment.managerId ?? null,
+            jobTitle: employment.jobTitle,
+            employmentType: employment.employmentType,
+            startDate: new Date(`${employment.startDate}T00:00:00.000Z`),
+            workLocation: employment.workLocation ?? '',
+            annualSalaryMinor: BigInt(compensation.annualSalaryMinor),
+            currency: compensation.currency,
+            payFrequency: compensation.payFrequency,
+            status: 'PENDING_INVITATION',
+          },
+        });
+
+        // The hire's starting salary is the first compensation history entry.
+        await client.compensationHistory.create({
+          data: {
+            organizationId,
+            employeeId: employee.id,
+            annualSalaryMinor: employee.annualSalaryMinor,
+            currency: employee.currency,
+            payFrequency: employee.payFrequency,
+            effectiveDate: employee.startDate,
+            changedByUserId: user.id,
+          },
+        });
+
+        // Field names only: compensation and contact values stay out of audit history.
+        await client.auditEvent.create({
+          data: {
+            organizationId,
+            actorUserId: user.id,
+            action: 'employee.created',
+            targetType: 'employee',
+            targetId: employee.id,
+            employeeId: employee.id,
+            description: `${employee.fullName} was added as ${employee.jobTitle}`,
+            changes: {
+              changedFields: ['personal', 'employment', 'compensation'],
+            },
+            createdAt: new Date(),
+          },
+        });
+
+        if (!input.sendInvitation) {
+          return { summary: toEmployeeSummary(employee), invitation: null };
+        }
+
+        const { token, tokenHash } = createInvitationToken();
+        const invitation = await client.invitation.create({
+          data: {
+            organizationId,
+            employeeId: employee.id,
+            email: employee.email,
+            role: 'EMPLOYEE',
+            status: 'pending',
+            tokenHash,
+            inviterId: user.id,
+            expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
+          },
+        });
+        return {
+          summary: toEmployeeSummary(employee),
+          invitation: { id: invitation.id, token },
+        };
+      })
+      .then(async ({ summary, invitation }) => {
+        if (!invitation) return summary;
+        const status = await this.deliverInvitation(
+          organizationId,
+          summary,
+          invitation,
+        );
+        return { ...summary, invitation: { status } };
+      });
+  }
+
+  // Runs after the employee transaction commits, so a slow or failing email
+  // provider neither holds the transaction open nor rolls back the new record.
+  private async deliverInvitation(
+    organizationId: string,
+    employee: EmployeeSummary,
+    invitation: { id: string; token: string },
+  ): Promise<'SENT' | 'FAILED'> {
+    try {
+      await this.emailService.send({
+        to: employee.email,
+        ...invitationEmail(employee.fullName, invitationLink(invitation.token)),
+        idempotencyKey: `employee-invitation:${invitation.id}`,
+      });
+    } catch {
+      return 'FAILED';
+    }
+
+    await this.tenant.run(organizationId, (client) =>
+      client.invitation.update({
+        where: { id: invitation.id },
+        data: { sendCount: { increment: 1 }, lastSentAt: new Date() },
+      }),
+    );
+    return 'SENT';
+  }
+
+  updateEmployee(
+    user: AuthenticatedUser,
+    employeeId: string,
+    input: UpdateEmployeeDto,
+  ) {
+    const organizationId = requirePeopleOrganization(user);
+    const { employment } = input;
+
+    return this.tenant.run(organizationId, async (client) => {
+      const existing = await client.employee.findFirst({
+        where: { id: employeeId, organizationId },
+      });
+      if (!existing) {
+        throw new NotFoundException('Employee was not found');
+      }
+
+      if (employment?.managerId) {
+        const invalidManager = (message: string) =>
+          new UnprocessableEntityException({
+            code: 'VALIDATION_ERROR',
+            message,
+            fields: { 'employment.managerId': message },
+          });
+        if (employment.managerId === employeeId) {
+          throw invalidManager('An employee cannot be their own manager');
+        }
+        // Walk up from the proposed manager; reaching this employee means a cycle.
+        const visited = new Set<string>();
+        let currentId: string | null = employment.managerId;
+        while (currentId && !visited.has(currentId)) {
+          if (currentId === employeeId) {
+            throw invalidManager(
+              'This manager change would create a reporting cycle',
+            );
+          }
+          visited.add(currentId);
+          const current: { id: string; managerId: string | null } | null =
+            await client.employee.findFirst({
+              where: { id: currentId, organizationId },
+              select: { id: true, managerId: true },
+            });
+          if (!current && currentId === employment.managerId) {
+            throw invalidManager('Manager was not found in this organization');
+          }
+          currentId = current?.managerId ?? null;
+        }
+      }
+
+      const employee = await client.employee.update({
+        where: { id: employeeId },
+        data: {
+          ...(employment?.jobTitle !== undefined
+            ? { jobTitle: employment.jobTitle }
+            : {}),
+          ...(employment?.workLocation !== undefined
+            ? { workLocation: employment.workLocation }
+            : {}),
+          ...(employment?.managerId !== undefined
+            ? { managerId: employment.managerId }
+            : {}),
+          ...(input.compensation
+            ? {
+                annualSalaryMinor: BigInt(input.compensation.annualSalaryMinor),
+                currency: input.compensation.currency,
+                payFrequency: input.compensation.payFrequency,
+              }
+            : {}),
+        },
+      });
+
+      if (input.compensation) {
+        await client.compensationHistory.create({
+          data: {
+            organizationId,
+            employeeId,
+            annualSalaryMinor: BigInt(input.compensation.annualSalaryMinor),
+            currency: input.compensation.currency,
+            payFrequency: input.compensation.payFrequency,
+            effectiveDate: new Date(
+              `${input.compensation.effectiveDate}T00:00:00.000Z`,
+            ),
+            changedByUserId: user.id,
+          },
+        });
+      }
+
+      return toEmployeeSummary(employee);
+    });
+  }
+
+  listCompensationHistory(user: AuthenticatedUser, employeeId: string) {
+    const organizationId = requirePeopleOrganization(user);
+    return this.tenant.run(organizationId, async (client) => {
+      const entries = await client.compensationHistory.findMany({
+        where: { organizationId, employeeId },
+        orderBy: [{ effectiveDate: 'desc' }, { id: 'desc' }],
+      });
+      return entries.map((entry) => ({
+        id: entry.id,
+        effectiveDate: toDateOnly(entry.effectiveDate),
+        annualSalaryMinor: Number(entry.annualSalaryMinor),
+        currency: entry.currency,
+        payFrequency: entry.payFrequency,
+      }));
+    });
+  }
+
   getEmployee(user: AuthenticatedUser, employeeId: string) {
     const organizationId = requirePeopleOrganization(user);
     return this.tenant.run(organizationId, async (client) => {
@@ -180,35 +444,28 @@ export class PeopleEmployeesService {
       }
 
       const scope = { organizationId, employeeId };
-      const [
-        organization,
-        leaveTypes,
-        balances,
-        requests,
-        documents,
-        activity,
-      ] = await Promise.all([
-        client.organization.findUnique({ where: { id: organizationId } }),
-        client.leaveType.findMany({
-          where: { organizationId },
-          orderBy: [{ position: 'asc' }, { name: 'asc' }],
-        }),
-        client.leaveBalance.findMany({
-          where: { ...scope, year: new Date().getUTCFullYear() },
-        }),
-        client.leaveRequest.findMany({
-          where: scope,
-          orderBy: [{ startDate: 'desc' }, { id: 'asc' }],
-        }),
-        client.document.findMany({
-          where: { ...scope, scope: 'EMPLOYEE' },
-          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-        }),
-        client.auditEvent.findMany({
-          where: scope,
-          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-        }),
-      ]);
+      const [leaveTypes, balances, requests, documents, activity] =
+        await Promise.all([
+          client.leaveType.findMany({
+            where: { organizationId },
+            orderBy: [{ position: 'asc' }, { name: 'asc' }],
+          }),
+          client.leaveBalance.findMany({
+            where: { ...scope, year: new Date().getUTCFullYear() },
+          }),
+          client.leaveRequest.findMany({
+            where: scope,
+            orderBy: [{ startDate: 'desc' }, { id: 'asc' }],
+          }),
+          client.document.findMany({
+            where: { ...scope, scope: 'EMPLOYEE' },
+            orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+          }),
+          client.auditEvent.findMany({
+            where: scope,
+            orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+          }),
+        ]);
 
       const typeNames = new Map(leaveTypes.map((type) => [type.id, type.name]));
       const typeOrder = new Map(
@@ -233,9 +490,11 @@ export class PeopleEmployeesService {
             employee.emergencyContactRelationship ?? '',
         },
         compensation: {
-          salary: employee.salaryAmount,
-          currency: organization?.currency ?? '',
-          payFrequency: toPayFrequency(organization?.payrollFrequency ?? ''),
+          // Existing contract: monthly amount in major units.
+          salary: Number(employee.annualSalaryMinor / 1200n),
+          annualSalaryMinor: Number(employee.annualSalaryMinor),
+          currency: employee.currency,
+          payFrequency: toPayFrequency(employee.payFrequency),
           bankName: employee.bankName ?? '',
           bankAccountLast4: employee.bankAccountLast4 ?? '',
         },

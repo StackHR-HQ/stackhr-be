@@ -78,8 +78,9 @@ export class PeopleDocumentsService {
       );
     }
 
-    const id = randomUUID();
-    const storageKey = `organizations/${organizationId}/documents/${id}`;
+    // The object is stored before its row exists, so it gets its own random
+    // name; the document row's ID is assigned by Postgres.
+    const storageKey = `organizations/${organizationId}/documents/${randomUUID()}`;
     // Bytes first: metadata is only persisted once the file is durable.
     await this.storage.put({
       key: storageKey,
@@ -91,7 +92,6 @@ export class PeopleDocumentsService {
       const document = await this.tenant.run(organizationId, (client) =>
         client.document.create({
           data: {
-            id,
             organizationId,
             scope: scope === 'company' ? 'COMPANY' : 'EMPLOYEE',
             employeeId: employee?.id ?? null,

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { TenantPrismaService } from '../tenant/tenant-prisma.service';
 
 type Row = Record<string, any>;
@@ -23,6 +24,8 @@ const MODELS = [
   'employeeOnboarding',
   'onboardingItemCompletion',
   'auditEvent',
+  'compensationHistory',
+  'invitation',
 ] as const;
 
 export type ModelName = (typeof MODELS)[number];
@@ -161,7 +164,11 @@ class InMemoryModel {
   }
 
   create(args: { data: Row }) {
-    const row = { createdAt: new Date(), ...args.data };
+    const row: Row = { createdAt: new Date(), ...args.data };
+    // Postgres generates `id` (uuidv7 default); services must not supply it.
+    if (this.keyFields.length === 1 && this.keyFields[0] === 'id' && !row.id) {
+      row.id = randomUUID();
+    }
     const duplicate = this.rows.some((existing) =>
       this.keyFields.every((field) => same(existing[field], row[field])),
     );

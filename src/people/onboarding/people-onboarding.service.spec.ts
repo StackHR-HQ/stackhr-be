@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { createInMemoryTenant } from '../testing/in-memory-tenant';
 import { adminUser, employeeRow, ORG_A, ORG_B } from '../testing/fixtures';
 import { PeopleOnboardingService } from './people-onboarding.service';
@@ -133,6 +134,54 @@ describe('PeopleOnboardingService', () => {
           completedItemIds: ['item_contract'],
         },
       ]);
+    });
+  });
+
+  describe('assignTemplate', () => {
+    it('assigns a template to an employee so their progress is tracked', async () => {
+      fake.seed('employee', [employeeRow({ status: 'ONBOARDING' })]);
+      const expectedRow = {
+        employeeId: 'emp_ada',
+        employeeName: 'Ada Okafor',
+        avatarInitials: 'AO',
+        jobTitle: 'Software Engineer',
+        startDate: '2026-01-05',
+        templateId: 'tpl_eng',
+        completedItemIds: [],
+      };
+
+      await expect(
+        service.assignTemplate(adminUser(), {
+          employeeId: 'emp_ada',
+          templateId: 'tpl_eng',
+        }),
+      ).resolves.toEqual(expectedRow);
+      await expect(service.listEmployees(adminUser())).resolves.toEqual([
+        expectedRow,
+      ]);
+    });
+
+    it('refuses to switch an employee to a different template once assigned', async () => {
+      fake.seed('employee', [employeeRow({ status: 'ONBOARDING' })]);
+      fake.seed('onboardingTemplate', [
+        {
+          id: 'tpl_sales',
+          organizationId: ORG_A,
+          name: 'Sales onboarding',
+          revision: 1,
+        },
+      ]);
+      await service.assignTemplate(adminUser(), {
+        employeeId: 'emp_ada',
+        templateId: 'tpl_eng',
+      });
+
+      await expect(
+        service.assignTemplate(adminUser(), {
+          employeeId: 'emp_ada',
+          templateId: 'tpl_sales',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
     });
   });
 

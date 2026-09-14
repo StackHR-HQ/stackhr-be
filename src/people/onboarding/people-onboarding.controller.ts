@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
@@ -30,6 +31,17 @@ export class PeopleOnboardingController {
   @Get('employees')
   listEmployees(@CurrentUser() user: AuthenticatedUser) {
     return this.onboardingService.listEmployees(user);
+  }
+
+  @Post('employees')
+  assignTemplate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.onboardingService.assignTemplate(user, {
+      employeeId: body?.employeeId,
+      templateId: body?.templateId,
+    });
   }
 
   @Patch('employees/:employeeId/checklist/:itemId')

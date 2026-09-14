@@ -1,9 +1,9 @@
 import {
+  ConflictException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import type { AuthenticatedUser } from '../../auth/auth.types';
 import { requirePeopleOrganization } from '../common/people-access';
 import { avatarInitials, toDateOnly } from '../common/people-mappers';
@@ -25,6 +25,21 @@ function toOnboardingRow(
       .filter((completion) => completion.employeeId === employee.id)
       .map((completion) => completion.itemId),
   };
+}
+
+function fieldError(field: string, message: string) {
+  return new UnprocessableEntityException({
+    code: 'VALIDATION_ERROR',
+    message,
+    fields: { [field]: message },
+  });
+}
+
+function requireId(value: unknown, field: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw fieldError(field, `${field} is required`);
+  }
+  return value.trim();
 }
 
 @Injectable()
@@ -102,6 +117,67 @@ export class PeopleOnboardingService {
     });
   }
 
+  assignTemplate(
+    user: AuthenticatedUser,
+    input: { employeeId: unknown; templateId: unknown },
+  ) {
+    const organizationId = requirePeopleOrganization(user);
+    const employeeId = requireId(input.employeeId, 'employeeId');
+    const templateId = requireId(input.templateId, 'templateId');
+
+    return this.tenant.run(organizationId, async (client) => {
+      const [employee, template] = await Promise.all([
+        client.employee.findFirst({
+          where: { id: employeeId, organizationId },
+        }),
+        client.onboardingTemplate.findFirst({
+          where: { id: templateId, organizationId },
+        }),
+      ]);
+      if (!employee) {
+        throw fieldError(
+          'employeeId',
+          'Employee was not found in this organization',
+        );
+      }
+      if (!template) {
+        throw fieldError(
+          'templateId',
+          'Template was not found in this organization',
+        );
+      }
+
+      const existing = await client.employeeOnboarding.findFirst({
+        where: { employeeId, organizationId },
+      });
+      if (existing && existing.templateId !== templateId) {
+        throw new ConflictException({
+          code: 'CONFLICT',
+          message: 'Employee already has a different onboarding template',
+        });
+      }
+      if (!existing) {
+        // Upsert so a concurrent identical assignment cannot fail on the unique key.
+        await client.employeeOnboarding.upsert({
+          where: { employeeId },
+          create: {
+            employeeId,
+            organizationId,
+            templateId,
+            assignedAt: new Date(),
+          },
+          update: {},
+        });
+      }
+
+      const completions = await client.onboardingItemCompletion.findMany({
+        where: { organizationId, employeeId },
+        orderBy: [{ completedAt: 'asc' }, { itemId: 'asc' }],
+      });
+      return toOnboardingRow(employee, templateId, completions);
+    });
+  }
+
   setChecklistItem(
     user: AuthenticatedUser,
     employeeId: string,
@@ -174,7 +250,6 @@ export class PeopleOnboardingService {
       if (completed !== Boolean(existing)) {
         await client.auditEvent.create({
           data: {
-            id: randomUUID(),
             organizationId,
             actorUserId: user.id,
             action: completed

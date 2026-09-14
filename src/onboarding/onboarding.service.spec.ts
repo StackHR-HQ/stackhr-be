@@ -57,9 +57,20 @@ function setup(existing: StoredEmployee[] = []) {
       findMany: jest
         .fn<Promise<StoredEmployee[]>, [Prisma.EmployeeFindManyArgs]>()
         .mockResolvedValue(existing),
-      createMany: jest
-        .fn<Promise<{ count: number }>, [Prisma.EmployeeCreateManyArgs]>()
-        .mockResolvedValue({ count: 2 }),
+      // Mirrors Postgres assigning IDs on insert.
+      createManyAndReturn: jest
+        .fn<
+          Promise<Array<{ id: string; email: string }>>,
+          [Prisma.EmployeeCreateManyAndReturnArgs]
+        >()
+        .mockImplementation((args) =>
+          Promise.resolve(
+            (args.data as Array<{ email: string }>).map((row, index) => ({
+              id: `db-${index}`,
+              email: row.email,
+            })),
+          ),
+        ),
       update: jest.fn(),
       count: jest.fn().mockResolvedValue(2),
     },
@@ -97,17 +108,19 @@ describe('frontend onboarding contract', () => {
         logo: companyInfo.logoDataUrl,
       }) as unknown,
     });
-    const rows = db.employee.createMany.mock.calls[0][0]
+    const rows = db.employee.createManyAndReturn.mock.calls[0][0]
       .data as StoredEmployee[];
     expect(rows[0]).toMatchObject({
       organizationId: 'org',
       employmentType: 'FULL_TIME',
-      managerId: null,
+      firstName: 'Ada',
+      lastName: 'Obi',
     });
-    expect(rows[0].id).not.toBe(employee.id);
+    // Postgres assigns IDs; draft IDs only link rows within the submission.
+    expect(rows[0]).not.toHaveProperty('id');
     expect(db.employee.update).toHaveBeenCalledWith({
-      where: { id: rows[0].id },
-      data: { managerId: rows[1].id },
+      where: { id: 'db-0' },
+      data: { managerId: 'db-1' },
     });
     expect(result.onboarding.complete).toBe(true);
   });
@@ -193,7 +206,7 @@ describe('frontend onboarding contract', () => {
       await expect(
         controller.complete(user, { companyInfo, employees }),
       ).rejects.toThrow();
-      expect(db.employee.createMany).not.toHaveBeenCalled();
+      expect(db.employee.createManyAndReturn).not.toHaveBeenCalled();
     },
   );
 
@@ -224,7 +237,7 @@ describe('frontend onboarding contract', () => {
 
   it('returns a conflict when another request inserts the email concurrently', async () => {
     const { controller, db } = setup();
-    db.employee.createMany.mockRejectedValue({ code: 'P2002' });
+    db.employee.createManyAndReturn.mockRejectedValue({ code: 'P2002' });
     await expect(
       controller.complete(user, { companyInfo, employees: [employee] }),
     ).rejects.toThrow('already exists');
@@ -232,7 +245,9 @@ describe('frontend onboarding contract', () => {
 
   it('propagates write failure out of the transaction so Prisma rolls back the whole save', async () => {
     const { controller, db, transaction } = setup();
-    db.employee.createMany.mockRejectedValue(new Error('database failure'));
+    db.employee.createManyAndReturn.mockRejectedValue(
+      new Error('database failure'),
+    );
     await expect(
       controller.complete(user, { companyInfo, employees: [employee] }),
     ).rejects.toThrow('database failure');

@@ -313,10 +313,11 @@ describe('PeopleLeaveService', () => {
         status: 'approved',
       });
 
-      const profile = await new PeopleEmployeesService(fake.tenant).getEmployee(
-        adminUser(),
-        'emp_ada',
-      );
+      // Reading a profile never sends email, so no email service is needed.
+      const profile = await new PeopleEmployeesService(
+        fake.tenant,
+        {} as never,
+      ).getEmployee(adminUser(), 'emp_ada');
       expect(profile.activity).toEqual([
         {
           id: expect.any(String) as unknown,

@@ -27,7 +27,10 @@ export function employeeRow(overrides: Record<string, any> = {}) {
     departmentId: 'dep_eng',
     jobTitle: 'Software Engineer',
     employmentType: 'FULL_TIME',
-    salaryAmount: 450000,
+    // ₦450,000 per month, in kobo per year.
+    annualSalaryMinor: 540_000_000n,
+    currency: 'NGN',
+    payFrequency: 'MONTHLY',
     startDate: new Date('2026-01-05T00:00:00.000Z'),
     managerId: null,
     status: 'ACTIVE',

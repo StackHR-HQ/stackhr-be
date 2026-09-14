@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { DOCUMENT_STORAGE } from './documents/document-storage';
 import { PeopleDocumentsController } from './documents/people-documents.controller';
 import { PeopleDocumentsService } from './documents/people-documents.service';
@@ -15,7 +16,7 @@ import { PeopleOrganizationService } from './organization/people-organization.se
 import { TenantPrismaService } from './tenant/tenant-prisma.service';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, NotificationsModule],
   controllers: [
     PeopleEmployeesController,
     PeopleLeaveController,

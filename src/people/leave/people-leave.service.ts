@@ -5,7 +5,6 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import type { AuthenticatedUser } from '../../auth/auth.types';
 import { requirePeopleOrganization } from '../common/people-access';
 import {
@@ -181,7 +180,6 @@ export class PeopleLeaveService {
     const range = formatDateRange(request.startDate, request.endDate);
     await client.auditEvent.create({
       data: {
-        id: randomUUID(),
         organizationId,
         actorUserId: user.id,
         action: `leave_request.${status.toLowerCase()}`,
@@ -219,7 +217,6 @@ export class PeopleLeaveService {
         },
       },
       create: {
-        id: randomUUID(),
         organizationId,
         employeeId: request.employeeId,
         leaveTypeId: request.leaveTypeId,

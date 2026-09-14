@@ -6,10 +6,20 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '../../generated/prisma/client';
-import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
 import { USER_ROLES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
+
+// Matches the employee_names migration backfill: the last word is the family name.
+function splitFullName(fullName: string) {
+  const words = fullName.trim().split(/\s+/);
+  return words.length < 2
+    ? { firstName: words[0] ?? '', lastName: '' }
+    : {
+        firstName: words.slice(0, -1).join(' '),
+        lastName: words[words.length - 1],
+      };
+}
 
 export interface CompanyInfoInput {
   companyName: string;
@@ -186,7 +196,6 @@ export class OnboardingService {
       );
     const rows = inputs.map((input) => ({
       ...this.normalizeEmployeeInput(input),
-      id: randomUUID(),
       localId: this.optionalString(input.id),
       managerName: this.optionalString(input.managerName),
       managerEmail: this.optionalString(input.managerEmail)?.toLowerCase(),
@@ -207,63 +216,70 @@ export class OnboardingService {
       throw new BadRequestException(
         'Draft IDs must not collide with existing employee IDs',
       );
-    const candidates = [...existing, ...rows];
+
+    // Postgres assigns IDs on insert, so drafts are keyed by their email (unique
+    // within the submission) until then; existing employees by persisted ID.
+    const draftKey = (email: string) => `draft:${email}`;
+    const candidates = [
+      ...existing.map((employee) => ({
+        key: employee.id,
+        email: employee.email,
+        fullName: employee.fullName,
+      })),
+      ...rows.map((row) => ({
+        key: draftKey(row.email),
+        email: row.email,
+        fullName: row.fullName,
+      })),
+    ];
     const byLocalId = new Map(
-      rows.filter((row) => row.localId).map((row) => [row.localId!, row.id]),
+      rows
+        .filter((row) => row.localId)
+        .map((row) => [row.localId!, draftKey(row.email)]),
     );
-    const managers = new Map(
+    const managers = new Map<string, string | null>(
       existing.map((employee) => [employee.id, employee.managerId]),
     );
-    const data = rows.map((row) => {
-      let managerId: string | undefined;
+    const managerKeys = rows.map((row) => {
+      const key = draftKey(row.email);
+      let managerKey: string | undefined;
       if (row.managerId) {
-        managerId =
+        managerKey =
           byLocalId.get(row.managerId) ??
           existing.find((employee) => employee.id === row.managerId)?.id;
-        if (!managerId)
+        if (!managerKey)
           throw new BadRequestException(
             'managerId must identify an employee in this organization or submission',
           );
       } else if (row.managerEmail) {
-        managerId = candidates.find(
-          (employee) => employee.email === row.managerEmail,
-        )?.id;
-        if (!managerId)
+        managerKey = candidates.find(
+          (candidate) => candidate.email === row.managerEmail,
+        )?.key;
+        if (!managerKey)
           throw new BadRequestException(
             `Unknown managerEmail: ${row.managerEmail}`,
           );
       } else if (row.managerName) {
         const matches = candidates.filter(
-          (employee) =>
-            employee.fullName.toLowerCase() === row.managerName!.toLowerCase(),
+          (candidate) =>
+            candidate.fullName.toLowerCase() === row.managerName!.toLowerCase(),
         );
         if (matches.length !== 1)
           throw new BadRequestException(
             `managerName must match exactly one employee: ${row.managerName}`,
           );
-        managerId = matches[0].id;
+        managerKey = matches[0].key;
       }
-      if (managerId === row.id)
+      if (managerKey === key)
         throw new BadRequestException(
           'An employee cannot be their own manager',
         );
-      managers.set(row.id, managerId ?? null);
-      return {
-        id: row.id,
-        organizationId,
-        fullName: row.fullName,
-        email: row.email,
-        department: row.department,
-        jobTitle: row.jobTitle,
-        employmentType: row.employmentType,
-        salaryAmount: row.salary,
-        startDate: row.startDate,
-        managerId,
-      };
+      managers.set(key, managerKey ?? null);
+      return managerKey;
     });
-    for (const row of data) {
+    for (const row of rows) {
       const visited = new Set<string>();
-      let current: string | null | undefined = row.id;
+      let current: string | null | undefined = draftKey(row.email);
       while (current) {
         if (visited.has(current))
           throw new BadRequestException(
@@ -273,10 +289,24 @@ export class OnboardingService {
         current = managers.get(current);
       }
     }
+
     // Insert every draft before linking managers, including managers later in the list.
+    let created: Array<{ id: string; email: string }>;
     try {
-      await db.employee.createMany({
-        data: data.map((row) => ({ ...row, managerId: null })),
+      created = await db.employee.createManyAndReturn({
+        data: rows.map((row) => ({
+          organizationId,
+          ...splitFullName(row.fullName),
+          fullName: row.fullName,
+          email: row.email,
+          department: row.department,
+          jobTitle: row.jobTitle,
+          employmentType: row.employmentType,
+          // Onboarding collects a monthly amount in major units.
+          annualSalaryMinor: BigInt(row.salary) * 1200n,
+          startDate: row.startDate,
+        })),
+        select: { id: true, email: true },
       });
     } catch (error: unknown) {
       if (
@@ -291,15 +321,23 @@ export class OnboardingService {
       }
       throw error;
     }
-    for (const row of data) {
-      if (row.managerId)
+    const idByKey = new Map(
+      created.map((employee) => [draftKey(employee.email), employee.id]),
+    );
+    const persistedId = (key: string) => idByKey.get(key) ?? key;
+    for (const [index, row] of rows.entries()) {
+      const managerKey = managerKeys[index];
+      if (managerKey)
         await db.employee.update({
-          where: { id: row.id },
-          data: { managerId: row.managerId },
+          where: { id: persistedId(draftKey(row.email)) },
+          data: { managerId: persistedId(managerKey) },
         });
     }
     return db.employee.findMany({
-      where: { organizationId, id: { in: data.map((row) => row.id) } },
+      where: {
+        organizationId,
+        id: { in: created.map((employee) => employee.id) },
+      },
       orderBy: { createdAt: 'asc' },
     });
   }
