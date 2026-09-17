@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -18,6 +19,7 @@ import { InvitationsModule } from './invitations/invitations.module';
 import { LeaveModule } from './leave/leave.module';
 import { MeModule } from './me/me.module';
 import { ComplianceModule } from './compliance/compliance.module';
+import { PeopleModule } from './people/people.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TenantInterceptor } from './database/tenant.interceptor';
 import { AuditInterceptor } from './audit/audit.interceptor';
@@ -25,6 +27,12 @@ import { AuditInterceptor } from './audit/audit.interceptor';
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     PrismaModule,
     AuthModule,
     OrganizationsModule,
@@ -41,10 +49,15 @@ import { AuditInterceptor } from './audit/audit.interceptor';
     LeaveModule,
     MeModule,
     ComplianceModule,
+    PeopleModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: TenantInterceptor,

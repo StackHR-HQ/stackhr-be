@@ -38,5 +38,21 @@ export class AddEmployeeDto {
 
   @IsOptional()
   @IsString()
+  id?: string;
+
+  @IsOptional()
+  @IsString()
   managerId?: string;
+
+  @IsOptional()
+  @IsString()
+  managerName?: string;
+
+  @IsOptional()
+  @IsString()
+  manager?: string;
+
+  @IsOptional()
+  @IsString()
+  managerEmail?: string;
 }

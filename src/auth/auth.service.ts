@@ -1,8 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
+  NotFoundException,
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -26,6 +26,7 @@ import {
   type UserType,
 } from './auth.constants';
 import type { AuthenticatedUser } from './auth.types';
+import { verificationEmail } from '../notifications/email-templates';
 
 interface SignupBusinessInput {
   email: string;
@@ -38,6 +39,7 @@ interface SignupBusinessInput {
 interface LoginInput {
   email: string;
   password: string;
+  orgSlug?: string;
 }
 
 interface SessionOptions {
@@ -51,7 +53,11 @@ interface UserRecord {
   email: string;
   userType: string;
   role: string | null;
-  memberships: Array<{ organizationId: string }>;
+  memberships: Array<{
+    organizationId: string;
+    role: string;
+    organization: { name: string; slug: string };
+  }>;
 }
 
 @Injectable()
@@ -63,6 +69,146 @@ export class AuthService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.ensureConfiguredAdmin();
+  }
+
+  /** What the accept page shows before the employee sets or confirms a password. */
+  async previewInvitation(token: string) {
+    const invitation = await this.findPendingInvitation(token);
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: invitation.email },
+    });
+
+    return {
+      employeeName: invitation.employee.fullName,
+      email: invitation.email,
+      organizationName: invitation.organization.name,
+      expiresAt: invitation.expiresAt,
+      hasAccount: Boolean(existingUser),
+    };
+  }
+
+  /**
+   * Grants an invited employee access to the self-service portal: a verified
+   * EMPLOYEE membership in the inviting organization, linked to their employee
+   * record, which moves to ONBOARDING until onboarding is completed.
+   */
+  async acceptEmployeeInvitation(
+    input: { token: string; password: string },
+    options: SessionOptions,
+  ) {
+    const invitation = await this.findPendingInvitation(input.token);
+    const password = this.validatePassword(input.password);
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: invitation.email },
+    });
+
+    // Emails are unique across StackHR, so an existing account is linked
+    // rather than duplicated, and only after its own password is confirmed.
+    if (
+      existingUser &&
+      (existingUser.banned ||
+        !existingUser.passwordHash ||
+        !(await this.verifyPassword(password, existingUser.passwordHash)))
+    ) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+    const passwordHash = existingUser
+      ? null
+      : await this.hashPassword(password);
+
+    const user = await this.prisma.$transaction(async (transaction) => {
+      const created =
+        existingUser ??
+        (await transaction.user.create({
+          data: {
+            id: randomUUID(),
+            name: invitation.employee.fullName,
+            email: invitation.email,
+            passwordHash,
+            // The emailed link proves ownership of the address.
+            emailVerified: true,
+            userType: USER_TYPES.BUSINESS,
+            role: USER_ROLES.EMPLOYEE,
+          },
+        }));
+      // Membership first: the database refuses an employee link without it.
+      const membership = await transaction.member.findFirst({
+        where: {
+          organizationId: invitation.organizationId,
+          userId: created.id,
+        },
+      });
+      if (!membership) {
+        await transaction.member.create({
+          data: {
+            id: randomUUID(),
+            organizationId: invitation.organizationId,
+            userId: created.id,
+            role: USER_ROLES.EMPLOYEE,
+            createdAt: new Date(),
+          },
+        });
+      }
+      await transaction.employee.update({
+        where: {
+          id: invitation.employee.id,
+          organizationId: invitation.organizationId,
+        },
+        data: { userId: created.id, status: 'ONBOARDING' },
+      });
+      await transaction.invitation.update({
+        where: { id: invitation.id },
+        data: { status: 'accepted' },
+      });
+      return created;
+    });
+
+    const authenticatedUser = this.toAuthenticatedUser(
+      {
+        ...user,
+        memberships: [
+          {
+            organizationId: invitation.organizationId,
+            role: USER_ROLES.EMPLOYEE,
+            organization: invitation.organization,
+          },
+        ],
+      },
+      invitation.organizationId,
+    );
+    const token = await this.createSession(
+      user.id,
+      options,
+      invitation.organizationId,
+    );
+    return { user: authenticatedUser, token };
+  }
+
+  /**
+   * Unknown, used and expired links are indistinguishable to the caller so a
+   * token cannot be probed for its state.
+   */
+  private async findPendingInvitation(token: string) {
+    const invitation =
+      typeof token === 'string' && token
+        ? await this.prisma.invitation.findUnique({
+            where: { tokenHash: this.hashToken(token) },
+            include: {
+              employee: { select: { id: true, fullName: true } },
+              organization: { select: { name: true, slug: true } },
+            },
+          })
+        : null;
+    if (
+      !invitation?.employee ||
+      invitation.status !== 'pending' ||
+      invitation.expiresAt.getTime() <= Date.now()
+    ) {
+      throw new NotFoundException(
+        'This invitation link is invalid or has expired',
+      );
+    }
+    return { ...invitation, employee: invitation.employee };
   }
 
   async signupBusiness(input: SignupBusinessInput): Promise<{
@@ -121,18 +267,6 @@ export class AuthService implements OnModuleInit {
           slug,
           ownerId: userId,
           createdAt: new Date(),
-          metadata: JSON.stringify({
-            approvalConfig: {
-              defaultStages: 1,
-              types: [
-                'LEAVE',
-                'EXPENSE',
-                'REIMBURSEMENT',
-                'SALARY_ADVANCE',
-                'PAYROLL',
-              ],
-            },
-          }),
         },
       });
 
@@ -159,7 +293,15 @@ export class AuthService implements OnModuleInit {
     const code = this.validateVerificationCode(codeInput);
     const user = await this.prisma.user.findUnique({
       where: { email },
-      include: { memberships: { select: { organizationId: true } } },
+      include: {
+        memberships: {
+          select: {
+            organizationId: true,
+            role: true,
+            organization: { select: { name: true, slug: true } },
+          },
+        },
+      },
     });
 
     if (!user || user.userType !== USER_TYPES.BUSINESS) {
@@ -193,7 +335,11 @@ export class AuthService implements OnModuleInit {
     ]);
 
     const authenticatedUser = this.toAuthenticatedUser(user);
-    const token = await this.createSession(user.id, options);
+    const token = await this.createSession(
+      user.id,
+      options,
+      authenticatedUser.organizationId,
+    );
 
     return {
       user: { ...authenticatedUser },
@@ -237,7 +383,15 @@ export class AuthService implements OnModuleInit {
       where: { token: this.hashToken(token) },
       include: {
         user: {
-          include: { memberships: { select: { organizationId: true } } },
+          include: {
+            memberships: {
+              select: {
+                organizationId: true,
+                role: true,
+                organization: { select: { name: true, slug: true } },
+              },
+            },
+          },
         },
       },
     });
@@ -251,49 +405,14 @@ export class AuthService implements OnModuleInit {
       return null;
     }
 
-    return this.toAuthenticatedUser(session.user, session.activeOrganizationId);
-  }
-
-  async switchOrganization(
-    token: string,
-    targetOrganizationId: string,
-  ): Promise<{ user: AuthenticatedUser }> {
-    const session = await this.prisma.session.findUnique({
-      where: { token: this.hashToken(token) },
-      include: {
-        user: {
-          include: { memberships: { select: { organizationId: true } } },
-        },
-      },
-    });
-
     if (
-      !session ||
-      session.revokedAt ||
-      session.expiresAt <= new Date() ||
-      session.user.banned
-    ) {
-      throw new UnauthorizedException('Session is invalid or expired');
-    }
-
-    const isMember = session.user.memberships.some(
-      (m) => m.organizationId === targetOrganizationId,
-    );
-
-    if (!isMember) {
-      throw new ForbiddenException(
-        'You are not a member of the target organization',
-      );
-    }
-
-    await this.prisma.session.update({
-      where: { id: session.id },
-      data: { activeOrganizationId: targetOrganizationId },
-    });
-
-    return {
-      user: this.toAuthenticatedUser(session.user, targetOrganizationId),
-    };
+      session.activeOrganizationId &&
+      !session.user.memberships.some(
+        (member) => member.organizationId === session.activeOrganizationId,
+      )
+    )
+      return null;
+    return this.toAuthenticatedUser(session.user, session.activeOrganizationId);
   }
 
   getTokenFromRequest(request: Request): string | null {
@@ -381,14 +500,37 @@ export class AuthService implements OnModuleInit {
     const password = this.validatePassword(input.password);
     const user = await this.prisma.user.findFirst({
       where: { email, userType },
-      include: { memberships: { select: { organizationId: true } } },
+      include: {
+        memberships: {
+          select: {
+            organizationId: true,
+            role: true,
+            organization: { select: { name: true, slug: true } },
+          },
+        },
+      },
     });
 
-    if (
-      !user?.passwordHash ||
-      !(await this.verifyPassword(password, user.passwordHash))
-    ) {
+    if (!user?.passwordHash) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    const isPasswordValid = await this.verifyPassword(
+      password,
+      user.passwordHash,
+    );
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (!user.passwordHash.startsWith('$argon2')) {
+      const newHash = await this.hashPassword(password);
+      await this.prisma.user
+        .update({
+          where: { id: user.id },
+          data: { passwordHash: newHash },
+        })
+        .catch(() => null);
     }
 
     if (user.banned) {
@@ -401,13 +543,32 @@ export class AuthService implements OnModuleInit {
       );
     }
 
-    const token = await this.createSession(user.id, options);
-    return { user: this.toAuthenticatedUser(user), token };
+    const membership =
+      input.orgSlug === undefined
+        ? user.memberships[0]
+        : user.memberships.find(
+            (member) =>
+              member.organization.slug === input.orgSlug?.trim().toLowerCase(),
+          );
+    if (userType === USER_TYPES.BUSINESS && !membership) {
+      throw new UnauthorizedException('Invalid workspace, email or password');
+    }
+    const authenticatedUser = this.toAuthenticatedUser(
+      user,
+      membership?.organizationId,
+    );
+    const token = await this.createSession(
+      user.id,
+      options,
+      authenticatedUser.organizationId,
+    );
+    return { user: authenticatedUser, token };
   }
 
   private async createSession(
     userId: string,
     options: SessionOptions,
+    organizationId: string | null,
   ): Promise<string> {
     const token = randomBytes(32).toString('base64url');
 
@@ -416,6 +577,7 @@ export class AuthService implements OnModuleInit {
         id: randomUUID(),
         token: this.hashToken(token),
         userId,
+        activeOrganizationId: organizationId,
         expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
         ipAddress: options.ipAddress,
         userAgent: options.userAgent,
@@ -445,9 +607,7 @@ export class AuthService implements OnModuleInit {
     if (apiKey) {
       await this.emailService.send({
         to: email,
-        subject: 'Verify your StackHR email',
-        text: `Your StackHR verification code is ${code}. It expires in 10 minutes.`,
-        html: `<p>Your StackHR verification code is <strong>${code}</strong>.</p><p>It expires in 10 minutes.</p>`,
+        ...verificationEmail(code),
         idempotencyKey: `business-signup-verification:${email}:${expiresAt.getTime()}`,
       });
       return { email, expiresAt };
@@ -490,20 +650,45 @@ export class AuthService implements OnModuleInit {
     );
   }
 
+  toFrontendUser(user: AuthenticatedUser) {
+    const businessRoles: Partial<Record<UserRole, string>> = {
+      BUSINESS_OWNER: 'admin',
+      BUSINESS_ADMIN: 'admin',
+      HR_ADMIN: 'admin',
+      MANAGER: 'manager',
+      EMPLOYEE: 'employee',
+    };
+    const role =
+      user.userType === USER_TYPES.STACKHR_ADMIN
+        ? user.role
+        : (businessRoles[user.role] ?? 'employee');
+    return {
+      ...user,
+      role,
+      backendRole: user.role,
+      orgSlug: user.orgSlug ?? null,
+      orgName: user.orgName ?? null,
+    };
+  }
+
   private toAuthenticatedUser(
     user: UserRecord,
-    activeOrganizationId?: string | null,
+    organizationId?: string | null,
   ): AuthenticatedUser {
-    const selectedOrgId =
-      activeOrganizationId ?? user.memberships[0]?.organizationId ?? null;
-
+    const member = organizationId
+      ? user.memberships.find(
+          (entry) => entry.organizationId === organizationId,
+        )
+      : user.memberships[0];
     return {
       id: user.id,
       name: user.name,
       email: user.email,
       userType: user.userType as UserType,
-      role: (user.role ?? USER_ROLES.EMPLOYEE) as UserRole,
-      organizationId: selectedOrgId,
+      role: (member?.role ?? user.role ?? USER_ROLES.EMPLOYEE) as UserRole,
+      organizationId: member?.organizationId ?? null,
+      orgSlug: member?.organization.slug ?? null,
+      orgName: member?.organization.name ?? null,
     };
   }
 
@@ -515,21 +700,15 @@ export class AuthService implements OnModuleInit {
     password: string,
     storedHash: string,
   ): Promise<boolean> {
-    if (storedHash.startsWith('scrypt$')) {
-      return this.verifyScryptPassword(password, storedHash);
+    if (storedHash.startsWith('$argon2')) {
+      try {
+        return await argon2.verify(storedHash, password);
+      } catch {
+        return false;
+      }
     }
-    try {
-      return await argon2.verify(storedHash, password);
-    } catch {
-      return false;
-    }
-  }
 
-  private async verifyScryptPassword(
-    password: string,
-    storedHash: string,
-  ): Promise<boolean> {
-    const [, algorithm, n, r, p, encodedSalt, encodedHash] =
+    const [algorithm, n, r, p, encodedSalt, encodedHash] =
       storedHash.split('$');
     if (
       algorithm !== 'scrypt' ||

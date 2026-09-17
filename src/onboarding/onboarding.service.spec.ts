@@ -1,157 +1,291 @@
-import { NotFoundException } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
-import { OnboardingService } from './onboarding.service';
+import type { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../database/prisma.service';
-import { USER_ROLES, USER_TYPES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { OnboardingController } from './onboarding.controller';
+import { OnboardingService } from './onboarding.service';
 
-describe('OnboardingService — Templates & Checklists', () => {
-  let service: OnboardingService;
-  let prismaMock: {
+const user: AuthenticatedUser = {
+  id: 'owner',
+  name: 'Owner',
+  email: 'owner@acme.com',
+  userType: 'BUSINESS',
+  role: 'BUSINESS_OWNER',
+  organizationId: 'org',
+};
+const companyInfo = {
+  name: 'Acme',
+  industry: 'Technology',
+  companySize: '11-50',
+  currency: 'GHS',
+  payrollFrequency: 'Bi-weekly',
+  logoDataUrl: 'data:image/png;base64,aGVsbG8=',
+};
+const employee = {
+  id: 'draft-ada',
+  fullName: 'Ada Obi',
+  email: 'ada@acme.com',
+  department: 'Engineering',
+  jobTitle: 'Developer',
+  employmentType: 'Full-time',
+  salary: 450000,
+  startDate: '2026-08-22',
+  source: 'manual',
+};
+const manager = {
+  ...employee,
+  id: 'draft-manager',
+  fullName: 'Manager',
+  email: 'manager@acme.com',
+};
+
+type StoredEmployee = {
+  id: string;
+  email: string;
+  fullName: string;
+  managerId: string | null;
+  organizationId: string;
+};
+function setup(existing: StoredEmployee[] = []) {
+  const db = {
     organization: {
-      findUnique: jest.Mock;
-      update: jest.Mock;
-    };
+      update: jest.fn().mockResolvedValue({ id: 'org', name: 'Acme' }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({ industry: 'Technology', companySize: '11-50' }),
+    },
     employee: {
-      findFirst: jest.Mock;
-    };
+      findMany: jest
+        .fn<Promise<StoredEmployee[]>, [Prisma.EmployeeFindManyArgs]>()
+        .mockResolvedValue(existing),
+      // Mirrors Postgres assigning IDs on insert.
+      createManyAndReturn: jest
+        .fn<
+          Promise<Array<{ id: string; email: string }>>,
+          [Prisma.EmployeeCreateManyAndReturnArgs]
+        >()
+        .mockImplementation((args) =>
+          Promise.resolve(
+            (args.data as Array<{ email: string }>).map((row, index) => ({
+              id: `db-${index}`,
+              email: row.email,
+            })),
+          ),
+        ),
+      update: jest.fn(),
+      count: jest.fn().mockResolvedValue(2),
+    },
   };
-
-  const mockAdminUser: AuthenticatedUser = {
-    id: 'user-admin-1',
-    name: 'Admin Owner',
-    email: 'owner@acme.com',
-    userType: USER_TYPES.BUSINESS,
-    role: USER_ROLES.BUSINESS_OWNER,
-    organizationId: 'org-123',
+  const transaction = jest.fn(
+    async (fn: (tx: Prisma.TransactionClient) => unknown) =>
+      await fn(db as unknown as Prisma.TransactionClient),
+  );
+  // Only the transaction client exposes writes: accidental writes outside it fail.
+  const service = new OnboardingService({
+    $transaction: transaction,
+  } as unknown as PrismaService);
+  return {
+    db,
+    transaction,
+    service,
+    controller: new OnboardingController(service),
   };
+}
 
-  beforeEach(async () => {
-    prismaMock = {
-      organization: {
-        findUnique: jest.fn(),
-        update: jest.fn(),
-      },
-      employee: {
-        findFirst: jest.fn(),
-      },
-    };
+describe('frontend onboarding contract', () => {
+  it('saves the exact frontend payload atomically and resolves forward draft manager IDs', async () => {
+    const { controller, db, transaction } = setup();
+    const result = await controller.complete(user, {
+      companyInfo,
+      employees: [{ ...employee, managerId: manager.id }, manager],
+    });
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(db.organization.update).toHaveBeenCalledWith({
+      where: { id: 'org' },
+      data: expect.objectContaining({
+        name: 'Acme',
+        currency: 'GHS',
+        payrollFrequency: 'BIWEEKLY',
+        logo: companyInfo.logoDataUrl,
+      }) as unknown,
+    });
+    const rows = db.employee.createManyAndReturn.mock.calls[0][0]
+      .data as StoredEmployee[];
+    expect(rows[0]).toMatchObject({
+      organizationId: 'org',
+      employmentType: 'FULL_TIME',
+      firstName: 'Ada',
+      lastName: 'Obi',
+    });
+    // Postgres assigns IDs; draft IDs only link rows within the submission.
+    expect(rows[0]).not.toHaveProperty('id');
+    expect(db.employee.update).toHaveBeenCalledWith({
+      where: { id: 'db-0' },
+      data: { managerId: 'db-1' },
+    });
+    expect(result.onboarding.complete).toBe(true);
+  });
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        OnboardingService,
+  it.each(['manager', 'manager name', 'managerEmail'])(
+    'resolves the CSV %s header within the workspace',
+    async (header) => {
+      const { service, db } = setup([
         {
-          provide: PrismaService,
-          useValue: prismaMock,
+          id: 'existing',
+          email: 'manager@acme.com',
+          fullName: 'Manager',
+          managerId: null,
+          organizationId: 'org',
         },
-      ],
-    }).compile();
-
-    service = module.get<OnboardingService>(OnboardingService);
-  });
-
-  describe('getTemplates', () => {
-    it('should return default department templates if metadata is empty', async () => {
-      prismaMock.organization.findUnique.mockResolvedValue({
-        id: 'org-123',
-        metadata: null,
-      });
-
-      const result = await service.getTemplates(mockAdminUser);
-
-      expect(result.templates.length).toBeGreaterThan(0);
-      expect(result.templates[0].department).toBe('General');
-    });
-
-    it('should return custom templates from organization metadata', async () => {
-      const customTemplates = [
-        {
-          department: 'Design',
-          title: 'Design Onboarding',
-          tasks: [{ id: 't1', title: 'Figma license setup', required: true }],
-        },
-      ];
-      prismaMock.organization.findUnique.mockResolvedValue({
-        id: 'org-123',
-        metadata: JSON.stringify({ onboardingTemplates: customTemplates }),
-      });
-
-      const result = await service.getTemplates(mockAdminUser);
-
-      expect(result.templates).toEqual(customTemplates);
-    });
-  });
-
-  describe('saveTemplate', () => {
-    it('should save/update a department onboarding template', async () => {
-      prismaMock.organization.findUnique.mockResolvedValue({
-        id: 'org-123',
-        metadata: null,
-      });
-      prismaMock.organization.update.mockResolvedValue({ id: 'org-123' });
-
-      const dto = {
-        department: 'Engineering',
-        title: 'Tech Onboarding',
-        tasks: [{ title: 'Setup Mac', required: true }],
-      };
-
-      const result = await service.saveTemplate(mockAdminUser, dto);
-
-      expect(result.message).toBe('Onboarding template saved successfully');
-      expect(result.template.department).toBe('Engineering');
-      expect(prismaMock.organization.update).toHaveBeenCalled();
-    });
-  });
-
-  describe('getEmployeeChecklist', () => {
-    it('should generate employee onboarding checklist based on department template', async () => {
-      prismaMock.employee.findFirst.mockResolvedValue({
-        id: 'emp-1',
-        fullName: 'Alice Dev',
-        department: 'Engineering',
-      });
-      prismaMock.organization.findUnique.mockResolvedValue({
-        id: 'org-123',
-        metadata: null,
-      });
-
-      const result = await service.getEmployeeChecklist(mockAdminUser, 'emp-1');
-
-      expect(result.employeeId).toBe('emp-1');
-      expect(result.checklist.length).toBeGreaterThan(0);
-    });
-
-    it('should throw NotFoundException if employee not found', async () => {
-      prismaMock.employee.findFirst.mockResolvedValue(null);
-
-      await expect(
-        service.getEmployeeChecklist(mockAdminUser, 'invalid-id'),
-      ).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('updateChecklistTask', () => {
-    it('should toggle task completion status', async () => {
-      prismaMock.employee.findFirst.mockResolvedValue({
-        id: 'emp-1',
-        fullName: 'Alice Dev',
-        department: 'General',
-      });
-      prismaMock.organization.findUnique.mockResolvedValue({
-        id: 'org-123',
-        metadata: null,
-      });
-
-      const result = await service.updateChecklistTask(
-        mockAdminUser,
-        'emp-1',
-        'task-1',
-        true,
+      ]);
+      await service.importEmployees(
+        user,
+        `fullName,email,department,jobTitle,employmentType,salary,startDate,${header}\nAda Obi,ada@acme.com,Engineering,Developer,Part-time,450000,2026-08-22,${header === 'managerEmail' ? 'manager@acme.com' : 'Manager'}`,
       );
+      expect(db.employee.findMany.mock.calls[0][0]).toMatchObject({
+        where: { organizationId: 'org' },
+      });
+      expect(db.employee.update).toHaveBeenCalledWith({
+        where: { id: expect.any(String) as unknown },
+        data: { managerId: 'existing' },
+      });
+    },
+  );
 
-      expect(result.task.completed).toBe(true);
-      expect(result.task.completedAt).not.toBeNull();
-    });
+  it.each(['NGN', 'USD', 'GHS', 'KES', 'ZAR', 'GBP', 'EUR'])(
+    'accepts currency %s',
+    async (currency) => {
+      const { controller } = setup();
+      await expect(
+        controller.complete(user, {
+          companyInfo: { ...companyInfo, currency },
+          employees: [employee],
+        }),
+      ).resolves.toBeDefined();
+    },
+  );
+
+  it.each(['Monthly', 'Weekly', 'MONTHLY', 'BIWEEKLY', 'WEEKLY'])(
+    'accepts payroll frequency %s',
+    async (payrollFrequency) => {
+      const { controller } = setup();
+      await expect(
+        controller.complete(user, {
+          companyInfo: { ...companyInfo, payrollFrequency },
+          employees: [employee],
+        }),
+      ).resolves.toBeDefined();
+    },
+  );
+
+  it.each(['Full-time', 'Part-time', 'Contract', 'Intern', 'FULL_TIME'])(
+    'accepts employment type %s',
+    async (employmentType) => {
+      const { controller } = setup();
+      await expect(
+        controller.complete(user, {
+          companyInfo,
+          employees: [{ ...employee, employmentType }],
+        }),
+      ).resolves.toBeDefined();
+    },
+  );
+
+  it.each([
+    [{ ...employee, managerId: employee.id }],
+    [{ ...employee, managerId: 'another-tenant-employee' }],
+    [{ ...employee, managerName: 'Missing Manager' }],
+    [
+      { ...employee, managerId: manager.id },
+      { ...manager, managerId: employee.id },
+    ],
+    [employee, employee],
+  ])(
+    'rejects invalid relationships or duplicates before inserting employees',
+    async (...employees) => {
+      const { controller, db } = setup();
+      await expect(
+        controller.complete(user, { companyInfo, employees }),
+      ).rejects.toThrow();
+      expect(db.employee.createManyAndReturn).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects ambiguous names', async () => {
+    const { controller } = setup([
+      {
+        id: 'a',
+        fullName: 'Manager',
+        email: 'a@acme.com',
+        managerId: null,
+        organizationId: 'org',
+      },
+      {
+        id: 'b',
+        fullName: 'Manager',
+        email: 'b@acme.com',
+        managerId: null,
+        organizationId: 'org',
+      },
+    ]);
+    await expect(
+      controller.complete(user, {
+        companyInfo,
+        employees: [{ ...employee, managerName: 'Manager' }],
+      }),
+    ).rejects.toThrow('exactly one');
+  });
+
+  it('returns a conflict when another request inserts the email concurrently', async () => {
+    const { controller, db } = setup();
+    db.employee.createManyAndReturn.mockRejectedValue({ code: 'P2002' });
+    await expect(
+      controller.complete(user, { companyInfo, employees: [employee] }),
+    ).rejects.toThrow('already exists');
+  });
+
+  it('propagates write failure out of the transaction so Prisma rolls back the whole save', async () => {
+    const { controller, db, transaction } = setup();
+    db.employee.createManyAndReturn.mockRejectedValue(
+      new Error('database failure'),
+    );
+    await expect(
+      controller.complete(user, { companyInfo, employees: [employee] }),
+    ).rejects.toThrow('database failure');
+    await expect(transaction.mock.results[0].value).rejects.toThrow(
+      'database failure',
+    );
+    expect(db.organization.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects malformed company/employee payloads and non-admin access', async () => {
+    const { controller, transaction } = setup();
+    expect(() =>
+      controller.complete(user, { companyInfo: null, employees: [] }),
+    ).toThrow('companyInfo');
+    expect(() =>
+      controller.complete(user, { companyInfo, employees: [null] }),
+    ).toThrow('employee');
+    await expect(
+      controller.complete(
+        { ...user, role: 'EMPLOYEE' },
+        { companyInfo, employees: [employee] },
+      ),
+    ).rejects.toThrow('administrator');
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'data:text/html;base64,aGVsbG8=',
+    'data:image/png;base64,...',
+    `data:image/png;base64,${Buffer.alloc(2 * 1024 * 1024 + 1).toString('base64')}`,
+  ])('rejects invalid or oversized image data', async (logoDataUrl) => {
+    const { controller, db } = setup();
+    await expect(
+      controller.complete(user, {
+        companyInfo: { ...companyInfo, logoDataUrl },
+        employees: [employee],
+      }),
+    ).rejects.toThrow();
+    expect(db.organization.update).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,7 @@
 import {
   IsEmail,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -15,4 +16,8 @@ export class LoginDto {
   @MinLength(12, { message: 'Password must be between 12 and 128 characters' })
   @MaxLength(128, { message: 'Password must be between 12 and 128 characters' })
   password!: string;
+
+  @IsOptional()
+  @IsString()
+  orgSlug?: string;
 }

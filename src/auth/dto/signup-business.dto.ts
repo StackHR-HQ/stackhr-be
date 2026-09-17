@@ -27,5 +27,9 @@ export class SignupBusinessDto {
 
   @IsOptional()
   @IsString()
+  organizationName?: string;
+
+  @IsOptional()
+  @IsString()
   organizationSlug?: string;
 }

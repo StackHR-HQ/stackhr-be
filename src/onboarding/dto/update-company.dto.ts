@@ -34,4 +34,12 @@ export class UpdateCompanyDto {
   @IsOptional()
   @IsString()
   logo?: string;
+
+  @IsOptional()
+  @IsString()
+  logoDataUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  name?: string;
 }
