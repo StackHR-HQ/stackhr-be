@@ -7,6 +7,9 @@ self-service portal. It supplements the screen-oriented People contract in
 documents overlap, this document defines the required write workflows and
 authorization rules for P0 completion.
 
+The Settings → Team & Access backend contract is documented separately in
+[team-access-backend-endpoints.md](./team-access-backend-endpoints.md).
+
 Base URL:
 
 ```text
