@@ -1,0 +1,9 @@
+# Use this workspace to collaborate
+workspace:
+  id: 9ca3f0e0-638b-4ebf-8d8b-76f4dea5e1c6
+
+localResources:
+  collections:
+    - ../StackHR.postman_collection.json
+  environments:
+    - ../StackHR.postman_environment.json
