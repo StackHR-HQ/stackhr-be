@@ -1,0 +1,3457 @@
+{
+  "info": {
+    "_postman_id": "stackhr-api-collection",
+    "name": "StackHR Backend API",
+    "description": "Postman API collection for StackHR backend modular monolith.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Authentication and user session management endpoints.",
+      "item": [
+        {
+          "name": "Register Business",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@company.com\",\n  \"password\": \"SecurePass123!\",\n  \"confirmPassword\": \"SecurePass123!\",\n  \"companyName\": \"Acme Corp\",\n  \"organizationSlug\": \"acme-corp\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/business/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "business",
+                "register"
+              ]
+            },
+            "description": "Register a new business account and create organization workspace. Public endpoint."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"email\": \"owner@company.com\",\n  \"expiresAt\": \"2026-09-09T10:00:00.000Z\"\n}"
+            },
+            {
+              "name": "Validation Error (400)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": [\n    \"A valid email is required\",\n    \"Password must be between 12 and 128 characters\",\n    \"property unknownField should not exist\"\n  ],\n  \"error\": \"Bad Request\",\n  \"statusCode\": 400\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify Business Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@company.com\",\n  \"code\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/business/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "business",
+                "verify-email"
+              ]
+            },
+            "description": "Verify 6-digit email code and generate active session token."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"user\": {\n    \"id\": \"usr-123\",\n    \"name\": \"Acme Corp\",\n    \"email\": \"owner@company.com\",\n    \"userType\": \"BUSINESS\",\n    \"role\": \"BUSINESS_OWNER\",\n    \"organizationId\": \"org-123\"\n  },\n  \"onboarding\": {\n    \"organizationId\": \"org-123\",\n    \"nextStep\": \"COMPANY_INFO\"\n  }\n}"
+            },
+            {
+              "name": "Validation Error (400)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": [\n    \"Verification code must be 6 digits\"\n  ],\n  \"error\": \"Bad Request\",\n  \"statusCode\": 400\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login Business",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@company.com\",\n  \"password\": \"SecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/business/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "business",
+                "login"
+              ]
+            },
+            "description": "Authenticate business user and set HttpOnly session cookie."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"user\": {\n    \"id\": \"usr-123\",\n    \"name\": \"Acme Corp\",\n    \"email\": \"owner@company.com\",\n    \"userType\": \"BUSINESS\",\n    \"role\": \"BUSINESS_OWNER\",\n    \"organizationId\": \"org-123\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Switch Organization",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"org-456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/switch-organization",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "switch-organization"
+              ]
+            },
+            "description": "Switch active session organization workspace context (ADR-009). Requires active session and user membership in target organization."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"user\": {\n    \"id\": \"usr-123\",\n    \"name\": \"Acme Corp\",\n    \"email\": \"owner@company.com\",\n    \"userType\": \"BUSINESS\",\n    \"role\": \"BUSINESS_OWNER\",\n    \"organizationId\": \"org-456\"\n  }\n}"
+            },
+            {
+              "name": "Not Member (403)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"You are not a member of the target organization\",\n  \"error\": \"Forbidden\",\n  \"statusCode\": 403\n}"
+            }
+          ]
+        },
+        {
+          "name": "Preview Invitation (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/invitations/:token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "invitations",
+                ":token"
+              ]
+            },
+            "description": "Public endpoint to preview employee invitation details before setting password."
+          },
+          "response": []
+        },
+        {
+          "name": "Accept Employee Invitation (Public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/invitations/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "invitations",
+                "accept"
+              ]
+            },
+            "description": "Public endpoint to set or confirm password and sign in using invitation token.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"invitation-token-123\",\n  \"password\": \"SecurePassword123!\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resend Business Verification Code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/business/resend-verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "business",
+                "resend-verification"
+              ]
+            },
+            "description": "Resend 6-digit email verification code.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@company.com\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Platform Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/admin/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "admin",
+                "login"
+              ]
+            },
+            "description": "Authenticate platform administrator account.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@stackhr.app\",\n  \"password\": \"AdminPassword123!\"\n}"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Onboarding",
+      "description": "Organization company profile setup and initial employee onboarding endpoints.",
+      "item": [
+        {
+          "name": "Update Company Info",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyName\": \"Acme Corp\",\n  \"industry\": \"Fintech\",\n  \"companySize\": \"11-50\",\n  \"currency\": \"NGN\",\n  \"payrollFrequency\": \"MONTHLY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboarding/company",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding",
+                "company"
+              ]
+            },
+            "description": "Update organization profile details. Required roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"organization\": {\n    \"id\": \"org-123\",\n    \"name\": \"Acme Corp\",\n    \"industry\": \"Fintech\",\n    \"companySize\": \"11-50\",\n    \"currency\": \"NGN\"\n  },\n  \"onboarding\": {\n    \"organizationId\": \"org-123\",\n    \"companyInfoComplete\": true,\n    \"nextStep\": \"FIRST_EMPLOYEE\"\n  }\n}"
+            },
+            {
+              "name": "Validation Error (400)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": [\n    \"currency must be one of: NGN, USD, GBP, EUR\"\n  ],\n  \"error\": \"Bad Request\",\n  \"statusCode\": 400\n}"
+            }
+          ]
+        },
+        {
+          "name": "Add Employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Jane Doe\",\n  \"email\": \"jane@acme.com\",\n  \"department\": \"Engineering\",\n  \"jobTitle\": \"Staff Engineer\",\n  \"employmentType\": \"FULL_TIME\",\n  \"salary\": 850000,\n  \"startDate\": \"2026-01-15\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboarding/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding",
+                "employees"
+              ]
+            },
+            "description": "Add a single employee during onboarding. Required roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"employee\": {\n    \"id\": \"emp-123\",\n    \"organizationId\": \"org-123\",\n    \"fullName\": \"Jane Doe\",\n    \"email\": \"jane@acme.com\",\n    \"department\": \"Engineering\",\n    \"salaryAmount\": 850000\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Import Employees CSV",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboarding/employees/import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding",
+                "employees",
+                "import"
+              ]
+            },
+            "description": "Bulk import employee records from raw CSV payload.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"csv\": \"fullName,email,department,jobTitle,employmentType,salary,startDate\\nJohn Doe,john@acme.com,Engineering,Software Engineer,FULL_TIME,500000,2026-01-01\"\n}"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Approvals",
+      "description": "Generic polymorphic approvals engine endpoints (US-023).",
+      "item": [
+        {
+          "name": "Submit Approval Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"LEAVE\",\n  \"subjectTable\": \"leave_request\",\n  \"subjectId\": \"leave-123\",\n  \"amountSnapshot\": 5,\n  \"metadata\": \"{\\\"reason\\\": \\\"Annual Leave\\\"}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/approvals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "approvals"
+              ]
+            },
+            "description": "Submit a new approval request. Polymorphic type can be LEAVE, EXPENSE, REIMBURSEMENT, SALARY_ADVANCE, or PAYROLL."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"approvalRequest\": {\n    \"id\": \"appr-123\",\n    \"organizationId\": \"org-123\",\n    \"type\": \"LEAVE\",\n    \"subjectTable\": \"leave_request\",\n    \"subjectId\": \"leave-123\",\n    \"requesterId\": \"usr-123\",\n    \"status\": \"PENDING\",\n    \"stage\": 1,\n    \"submittedAt\": \"2026-09-09T10:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Approval Requests (Inbox)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/approvals?status=PENDING&page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "approvals"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "List unified approval inbox requests for current tenant. Non-elevated roles see their own requests."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"items\": [\n    {\n      \"id\": \"appr-123\",\n      \"type\": \"LEAVE\",\n      \"status\": \"PENDING\",\n      \"requesterId\": \"usr-123\"\n    }\n  ],\n  \"meta\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 20,\n    \"totalPages\": 1\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Decide Approval Request (Approve/Reject)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/approvals/appr-123/decide",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "approvals",
+                "appr-123",
+                "decide"
+              ]
+            },
+            "description": "Approve or reject a pending request. Maker-checker rule: requester cannot approve their own request. Roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN, MANAGER."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"approvalRequest\": {\n    \"id\": \"appr-123\",\n    \"status\": \"APPROVED\",\n    \"approverId\": \"mgr-456\",\n    \"decidedAt\": \"2026-09-09T10:15:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "Maker-Checker Violation (403)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"You cannot approve or reject your own request\",\n  \"error\": \"Forbidden\",\n  \"statusCode\": 403\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Employees",
+      "description": "Employee CRUD management and offboarding endpoints.",
+      "item": [
+        {
+          "name": "Create Employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Jane Doe\",\n  \"email\": \"jane.doe@company.com\",\n  \"department\": \"Engineering\",\n  \"jobTitle\": \"Senior Software Engineer\",\n  \"employmentType\": \"FULL_TIME\",\n  \"salaryAmount\": 650000,\n  \"startDate\": \"2026-01-15\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees"
+              ]
+            },
+            "description": "Create a new employee record under active organization."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"employee\": {\n    \"id\": \"emp-123\",\n    \"organizationId\": \"org-456\",\n    \"fullName\": \"Jane Doe\",\n    \"email\": \"jane.doe@company.com\",\n    \"department\": \"Engineering\",\n    \"jobTitle\": \"Senior Software Engineer\",\n    \"employmentType\": \"FULL_TIME\",\n    \"salaryAmount\": 650000,\n    \"startDate\": \"2026-01-15T00:00:00.000Z\",\n    \"status\": \"ACTIVE\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Employees (Paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/employees?page=1&limit=10&department=Engineering",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "department",
+                  "value": "Engineering"
+                }
+              ]
+            },
+            "description": "Retrieve paginated, filterable employee listing for active organization."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"data\": [\n    {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane.doe@company.com\",\n      \"department\": \"Engineering\",\n      \"jobTitle\": \"Senior Software Engineer\",\n      \"status\": \"ACTIVE\"\n    }\n  ],\n  \"meta\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 10,\n    \"totalPages\": 1\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Employee Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/employees/emp-123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees",
+                "emp-123"
+              ]
+            },
+            "description": "Fetch single employee details including manager and direct reports."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"employee\": {\n    \"id\": \"emp-123\",\n    \"fullName\": \"Jane Doe\",\n    \"email\": \"jane.doe@company.com\",\n    \"department\": \"Engineering\",\n    \"jobTitle\": \"Senior Software Engineer\",\n    \"status\": \"ACTIVE\",\n    \"manager\": null,\n    \"directReports\": []\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Employee",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobTitle\": \"Staff Engineer\",\n  \"salaryAmount\": 750000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/employees/emp-123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees",
+                "emp-123"
+              ]
+            },
+            "description": "Update specific details of an employee record."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"employee\": {\n    \"id\": \"emp-123\",\n    \"fullName\": \"Jane Doe\",\n    \"jobTitle\": \"Staff Engineer\",\n    \"salaryAmount\": 750000\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Hierarchy Tree",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/employees/hierarchy/tree",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees",
+                "hierarchy",
+                "tree"
+              ]
+            },
+            "description": "Retrieve nested organization hierarchy tree."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"organizationTree\": [\n    {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane CEO\",\n      \"directReports\": []\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Department Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/employees/departments/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees",
+                "departments",
+                "summary"
+              ]
+            },
+            "description": "Retrieve summary breakdown of employees grouped by department."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"departments\": [\n    {\n      \"department\": \"Engineering\",\n      \"count\": 5,\n      \"employees\": []\n    }\n  ],\n  \"totalDepartments\": 1,\n  \"totalEmployees\": 5\n}"
+            }
+          ]
+        },
+        {
+          "name": "Reassign Employee Manager",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"managerId\": \"emp-mgr-456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/employees/emp-123/reassign-manager",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees",
+                "emp-123",
+                "reassign-manager"
+              ]
+            },
+            "description": "Reassign manager for an employee. Performs circular hierarchy check."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Manager reassigned successfully\",\n  \"employee\": {\n    \"id\": \"emp-123\",\n    \"managerId\": \"emp-mgr-456\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Offboard Employee",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offboardDate\": \"2026-12-31\",\n  \"reason\": \"Resigned for personal reasons\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/employees/emp-123/offboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees",
+                "emp-123",
+                "offboard"
+              ]
+            },
+            "description": "Offboard an employee and mark status as OFFBOARDED."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Employee offboarded successfully\",\n  \"employee\": {\n    \"id\": \"emp-123\",\n    \"status\": \"OFFBOARDED\"\n  },\n  \"offboardDetails\": {\n    \"offboardDate\": \"2026-12-31\",\n    \"reason\": \"Resigned for personal reasons\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Invitations",
+      "description": "Workspace invitation management, member onboarding, and expiration handling endpoints.",
+      "item": [
+        {
+          "name": "Send Workspace Invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newmember@company.com\",\n  \"role\": \"EMPLOYEE\",\n  \"department\": \"Engineering\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/invitations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invitations"
+              ]
+            },
+            "description": "Send a 7-day expiration workspace invitation to a new team member."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"invitation\": {\n    \"id\": \"inv-123\",\n    \"email\": \"newmember@company.com\",\n    \"role\": \"EMPLOYEE\",\n    \"status\": \"pending\",\n    \"expiresAt\": \"2026-09-16T10:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Invitations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/invitations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invitations"
+              ]
+            },
+            "description": "List all workspace invitations for active organization."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"invitations\": [\n    {\n      \"id\": \"inv-123\",\n      \"email\": \"newmember@company.com\",\n      \"status\": \"pending\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Invitation Details (Public)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/invitations/inv-123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invitations",
+                "inv-123"
+              ]
+            },
+            "description": "Public endpoint to inspect invitation validity and expiration status."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"invitation\": {\n    \"id\": \"inv-123\",\n    \"email\": \"newmember@company.com\",\n    \"status\": \"pending\",\n    \"organization\": {\n      \"name\": \"Acme Corp\",\n      \"slug\": \"acme-corp\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Accept Invitation (Public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"New Member\",\n  \"password\": \"SecurePassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/invitations/inv-123/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invitations",
+                "inv-123",
+                "accept"
+              ]
+            },
+            "description": "Public endpoint to accept workspace invitation and create user account."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Invitation accepted successfully\",\n  \"user\": {\n    \"id\": \"usr-789\",\n    \"name\": \"New Member\",\n    \"email\": \"newmember@company.com\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Revoke Invitation",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/invitations/inv-123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invitations",
+                "inv-123"
+              ]
+            },
+            "description": "Revoke a pending workspace invitation."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Invitation revoked successfully\",\n  \"invitation\": {\n    \"id\": \"inv-123\",\n    \"status\": \"revoked\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Resend Invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/invitations/inv-123/resend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invitations",
+                "inv-123",
+                "resend"
+              ]
+            },
+            "description": "Resend invitation and refresh 7-day expiration date."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Invitation resent successfully\",\n  \"invitation\": {\n    \"id\": \"inv-123\",\n    \"status\": \"pending\",\n    \"expiresAt\": \"2026-09-16T10:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Onboarding Templates & Checklists",
+      "description": "Department onboarding template management and per-employee checklist tracking endpoints.",
+      "item": [
+        {
+          "name": "List Onboarding Templates",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboarding/templates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding",
+                "templates"
+              ]
+            },
+            "description": "List department-based onboarding templates for active organization."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"templates\": [\n    {\n      \"department\": \"Engineering\",\n      \"title\": \"Engineering Onboarding\",\n      \"tasks\": [\n        { \"id\": \"task-eng-1\", \"title\": \"Setup workstation\", \"required\": true }\n      ]\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Save Onboarding Template",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"department\": \"Engineering\",\n  \"title\": \"Engineering Onboarding\",\n  \"tasks\": [\n    {\n      \"title\": \"Configure local dev environment\",\n      \"description\": \"Clone repos and install dependencies\",\n      \"required\": true\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboarding/templates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding",
+                "templates"
+              ]
+            },
+            "description": "Save or update a department onboarding template."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Onboarding template saved successfully\",\n  \"template\": {\n    \"department\": \"Engineering\",\n    \"title\": \"Engineering Onboarding\",\n    \"tasks\": []\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Employee Checklist",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboarding/checklists/emp-123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding",
+                "checklists",
+                "emp-123"
+              ]
+            },
+            "description": "Get onboarding checklist tasks assigned to a specific employee."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"employeeId\": \"emp-123\",\n  \"employeeName\": \"Jane Doe\",\n  \"department\": \"Engineering\",\n  \"checklist\": [\n    {\n      \"id\": \"task-eng-1\",\n      \"title\": \"Setup workstation\",\n      \"completed\": false\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Checklist Task Completion",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completed\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboarding/checklists/emp-123/tasks/task-eng-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding",
+                "checklists",
+                "emp-123",
+                "tasks",
+                "task-eng-1"
+              ]
+            },
+            "description": "Toggle completed status for an employee onboarding checklist task."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Task marked completed\",\n  \"employeeId\": \"emp-123\",\n  \"task\": {\n    \"id\": \"task-eng-1\",\n    \"completed\": true,\n    \"completedAt\": \"2026-09-09T10:45:00.000Z\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Leave Management",
+      "description": "Leave policies, leave type configurations, leave balances, and request submission routed to generic Approvals Engine.",
+      "item": [
+        {
+          "name": "Create Leave Type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Annual Paid Leave\",\n  \"description\": \"Standard annual paid time off\",\n  \"daysPerYear\": 20,\n  \"paid\": true,\n  \"requiresApproval\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/leave/types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leave",
+                "types"
+              ]
+            },
+            "description": "Create a new leave type and allocate initial balances to active employees."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"leaveType\": {\n    \"id\": \"lt-123\",\n    \"name\": \"Annual Paid Leave\",\n    \"daysPerYear\": 20,\n    \"paid\": true,\n    \"requiresApproval\": true\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Leave Types",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leave/types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leave",
+                "types"
+              ]
+            },
+            "description": "List all leave types for active organization."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"leaveTypes\": [\n    {\n      \"id\": \"lt-123\",\n      \"name\": \"Annual Paid Leave\",\n      \"daysPerYear\": 20\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Leave Balances",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leave/balances",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leave",
+                "balances"
+              ]
+            },
+            "description": "Retrieve current leave balances (allocated, used, pending, remaining) for logged in employee or organization."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"employeeId\": \"emp-123\",\n  \"balances\": [\n    {\n      \"allocatedDays\": 20,\n      \"usedDays\": 2,\n      \"pendingDays\": 5,\n      \"remainingDays\": 13,\n      \"leaveType\": {\n        \"id\": \"lt-123\",\n        \"name\": \"Annual Paid Leave\"\n      }\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Submit Leave Request (Routes to Approvals)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"leaveTypeId\": \"lt-123\",\n  \"startDate\": \"2026-10-01\",\n  \"endDate\": \"2026-10-05\",\n  \"reason\": \"Annual family vacation\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/leave/requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leave",
+                "requests"
+              ]
+            },
+            "description": "Submit a leave request. Validates leave balance and routes through the generic Approvals Engine (ADR-003)."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Leave request submitted and routed for approval\",\n  \"leaveRequest\": {\n    \"id\": \"lr-456\",\n    \"status\": \"PENDING\",\n    \"totalDays\": 5\n  },\n  \"approvalRequest\": {\n    \"id\": \"appr-789\",\n    \"status\": \"PENDING\",\n    \"type\": \"LEAVE\",\n    \"subjectTable\": \"leave_request\",\n    \"subjectId\": \"lr-456\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Leave History (Paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leave/history?page=1&limit=10&status=APPROVED",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leave",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "APPROVED"
+                }
+              ]
+            },
+            "description": "Retrieve paginated leave request history with optional status and employee filters."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"data\": [\n    {\n      \"id\": \"lr-456\",\n      \"startDate\": \"2026-10-01T00:00:00.000Z\",\n      \"endDate\": \"2026-10-05T00:00:00.000Z\",\n      \"totalDays\": 5,\n      \"status\": \"APPROVED\",\n      \"leaveType\": {\n        \"id\": \"lt-123\",\n        \"name\": \"Annual Paid Leave\"\n      }\n    }\n  ],\n  \"meta\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 10,\n    \"totalPages\": 1\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Leave Request Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leave/requests/lr-456",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leave",
+                "requests",
+                "lr-456"
+              ]
+            },
+            "description": "Retrieve details of a single leave request."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"leaveRequest\": {\n    \"id\": \"lr-456\",\n    \"startDate\": \"2026-10-01T00:00:00.000Z\",\n    \"endDate\": \"2026-10-05T00:00:00.000Z\",\n    \"totalDays\": 5,\n    \"status\": \"APPROVED\",\n    \"employee\": {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\"\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Spend Management",
+      "description": "Expenses, reimbursements, and salary advance requests routed to generic Approvals Engine.",
+      "item": [
+        {
+          "name": "Submit Expense (Routes to Approvals)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"Travel\",\n  \"amount\": 25000,\n  \"currency\": \"NGN\",\n  \"description\": \"Client visit taxi fare\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/spend/expenses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "expenses"
+              ]
+            },
+            "description": "Submit an expense claim. Routes through the generic Approvals Engine (ADR-003)."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Expense submission recorded and routed for approval\",\n  \"expense\": {\n    \"id\": \"exp-123\",\n    \"category\": \"Travel\",\n    \"amount\": 25000,\n    \"status\": \"PENDING\"\n  },\n  \"approvalRequest\": {\n    \"id\": \"appr-exp-123\",\n    \"type\": \"EXPENSE\",\n    \"status\": \"PENDING\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Expenses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spend/expenses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "expenses"
+              ]
+            },
+            "description": "List expenses for active organization / employee."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"expenses\": [\n    {\n      \"id\": \"exp-123\",\n      \"category\": \"Travel\",\n      \"amount\": 25000,\n      \"status\": \"PENDING\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Submit Salary Advance (Routes to Approvals)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 100000,\n  \"repaymentMonths\": 2,\n  \"reason\": \"Medical emergency advance\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/spend/advances",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "advances"
+              ]
+            },
+            "description": "Request a salary advance with monthly deduction calculation. Routes through generic Approvals Engine (ADR-003)."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Salary advance request submitted and routed for approval\",\n  \"salaryAdvance\": {\n    \"id\": \"adv-123\",\n    \"amount\": 100000,\n    \"repaymentMonths\": 2,\n    \"monthlyDeduction\": 50000,\n    \"status\": \"PENDING\"\n  },\n  \"approvalRequest\": {\n    \"id\": \"appr-adv-123\",\n    \"type\": \"SALARY_ADVANCE\",\n    \"status\": \"PENDING\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Attach Receipt to Expense Claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiptUrl\": \"https://storage.stackhr.app/receipts/exp-123.pdf\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/spend/expenses/exp-123/receipt",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "expenses",
+                "exp-123",
+                "receipt"
+              ]
+            },
+            "description": "Attach proof of receipt/attachment URL to an existing expense claim."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Receipt URL attached to expense claim successfully\",\n  \"expense\": {\n    \"id\": \"exp-123\",\n    \"receiptUrl\": \"https://storage.stackhr.app/receipts/exp-123.pdf\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Salary Advances",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spend/advances",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "advances"
+              ]
+            },
+            "description": "List salary advance requests."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"advances\": [\n    {\n      \"id\": \"adv-123\",\n      \"amount\": 100000,\n      \"repaymentMonths\": 2,\n      \"monthlyDeduction\": 50000,\n      \"status\": \"PENDING\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Reimbursements",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spend/reimbursements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "reimbursements"
+              ]
+            },
+            "description": "List generated pending/paid reimbursement records automatically created upon expense approval."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"reimbursements\": [\n    {\n      \"id\": \"reimb-123\",\n      \"expenseId\": \"exp-123\",\n      \"amount\": 25000,\n      \"currency\": \"NGN\",\n      \"status\": \"PENDING\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Payroll & Compensation Engine",
+      "item": [
+        {
+          "name": "Set Employee Compensation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"basicSalary\": 30000000,\n  \"housingAllowance\": 10000000,\n  \"transportAllowance\": 5000000,\n  \"otherAllowances\": 2000000,\n  \"currency\": \"NGN\",\n  \"paymentFrequency\": \"MONTHLY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payroll/compensation",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "compensation"
+              ]
+            },
+            "description": "Set/update versioned effective-dated compensation record for an employee. Automatically closes previous active record."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Compensation record set successfully\",\n  \"compensationRecord\": {\n    \"id\": \"comp-123\",\n    \"employeeId\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"basicSalary\": 30000000,\n    \"housingAllowance\": 10000000,\n    \"transportAllowance\": 5000000,\n    \"otherAllowances\": 2000000,\n    \"effectiveFrom\": \"2026-09-09T13:00:00.000Z\",\n    \"effectiveTo\": null\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Compensation History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/compensation/550e8400-e29b-41d4-a716-446655440000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "compensation",
+                "550e8400-e29b-41d4-a716-446655440000"
+              ]
+            },
+            "description": "Retrieve full versioned compensation history for an employee."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"history\": [\n    {\n      \"id\": \"comp-123\",\n      \"basicSalary\": 30000000,\n      \"effectiveFrom\": \"2026-09-09T13:00:00.000Z\",\n      \"effectiveTo\": null\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Payroll Run (Draft)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"periodMonth\": 9,\n  \"periodYear\": 2026,\n  \"title\": \"September 2026 Regular Payroll\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payroll/runs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "runs"
+              ]
+            },
+            "description": "Create a new payroll run in DRAFT status."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Payroll run created in DRAFT state\",\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"periodMonth\": 9,\n    \"periodYear\": 2026,\n    \"title\": \"September 2026 Regular Payroll\",\n    \"status\": \"DRAFT\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Calculate Payroll Run (Calculated/Preview)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/runs/run-123/calculate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "runs",
+                "run-123",
+                "calculate"
+              ]
+            },
+            "description": "Compute line items for all active employees using compensation records and transition to CALCULATED preview state."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Payroll run calculated successfully for 5 employees\",\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"status\": \"CALCULATED\",\n    \"totalGross\": 225000000,\n    \"totalTax\": 0,\n    \"totalPension\": 18000000,\n    \"totalNet\": 207000000\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Submit Payroll Run for Approval",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/runs/run-123/submit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "runs",
+                "run-123",
+                "submit"
+              ]
+            },
+            "description": "Submit calculated payroll run to generic Approvals Engine (ADR-003) and lock from further edits."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Payroll run submitted for approval and locked from edits\",\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"status\": \"PENDING_APPROVAL\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Attest Funding Check",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"confirmed\": true,\n  \"notes\": \"Bank balance verified to cover total net payout of N2,070,000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payroll/runs/run-123/funding-check",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "runs",
+                "run-123",
+                "funding-check"
+              ]
+            },
+            "description": "Attest manual funding check (ADR-004) to confirm bank balance sufficiency. Transitions to FUNDING_CHECK_PASSED or FUNDING_SHORTFALL."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Funding check passed successfully. Ready for payment execution.\",\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"status\": \"FUNDING_CHECK_PASSED\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Execute Payment (Export File)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/runs/run-123/execute",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "runs",
+                "run-123",
+                "execute"
+              ]
+            },
+            "description": "Record payment execution and generate bank payment-file export batch (ADR-004)."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Payment execution recorded and bank transfer file exported\",\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"status\": \"EXECUTED\",\n    \"executedAt\": \"2026-09-09T13:30:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Reconcile Payroll Run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/runs/run-123/reconcile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "runs",
+                "run-123",
+                "reconcile"
+              ]
+            },
+            "description": "Reconcile payroll run after manual outcome import (ADR-004)."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Payroll run successfully reconciled\",\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"status\": \"RECONCILED\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Payroll Runs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/runs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "runs"
+              ]
+            },
+            "description": "List all payroll runs for the active organization."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"payrollRuns\": [\n    {\n      \"id\": \"run-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"status\": \"RECONCILED\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Payroll Run Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/runs/run-123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "runs",
+                "run-123"
+              ]
+            },
+            "description": "Get detailed payroll run including line items and generated payslips."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"status\": \"RECONCILED\",\n    \"items\": [],\n    \"payslips\": []\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Employee Self-Service",
+      "item": [
+        {
+          "name": "Get Own Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "profile"
+              ]
+            },
+            "description": "Retrieve own employee profile details (strictly self-scoped)."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"profile\": {\n    \"id\": \"emp-123\",\n    \"fullName\": \"Jane Doe\",\n    \"email\": \"jane@acme.com\",\n    \"department\": \"Engineering\",\n    \"jobTitle\": \"Software Engineer\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Own Payslips",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/payslips",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "payslips"
+              ]
+            },
+            "description": "Retrieve list of own generated payslips (strictly self-scoped)."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"payslips\": [\n    {\n      \"id\": \"pay-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"netSalary\": 41400000\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Own Leave Balances",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/leave-balances",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "leave-balances"
+              ]
+            },
+            "description": "Retrieve own allocated, used, and remaining leave balances."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"leaveBalances\": [\n    {\n      \"allocatedDays\": 20,\n      \"usedDays\": 5,\n      \"remainingDays\": 15\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Own Leave Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/leave-requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "leave-requests"
+              ]
+            },
+            "description": "Retrieve own leave application requests."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"leaveRequests\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Own Expenses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/expenses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "expenses"
+              ]
+            },
+            "description": "Retrieve own expense claims."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"expenses\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Own Salary Advances",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/advances",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "advances"
+              ]
+            },
+            "description": "Retrieve own salary advance applications."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"salaryAdvances\": []\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Compliance & Tax Engine",
+      "description": "Statutory compliance rule sets, PAYE progressive tax bands, pension basis, NHF opt-in, and rent relief configuration managed by StackHR Admin users.",
+      "item": [
+        {
+          "name": "List Tax Rule Sets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/compliance/rule-sets?country=NG",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "compliance",
+                "rule-sets"
+              ],
+              "query": [
+                {
+                  "key": "country",
+                  "value": "NG",
+                  "description": "Filter by country code (default: NG)"
+                }
+              ]
+            },
+            "description": "Retrieve all versioned tax rule sets for a country. Requires StackHR Admin role."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"id\": \"TRS-NTA-2026\",\n    \"country\": \"NG\",\n    \"name\": \"Nigeria Tax Act 2025/2026 (NTA)\",\n    \"effectiveFrom\": \"2026-01-01T00:00:00.000Z\",\n    \"effectiveTo\": null,\n    \"isDefault\": true,\n    \"rentReliefPercentage\": 0.2,\n    \"rentReliefCap\": 500000,\n    \"pensionEmployeeRate\": 0.08,\n    \"pensionEmployerRate\": 0.1,\n    \"pensionBasisFields\": \"BASIC,HOUSING,TRANSPORT\",\n    \"nhfRate\": 0.025,\n    \"nhfBasisField\": \"BASIC\",\n    \"taxFreeThreshold\": 800000,\n    \"taxRules\": [\n      {\n        \"id\": \"TR-NTA-1\",\n        \"bandOrder\": 1,\n        \"bandName\": \"First ₦800,000\",\n        \"lowerLimit\": 0,\n        \"upperLimit\": 800000,\n        \"taxRate\": 0.0\n      },\n      {\n        \"id\": \"TR-NTA-2\",\n        \"bandOrder\": 2,\n        \"bandName\": \"Next ₦2,200,000\",\n        \"lowerLimit\": 800000,\n        \"upperLimit\": 3000000,\n        \"taxRate\": 0.15\n      }\n    ]\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Get Tax Rule Set Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/compliance/rule-sets/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "compliance",
+                "rule-sets",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "TRS-NTA-2026",
+                  "description": "Tax Rule Set ID"
+                }
+              ]
+            },
+            "description": "Retrieve detailed configuration and progressive tax bands for a specific tax rule set."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"TRS-NTA-2026\",\n  \"country\": \"NG\",\n  \"name\": \"Nigeria Tax Act 2025/2026 (NTA)\",\n  \"effectiveFrom\": \"2026-01-01T00:00:00.000Z\",\n  \"effectiveTo\": null,\n  \"isDefault\": true,\n  \"rentReliefPercentage\": 0.2,\n  \"rentReliefCap\": 500000,\n  \"pensionEmployeeRate\": 0.08,\n  \"pensionEmployerRate\": 0.1,\n  \"pensionBasisFields\": \"BASIC,HOUSING,TRANSPORT\",\n  \"nhfRate\": 0.025,\n  \"nhfBasisField\": \"BASIC\",\n  \"taxFreeThreshold\": 800000,\n  \"taxRules\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Tax Rule Set",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"country\": \"NG\",\n  \"name\": \"Nigeria Tax Act 2027 Amendment\",\n  \"effectiveFrom\": \"2027-01-01T00:00:00.000Z\",\n  \"isDefault\": true,\n  \"rentReliefPercentage\": 0.20,\n  \"rentReliefCap\": 500000,\n  \"pensionEmployeeRate\": 0.08,\n  \"pensionEmployerRate\": 0.10,\n  \"pensionBasisFields\": \"BASIC,HOUSING,TRANSPORT\",\n  \"nhfRate\": 0.025,\n  \"nhfBasisField\": \"BASIC\",\n  \"taxFreeThreshold\": 800000,\n  \"taxRules\": [\n    {\n      \"bandOrder\": 1,\n      \"bandName\": \"First ₦800,000\",\n      \"lowerLimit\": 0,\n      \"upperLimit\": 800000,\n      \"taxRate\": 0.0\n    },\n    {\n      \"bandOrder\": 2,\n      \"bandName\": \"Next ₦2,200,000\",\n      \"lowerLimit\": 800000,\n      \"upperLimit\": 3000000,\n      \"taxRate\": 0.15\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/compliance/rule-sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "compliance",
+                "rule-sets"
+              ]
+            },
+            "description": "Create a new versioned tax rule set with progressive tax bands. Requires StackHR Admin role."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"TRS-1725916000000\",\n  \"name\": \"Nigeria Tax Act 2027 Amendment\",\n  \"effectiveFrom\": \"2027-01-01T00:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Tax Rule Set",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rentReliefCap\": 600000,\n  \"pensionEmployerRate\": 0.12\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/compliance/rule-sets/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "compliance",
+                "rule-sets",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "TRS-NTA-2026",
+                  "description": "Tax Rule Set ID"
+                }
+              ]
+            },
+            "description": "Update parameters or band definitions of an existing tax rule set."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"TRS-NTA-2026\",\n  \"rentReliefCap\": 600000,\n  \"pensionEmployerRate\": 0.12\n}"
+            }
+          ]
+        },
+        {
+          "name": "Seed Default NTA 2026 Rule Set",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/compliance/seed-nta2026",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "compliance",
+                "seed-nta2026"
+              ]
+            },
+            "description": "Trigger automatic seeding of the Nigeria Tax Act 2025/2026 default rule set into the database."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"TRS-NTA-2026\",\n  \"name\": \"Nigeria Tax Act 2025/2026 (NTA)\",\n  \"isDefault\": true\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Organizations",
+      "description": "Organization workspace management endpoints.",
+      "item": [
+        {
+          "name": "Get Current Organization",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/organizations/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organizations",
+                "current"
+              ]
+            },
+            "description": "Retrieve active organization profile for current business session."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "People",
+      "description": "Unified People module endpoints (Employee Directory, Leave, Documents, Organization, Onboarding).",
+      "item": [
+        {
+          "name": "Employees",
+          "item": [
+            {
+              "name": "List Employee Directory",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/employees?query=john&status=ACTIVE&page=1&limit=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "employees"
+                  ],
+                  "query": [
+                    {
+                      "key": "query",
+                      "value": "john"
+                    },
+                    {
+                      "key": "status",
+                      "value": "ACTIVE"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
+                },
+                "description": "Get directory listing of employees with search and pagination."
+              },
+              "response": []
+            },
+            {
+              "name": "Create Employee",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/employees",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "employees"
+                  ]
+                },
+                "description": "Create individual employee record.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"fullName\": \"John Doe\",\n  \"workEmail\": \"john.doe@acme.com\",\n  \"jobTitle\": \"Software Engineer\",\n  \"employmentType\": \"FULL_TIME\",\n  \"startDate\": \"2026-01-01\",\n  \"salaryAmount\": 500000\n}"
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Employee Profile",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/employees/:employeeId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "employees",
+                    ":employeeId"
+                  ]
+                },
+                "description": "Get comprehensive employee profile, compensation, leave summary, and activity feed."
+              },
+              "response": []
+            },
+            {
+              "name": "Update Employee Profile",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/employees/:employeeId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "employees",
+                    ":employeeId"
+                  ]
+                },
+                "description": "Update employee profile details.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"jobTitle\": \"Senior Software Engineer\",\n  \"status\": \"ACTIVE\"\n}"
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Resend Employee Invitation",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/employees/:employeeId/invitations",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "employees",
+                    ":employeeId",
+                    "invitations"
+                  ]
+                },
+                "description": "Resend self-service portal invitation email to employee."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Compensation History",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/employees/:employeeId/compensation-history",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "employees",
+                    ":employeeId",
+                    "compensation-history"
+                  ]
+                },
+                "description": "Get compensation change log for employee."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Leave",
+          "item": [
+            {
+              "name": "List Leave Types",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/leave/types",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "leave",
+                    "types"
+                  ]
+                },
+                "description": "List configured leave types."
+              },
+              "response": []
+            },
+            {
+              "name": "List Leave Policies",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/leave/policies",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "leave",
+                    "policies"
+                  ]
+                },
+                "description": "List organization leave policies."
+              },
+              "response": []
+            },
+            {
+              "name": "List Leave Balances",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/leave/balances",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "leave",
+                    "balances"
+                  ]
+                },
+                "description": "Retrieve employee leave balances."
+              },
+              "response": []
+            },
+            {
+              "name": "List Leave Requests",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/leave/requests?status=PENDING",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "leave",
+                    "requests"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "PENDING"
+                    }
+                  ]
+                },
+                "description": "List employee leave requests."
+              },
+              "response": []
+            },
+            {
+              "name": "Decide Leave Request",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/leave/requests/:requestId/decision",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "leave",
+                    "requests",
+                    ":requestId",
+                    "decision"
+                  ]
+                },
+                "description": "Approve or reject a leave request.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"APPROVED\",\n  \"notes\": \"Approved by HR manager\"\n}"
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Documents",
+          "item": [
+            {
+              "name": "Get Company Documents",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/documents/company",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "documents",
+                    "company"
+                  ]
+                },
+                "description": "List organization company documents."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Employee Documents",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/documents/employees",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "documents",
+                    "employees"
+                  ]
+                },
+                "description": "List employee documents."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Document Templates",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/documents/templates",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "documents",
+                    "templates"
+                  ]
+                },
+                "description": "List document templates."
+              },
+              "response": []
+            },
+            {
+              "name": "Upload Document",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/documents",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "documents"
+                  ]
+                },
+                "description": "Upload document file (multipart/form-data).",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": ""
+                    },
+                    {
+                      "key": "name",
+                      "value": "Offer Letter"
+                    },
+                    {
+                      "key": "category",
+                      "value": "EMPLOYMENT"
+                    },
+                    {
+                      "key": "scope",
+                      "value": "company"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Organization",
+          "item": [
+            {
+              "name": "List Departments",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/departments",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "departments"
+                  ]
+                },
+                "description": "List departments with head employee and sub-departments."
+              },
+              "response": []
+            },
+            {
+              "name": "Create Department",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/departments",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "departments"
+                  ]
+                },
+                "description": "Create new department.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Engineering\",\n  \"code\": \"ENG\"\n}"
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Department",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/departments/:departmentId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "departments",
+                    ":departmentId"
+                  ]
+                },
+                "description": "Update department.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Software Engineering\"\n}"
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Department",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/departments/:departmentId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "departments",
+                    ":departmentId"
+                  ]
+                },
+                "description": "Delete department."
+              },
+              "response": []
+            },
+            {
+              "name": "List Teams",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/teams",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "teams"
+                  ]
+                },
+                "description": "List teams and team leads."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Onboarding",
+          "item": [
+            {
+              "name": "Get Onboarding Templates",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/onboarding/templates",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "onboarding",
+                    "templates"
+                  ]
+                },
+                "description": "List onboarding checklist templates."
+              },
+              "response": []
+            },
+            {
+              "name": "List Employee Onboardings",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/people/onboarding/employees",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "onboarding",
+                    "employees"
+                  ]
+                },
+                "description": "List employee onboarding progress."
+              },
+              "response": []
+            },
+            {
+              "name": "Assign Onboarding Template",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/onboarding/employees",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "onboarding",
+                    "employees"
+                  ]
+                },
+                "description": "Assign onboarding template to employee.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"employeeId\": \"{{employeeId}}\",\n  \"templateId\": \"{{templateId}}\"\n}"
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Checklist Item Status",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/onboarding/employees/:employeeId/checklist/:itemId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "onboarding",
+                    "employees",
+                    ":employeeId",
+                    "checklist",
+                    ":itemId"
+                  ]
+                },
+                "description": "Mark onboarding task item complete or incomplete.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"completed\": true\n}"
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

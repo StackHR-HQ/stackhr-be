@@ -1,0 +1,12 @@
+node_modules
+dist
+generated
+.git
+.gitignore
+.env
+.env.local
+npm-debug.log
+pnpm-debug.log
+yarn-debug.log
+yarn-error.log
+coverage
