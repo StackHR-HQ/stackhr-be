@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 const DEV_ALLOWED_ORIGINS = [
@@ -15,6 +16,9 @@ const PROD_DEFAULT_ORIGINS = ['https://app.stackhr.app'];
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Security HTTP headers
+  app.use(helmet());
 
   // Set tight default JSON limit to prevent body payload flooding DoS
   app.useBodyParser('json', { limit: '100kb' });

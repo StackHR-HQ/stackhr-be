@@ -12,7 +12,10 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CreateApprovalRequestDto } from './dto/create-approval-request.dto';
 import { DecideApprovalDto } from './dto/decide-approval.dto';
 import { ApprovalQueryDto } from './dto/approval-query.dto';
-import { ApprovalDecidedEvent } from './events/approval-decided.event';
+import {
+  APPROVAL_EVENTS,
+  ApprovalDecidedEvent,
+} from './events/approval-decided.event';
 
 @Injectable()
 export class ApprovalsService {
@@ -192,7 +195,7 @@ export class ApprovalsService {
     });
 
     this.eventEmitter.emit(
-      'approval.decided',
+      APPROVAL_EVENTS.DECIDED,
       new ApprovalDecidedEvent(
         updated.id,
         updated.organizationId,

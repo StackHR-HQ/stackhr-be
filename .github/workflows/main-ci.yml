@@ -1,14 +1,14 @@
-name: StackHR Backend CI
+name: Main Production CI/CD & Railway Deploy
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [ main ]
 
 jobs:
   build-and-test:
-    name: Build, Lint & Test
+    name: Build, Lint & Test (Main)
     runs-on: ubuntu-latest
 
     env:
@@ -41,3 +41,21 @@ jobs:
 
       - name: Build Application
         run: npm run build
+
+  deploy:
+    name: Deploy to Railway
+    needs: build-and-test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway Production
+        run: railway up --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
