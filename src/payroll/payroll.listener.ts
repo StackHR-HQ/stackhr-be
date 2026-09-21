@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
-import { ApprovalDecidedEvent } from '../approvals/events/approval-decided.event';
+import {
+  APPROVAL_EVENTS,
+  ApprovalDecidedEvent,
+} from '../approvals/events/approval-decided.event';
 
 @Injectable()
 export class PayrollListener {
@@ -10,7 +13,7 @@ export class PayrollListener {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  @OnEvent('approval.decided')
+  @OnEvent(APPROVAL_EVENTS.DECIDED)
   async handleApprovalDecided(event: ApprovalDecidedEvent): Promise<void> {
     if (event.type !== 'PAYROLL' && event.subjectTable !== 'payroll_run') {
       return;

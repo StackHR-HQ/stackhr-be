@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../database/prisma.service';
-import { ApprovalDecidedEvent } from '../approvals/events/approval-decided.event';
+import {
+  APPROVAL_EVENTS,
+  ApprovalDecidedEvent,
+} from '../approvals/events/approval-decided.event';
 
 @Injectable()
 export class LeaveListener {
@@ -9,7 +12,7 @@ export class LeaveListener {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  @OnEvent('approval.decided')
+  @OnEvent(APPROVAL_EVENTS.DECIDED)
   async handleApprovalDecided(event: ApprovalDecidedEvent): Promise<void> {
     if (event.type !== 'LEAVE' && event.subjectTable !== 'leave_request') {
       return;

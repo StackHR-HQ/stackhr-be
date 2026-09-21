@@ -1,3 +1,7 @@
+export const APPROVAL_EVENTS = {
+  DECIDED: 'approval.decided',
+} as const;
+
 export class ApprovalDecidedEvent {
   constructor(
     public readonly approvalRequestId: string,

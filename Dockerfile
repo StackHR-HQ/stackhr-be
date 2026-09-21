@@ -42,6 +42,11 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/generated ./generated
 COPY --from=builder /app/dist ./dist
 
+# Set permissions for non-root execution
+RUN chown -R node:node /app
+
+USER node
+
 EXPOSE 3001
 
 CMD ["node", "dist/src/main.js"]

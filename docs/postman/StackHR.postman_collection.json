@@ -7,6 +7,90 @@
   },
   "item": [
     {
+      "name": "Waitlist",
+      "description": "Public waitlist registration and admin entry management endpoints.",
+      "item": [
+        {
+          "name": "Join Waitlist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"position\": \"Head of HR\",\n  \"businessName\": \"Acme Technologies\",\n  \"businessEmail\": \"jane@acmetech.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/waitlist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "waitlist"
+              ]
+            },
+            "description": "Submit a public entry to join the StackHR waitlist. Rate-limited to 5 submissions/min."
+          },
+          "response": [
+            {
+              "name": "Success (201 Created)",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"w_8f9a2b1c\",\n    \"name\": \"Jane Doe\",\n    \"position\": \"Head of HR\",\n    \"businessName\": \"Acme Technologies\",\n    \"businessEmail\": \"jane@acmetech.com\",\n    \"alreadyJoined\": false,\n    \"createdAt\": \"2026-09-21T12:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Waitlist Entries (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bearer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/waitlist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "waitlist"
+              ]
+            },
+            "description": "Retrieve all waitlist submissions. Requires StackHR Admin privileges."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": [\n    {\n      \"id\": \"w_8f9a2b1c\",\n      \"name\": \"Jane Doe\",\n      \"position\": \"Head of HR\",\n      \"businessName\": \"Acme Technologies\",\n      \"businessEmail\": \"jane@acmetech.com\",\n      \"createdAt\": \"2026-09-21T12:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Auth",
       "description": "Authentication and user session management endpoints.",
       "item": [
@@ -49,7 +133,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"email\": \"owner@company.com\",\n  \"expiresAt\": \"2026-09-09T10:00:00.000Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"email\": \"owner@company.com\",\n    \"expiresAt\": \"2026-09-09T10:00:00.000Z\"\n  }\n}"
             },
             {
               "name": "Validation Error (400)",
@@ -62,7 +146,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": [\n    \"A valid email is required\",\n    \"Password must be between 12 and 128 characters\",\n    \"property unknownField should not exist\"\n  ],\n  \"error\": \"Bad Request\",\n  \"statusCode\": 400\n}"
+              "body": "{\n  \"success\": false,\n  \"message\": \"A valid email is required\",\n  \"data\": null,\n  \"error\": {\n    \"error\": \"Bad Request\",\n    \"statusCode\": 400\n  }\n}"
             }
           ]
         },
@@ -105,7 +189,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"user\": {\n    \"id\": \"usr-123\",\n    \"name\": \"Acme Corp\",\n    \"email\": \"owner@company.com\",\n    \"userType\": \"BUSINESS\",\n    \"role\": \"BUSINESS_OWNER\",\n    \"organizationId\": \"org-123\"\n  },\n  \"onboarding\": {\n    \"organizationId\": \"org-123\",\n    \"nextStep\": \"COMPANY_INFO\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"usr-123\",\n      \"name\": \"Acme Corp\",\n      \"email\": \"owner@company.com\",\n      \"userType\": \"BUSINESS\",\n      \"role\": \"BUSINESS_OWNER\",\n      \"organizationId\": \"org-123\"\n    },\n    \"onboarding\": {\n      \"organizationId\": \"org-123\",\n      \"nextStep\": \"COMPANY_INFO\"\n    }\n  }\n}"
             },
             {
               "name": "Validation Error (400)",
@@ -118,7 +202,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": [\n    \"Verification code must be 6 digits\"\n  ],\n  \"error\": \"Bad Request\",\n  \"statusCode\": 400\n}"
+              "body": "{\n  \"success\": false,\n  \"message\": \"Verification code must be 6 digits\",\n  \"data\": null,\n  \"error\": {\n    \"error\": \"Bad Request\",\n    \"statusCode\": 400\n  }\n}"
             }
           ]
         },
@@ -161,7 +245,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"user\": {\n    \"id\": \"usr-123\",\n    \"name\": \"Acme Corp\",\n    \"email\": \"owner@company.com\",\n    \"userType\": \"BUSINESS\",\n    \"role\": \"BUSINESS_OWNER\",\n    \"organizationId\": \"org-123\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"usr-123\",\n      \"name\": \"Acme Corp\",\n      \"email\": \"owner@company.com\",\n      \"userType\": \"BUSINESS\",\n      \"role\": \"BUSINESS_OWNER\",\n      \"organizationId\": \"org-123\"\n    }\n  }\n}"
             }
           ]
         },
@@ -207,7 +291,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"user\": {\n    \"id\": \"usr-123\",\n    \"name\": \"Acme Corp\",\n    \"email\": \"owner@company.com\",\n    \"userType\": \"BUSINESS\",\n    \"role\": \"BUSINESS_OWNER\",\n    \"organizationId\": \"org-456\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"usr-123\",\n      \"name\": \"Acme Corp\",\n      \"email\": \"owner@company.com\",\n      \"userType\": \"BUSINESS\",\n      \"role\": \"BUSINESS_OWNER\",\n      \"organizationId\": \"org-456\"\n    }\n  }\n}"
             },
             {
               "name": "Not Member (403)",
@@ -220,7 +304,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"You are not a member of the target organization\",\n  \"error\": \"Forbidden\",\n  \"statusCode\": 403\n}"
+              "body": "{\n  \"success\": false,\n  \"message\": \"You are not a member of the target organization\",\n  \"data\": null,\n  \"error\": {\n    \"error\": \"Forbidden\",\n    \"statusCode\": 403\n  }\n}"
             }
           ]
         },
@@ -379,7 +463,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"organization\": {\n    \"id\": \"org-123\",\n    \"name\": \"Acme Corp\",\n    \"industry\": \"Fintech\",\n    \"companySize\": \"11-50\",\n    \"currency\": \"NGN\"\n  },\n  \"onboarding\": {\n    \"organizationId\": \"org-123\",\n    \"companyInfoComplete\": true,\n    \"nextStep\": \"FIRST_EMPLOYEE\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"organization\": {\n      \"id\": \"org-123\",\n      \"name\": \"Acme Corp\",\n      \"industry\": \"Fintech\",\n      \"companySize\": \"11-50\",\n      \"currency\": \"NGN\"\n    },\n    \"onboarding\": {\n      \"organizationId\": \"org-123\",\n      \"companyInfoComplete\": true,\n      \"nextStep\": \"FIRST_EMPLOYEE\"\n    }\n  }\n}"
             },
             {
               "name": "Validation Error (400)",
@@ -392,7 +476,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": [\n    \"currency must be one of: NGN, USD, GBP, EUR\"\n  ],\n  \"error\": \"Bad Request\",\n  \"statusCode\": 400\n}"
+              "body": "{\n  \"success\": false,\n  \"message\": \"currency must be one of: NGN, USD, GBP, EUR\",\n  \"data\": null,\n  \"error\": {\n    \"error\": \"Bad Request\",\n    \"statusCode\": 400\n  }\n}"
             }
           ]
         },
@@ -438,7 +522,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"employee\": {\n    \"id\": \"emp-123\",\n    \"organizationId\": \"org-123\",\n    \"fullName\": \"Jane Doe\",\n    \"email\": \"jane@acme.com\",\n    \"department\": \"Engineering\",\n    \"salaryAmount\": 850000\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employee\": {\n      \"id\": \"emp-123\",\n      \"organizationId\": \"org-123\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane@acme.com\",\n      \"department\": \"Engineering\",\n      \"salaryAmount\": 850000\n    }\n  }\n}"
             }
           ]
         },
@@ -518,7 +602,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"approvalRequest\": {\n    \"id\": \"appr-123\",\n    \"organizationId\": \"org-123\",\n    \"type\": \"LEAVE\",\n    \"subjectTable\": \"leave_request\",\n    \"subjectId\": \"leave-123\",\n    \"requesterId\": \"usr-123\",\n    \"status\": \"PENDING\",\n    \"stage\": 1,\n    \"submittedAt\": \"2026-09-09T10:00:00.000Z\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"approvalRequest\": {\n      \"id\": \"appr-123\",\n      \"organizationId\": \"org-123\",\n      \"type\": \"LEAVE\",\n      \"subjectTable\": \"leave_request\",\n      \"subjectId\": \"leave-123\",\n      \"requesterId\": \"usr-123\",\n      \"status\": \"PENDING\",\n      \"stage\": 1,\n      \"submittedAt\": \"2026-09-09T10:00:00.000Z\"\n    }\n  }\n}"
             }
           ]
         },
@@ -569,7 +653,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"items\": [\n    {\n      \"id\": \"appr-123\",\n      \"type\": \"LEAVE\",\n      \"status\": \"PENDING\",\n      \"requesterId\": \"usr-123\"\n    }\n  ],\n  \"meta\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 20,\n    \"totalPages\": 1\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"appr-123\",\n        \"type\": \"LEAVE\",\n        \"status\": \"PENDING\",\n        \"requesterId\": \"usr-123\"\n      }\n    ],\n    \"meta\": {\n      \"total\": 1,\n      \"page\": 1,\n      \"limit\": 20,\n      \"totalPages\": 1\n    }\n  }\n}"
             }
           ]
         },
@@ -616,7 +700,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"approvalRequest\": {\n    \"id\": \"appr-123\",\n    \"status\": \"APPROVED\",\n    \"approverId\": \"mgr-456\",\n    \"decidedAt\": \"2026-09-09T10:15:00.000Z\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"approvalRequest\": {\n      \"id\": \"appr-123\",\n      \"status\": \"APPROVED\",\n      \"approverId\": \"mgr-456\",\n      \"decidedAt\": \"2026-09-09T10:15:00.000Z\"\n    }\n  }\n}"
             },
             {
               "name": "Maker-Checker Violation (403)",
@@ -629,7 +713,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"You cannot approve or reject your own request\",\n  \"error\": \"Forbidden\",\n  \"statusCode\": 403\n}"
+              "body": "{\n  \"success\": false,\n  \"message\": \"You cannot approve or reject your own request\",\n  \"data\": null,\n  \"error\": {\n    \"error\": \"Forbidden\",\n    \"statusCode\": 403\n  }\n}"
             }
           ]
         }
@@ -680,7 +764,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"employee\": {\n    \"id\": \"emp-123\",\n    \"organizationId\": \"org-456\",\n    \"fullName\": \"Jane Doe\",\n    \"email\": \"jane.doe@company.com\",\n    \"department\": \"Engineering\",\n    \"jobTitle\": \"Senior Software Engineer\",\n    \"employmentType\": \"FULL_TIME\",\n    \"salaryAmount\": 650000,\n    \"startDate\": \"2026-01-15T00:00:00.000Z\",\n    \"status\": \"ACTIVE\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employee\": {\n      \"id\": \"emp-123\",\n      \"organizationId\": \"org-456\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane.doe@company.com\",\n      \"department\": \"Engineering\",\n      \"jobTitle\": \"Senior Software Engineer\",\n      \"employmentType\": \"FULL_TIME\",\n      \"salaryAmount\": 650000,\n      \"startDate\": \"2026-01-15T00:00:00.000Z\",\n      \"status\": \"ACTIVE\"\n    }\n  }\n}"
             }
           ]
         },
@@ -731,7 +815,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"data\": [\n    {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane.doe@company.com\",\n      \"department\": \"Engineering\",\n      \"jobTitle\": \"Senior Software Engineer\",\n      \"status\": \"ACTIVE\"\n    }\n  ],\n  \"meta\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 10,\n    \"totalPages\": 1\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"data\": [\n      {\n        \"id\": \"emp-123\",\n        \"fullName\": \"Jane Doe\",\n        \"email\": \"jane.doe@company.com\",\n        \"department\": \"Engineering\",\n        \"jobTitle\": \"Senior Software Engineer\",\n        \"status\": \"ACTIVE\"\n      }\n    ],\n    \"meta\": {\n      \"total\": 1,\n      \"page\": 1,\n      \"limit\": 10,\n      \"totalPages\": 1\n    }\n  }\n}"
             }
           ]
         },
@@ -769,7 +853,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"employee\": {\n    \"id\": \"emp-123\",\n    \"fullName\": \"Jane Doe\",\n    \"email\": \"jane.doe@company.com\",\n    \"department\": \"Engineering\",\n    \"jobTitle\": \"Senior Software Engineer\",\n    \"status\": \"ACTIVE\",\n    \"manager\": null,\n    \"directReports\": []\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employee\": {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane.doe@company.com\",\n      \"department\": \"Engineering\",\n      \"jobTitle\": \"Senior Software Engineer\",\n      \"status\": \"ACTIVE\",\n      \"manager\": null,\n      \"directReports\": []\n    }\n  }\n}"
             }
           ]
         },
@@ -815,7 +899,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"employee\": {\n    \"id\": \"emp-123\",\n    \"fullName\": \"Jane Doe\",\n    \"jobTitle\": \"Staff Engineer\",\n    \"salaryAmount\": 750000\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employee\": {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\",\n      \"jobTitle\": \"Staff Engineer\",\n      \"salaryAmount\": 750000\n    }\n  }\n}"
             }
           ]
         },
@@ -854,7 +938,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"organizationTree\": [\n    {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane CEO\",\n      \"directReports\": []\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"organizationTree\": [\n      {\n        \"id\": \"emp-123\",\n        \"fullName\": \"Jane CEO\",\n        \"directReports\": []\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -893,7 +977,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"departments\": [\n    {\n      \"department\": \"Engineering\",\n      \"count\": 5,\n      \"employees\": []\n    }\n  ],\n  \"totalDepartments\": 1,\n  \"totalEmployees\": 5\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"departments\": [\n      {\n        \"department\": \"Engineering\",\n        \"count\": 5,\n        \"employees\": []\n      }\n    ],\n    \"totalDepartments\": 1,\n    \"totalEmployees\": 5\n  }\n}"
             }
           ]
         },
@@ -940,7 +1024,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Manager reassigned successfully\",\n  \"employee\": {\n    \"id\": \"emp-123\",\n    \"managerId\": \"emp-mgr-456\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Manager reassigned successfully\",\n    \"employee\": {\n      \"id\": \"emp-123\",\n      \"managerId\": \"emp-mgr-456\"\n    }\n  }\n}"
             }
           ]
         },
@@ -987,7 +1071,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Employee offboarded successfully\",\n  \"employee\": {\n    \"id\": \"emp-123\",\n    \"status\": \"OFFBOARDED\"\n  },\n  \"offboardDetails\": {\n    \"offboardDate\": \"2026-12-31\",\n    \"reason\": \"Resigned for personal reasons\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Employee offboarded successfully\",\n    \"employee\": {\n      \"id\": \"emp-123\",\n      \"status\": \"OFFBOARDED\"\n    },\n    \"offboardDetails\": {\n      \"offboardDate\": \"2026-12-31\",\n      \"reason\": \"Resigned for personal reasons\"\n    }\n  }\n}"
             }
           ]
         }
@@ -1038,7 +1122,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"invitation\": {\n    \"id\": \"inv-123\",\n    \"email\": \"newmember@company.com\",\n    \"role\": \"EMPLOYEE\",\n    \"status\": \"pending\",\n    \"expiresAt\": \"2026-09-16T10:00:00.000Z\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"invitation\": {\n      \"id\": \"inv-123\",\n      \"email\": \"newmember@company.com\",\n      \"role\": \"EMPLOYEE\",\n      \"status\": \"pending\",\n      \"expiresAt\": \"2026-09-16T10:00:00.000Z\"\n    }\n  }\n}"
             }
           ]
         },
@@ -1075,7 +1159,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"invitations\": [\n    {\n      \"id\": \"inv-123\",\n      \"email\": \"newmember@company.com\",\n      \"status\": \"pending\"\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"invitations\": [\n      {\n        \"id\": \"inv-123\",\n        \"email\": \"newmember@company.com\",\n        \"status\": \"pending\"\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -1107,7 +1191,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"invitation\": {\n    \"id\": \"inv-123\",\n    \"email\": \"newmember@company.com\",\n    \"status\": \"pending\",\n    \"organization\": {\n      \"name\": \"Acme Corp\",\n      \"slug\": \"acme-corp\"\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"invitation\": {\n      \"id\": \"inv-123\",\n      \"email\": \"newmember@company.com\",\n      \"status\": \"pending\",\n      \"organization\": {\n        \"name\": \"Acme Corp\",\n        \"slug\": \"acme-corp\"\n      }\n    }\n  }\n}"
             }
           ]
         },
@@ -1150,7 +1234,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Invitation accepted successfully\",\n  \"user\": {\n    \"id\": \"usr-789\",\n    \"name\": \"New Member\",\n    \"email\": \"newmember@company.com\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Invitation accepted successfully\",\n    \"user\": {\n      \"id\": \"usr-789\",\n      \"name\": \"New Member\",\n      \"email\": \"newmember@company.com\"\n    }\n  }\n}"
             }
           ]
         },
@@ -1188,7 +1272,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Invitation revoked successfully\",\n  \"invitation\": {\n    \"id\": \"inv-123\",\n    \"status\": \"revoked\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Invitation revoked successfully\",\n    \"invitation\": {\n      \"id\": \"inv-123\",\n      \"status\": \"revoked\"\n    }\n  }\n}"
             }
           ]
         },
@@ -1227,7 +1311,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Invitation resent successfully\",\n  \"invitation\": {\n    \"id\": \"inv-123\",\n    \"status\": \"pending\",\n    \"expiresAt\": \"2026-09-16T10:00:00.000Z\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Invitation resent successfully\",\n    \"invitation\": {\n      \"id\": \"inv-123\",\n      \"status\": \"pending\",\n      \"expiresAt\": \"2026-09-16T10:00:00.000Z\"\n    }\n  }\n}"
             }
           ]
         }
@@ -1271,7 +1355,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"templates\": [\n    {\n      \"department\": \"Engineering\",\n      \"title\": \"Engineering Onboarding\",\n      \"tasks\": [\n        { \"id\": \"task-eng-1\", \"title\": \"Setup workstation\", \"required\": true }\n      ]\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"templates\": [\n      {\n        \"department\": \"Engineering\",\n        \"title\": \"Engineering Onboarding\",\n        \"tasks\": [\n          {\n            \"id\": \"task-eng-1\",\n            \"title\": \"Setup workstation\",\n            \"required\": true\n          }\n        ]\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -1317,7 +1401,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Onboarding template saved successfully\",\n  \"template\": {\n    \"department\": \"Engineering\",\n    \"title\": \"Engineering Onboarding\",\n    \"tasks\": []\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Onboarding template saved successfully\",\n    \"template\": {\n      \"department\": \"Engineering\",\n      \"title\": \"Engineering Onboarding\",\n      \"tasks\": []\n    }\n  }\n}"
             }
           ]
         },
@@ -1356,7 +1440,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"employeeId\": \"emp-123\",\n  \"employeeName\": \"Jane Doe\",\n  \"department\": \"Engineering\",\n  \"checklist\": [\n    {\n      \"id\": \"task-eng-1\",\n      \"title\": \"Setup workstation\",\n      \"completed\": false\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employeeId\": \"emp-123\",\n    \"employeeName\": \"Jane Doe\",\n    \"department\": \"Engineering\",\n    \"checklist\": [\n      {\n        \"id\": \"task-eng-1\",\n        \"title\": \"Setup workstation\",\n        \"completed\": false\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -1405,7 +1489,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Task marked completed\",\n  \"employeeId\": \"emp-123\",\n  \"task\": {\n    \"id\": \"task-eng-1\",\n    \"completed\": true,\n    \"completedAt\": \"2026-09-09T10:45:00.000Z\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Task marked completed\",\n    \"employeeId\": \"emp-123\",\n    \"task\": {\n      \"id\": \"task-eng-1\",\n      \"completed\": true,\n      \"completedAt\": \"2026-09-09T10:45:00.000Z\"\n    }\n  }\n}"
             }
           ]
         }
@@ -1457,7 +1541,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"leaveType\": {\n    \"id\": \"lt-123\",\n    \"name\": \"Annual Paid Leave\",\n    \"daysPerYear\": 20,\n    \"paid\": true,\n    \"requiresApproval\": true\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveType\": {\n      \"id\": \"lt-123\",\n      \"name\": \"Annual Paid Leave\",\n      \"daysPerYear\": 20,\n      \"paid\": true,\n      \"requiresApproval\": true\n    }\n  }\n}"
             }
           ]
         },
@@ -1495,7 +1579,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"leaveTypes\": [\n    {\n      \"id\": \"lt-123\",\n      \"name\": \"Annual Paid Leave\",\n      \"daysPerYear\": 20\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveTypes\": [\n      {\n        \"id\": \"lt-123\",\n        \"name\": \"Annual Paid Leave\",\n        \"daysPerYear\": 20\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -1533,7 +1617,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"employeeId\": \"emp-123\",\n  \"balances\": [\n    {\n      \"allocatedDays\": 20,\n      \"usedDays\": 2,\n      \"pendingDays\": 5,\n      \"remainingDays\": 13,\n      \"leaveType\": {\n        \"id\": \"lt-123\",\n        \"name\": \"Annual Paid Leave\"\n      }\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employeeId\": \"emp-123\",\n    \"balances\": [\n      {\n        \"allocatedDays\": 20,\n        \"usedDays\": 2,\n        \"pendingDays\": 5,\n        \"remainingDays\": 13,\n        \"leaveType\": {\n          \"id\": \"lt-123\",\n          \"name\": \"Annual Paid Leave\"\n        }\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -1579,7 +1663,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Leave request submitted and routed for approval\",\n  \"leaveRequest\": {\n    \"id\": \"lr-456\",\n    \"status\": \"PENDING\",\n    \"totalDays\": 5\n  },\n  \"approvalRequest\": {\n    \"id\": \"appr-789\",\n    \"status\": \"PENDING\",\n    \"type\": \"LEAVE\",\n    \"subjectTable\": \"leave_request\",\n    \"subjectId\": \"lr-456\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Leave request submitted and routed for approval\",\n    \"leaveRequest\": {\n      \"id\": \"lr-456\",\n      \"status\": \"PENDING\",\n      \"totalDays\": 5\n    },\n    \"approvalRequest\": {\n      \"id\": \"appr-789\",\n      \"status\": \"PENDING\",\n      \"type\": \"LEAVE\",\n      \"subjectTable\": \"leave_request\",\n      \"subjectId\": \"lr-456\"\n    }\n  }\n}"
             }
           ]
         },
@@ -1631,7 +1715,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"data\": [\n    {\n      \"id\": \"lr-456\",\n      \"startDate\": \"2026-10-01T00:00:00.000Z\",\n      \"endDate\": \"2026-10-05T00:00:00.000Z\",\n      \"totalDays\": 5,\n      \"status\": \"APPROVED\",\n      \"leaveType\": {\n        \"id\": \"lt-123\",\n        \"name\": \"Annual Paid Leave\"\n      }\n    }\n  ],\n  \"meta\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 10,\n    \"totalPages\": 1\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"data\": [\n      {\n        \"id\": \"lr-456\",\n        \"startDate\": \"2026-10-01T00:00:00.000Z\",\n        \"endDate\": \"2026-10-05T00:00:00.000Z\",\n        \"totalDays\": 5,\n        \"status\": \"APPROVED\",\n        \"leaveType\": {\n          \"id\": \"lt-123\",\n          \"name\": \"Annual Paid Leave\"\n        }\n      }\n    ],\n    \"meta\": {\n      \"total\": 1,\n      \"page\": 1,\n      \"limit\": 10,\n      \"totalPages\": 1\n    }\n  }\n}"
             }
           ]
         },
@@ -1670,7 +1754,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"leaveRequest\": {\n    \"id\": \"lr-456\",\n    \"startDate\": \"2026-10-01T00:00:00.000Z\",\n    \"endDate\": \"2026-10-05T00:00:00.000Z\",\n    \"totalDays\": 5,\n    \"status\": \"APPROVED\",\n    \"employee\": {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\"\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveRequest\": {\n      \"id\": \"lr-456\",\n      \"startDate\": \"2026-10-01T00:00:00.000Z\",\n      \"endDate\": \"2026-10-05T00:00:00.000Z\",\n      \"totalDays\": 5,\n      \"status\": \"APPROVED\",\n      \"employee\": {\n        \"id\": \"emp-123\",\n        \"fullName\": \"Jane Doe\"\n      }\n    }\n  }\n}"
             }
           ]
         }
@@ -1722,7 +1806,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Expense submission recorded and routed for approval\",\n  \"expense\": {\n    \"id\": \"exp-123\",\n    \"category\": \"Travel\",\n    \"amount\": 25000,\n    \"status\": \"PENDING\"\n  },\n  \"approvalRequest\": {\n    \"id\": \"appr-exp-123\",\n    \"type\": \"EXPENSE\",\n    \"status\": \"PENDING\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Expense submission recorded and routed for approval\",\n    \"expense\": {\n      \"id\": \"exp-123\",\n      \"category\": \"Travel\",\n      \"amount\": 25000,\n      \"status\": \"PENDING\"\n    },\n    \"approvalRequest\": {\n      \"id\": \"appr-exp-123\",\n      \"type\": \"EXPENSE\",\n      \"status\": \"PENDING\"\n    }\n  }\n}"
             }
           ]
         },
@@ -1760,7 +1844,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"expenses\": [\n    {\n      \"id\": \"exp-123\",\n      \"category\": \"Travel\",\n      \"amount\": 25000,\n      \"status\": \"PENDING\"\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"expenses\": [\n      {\n        \"id\": \"exp-123\",\n        \"category\": \"Travel\",\n        \"amount\": 25000,\n        \"status\": \"PENDING\"\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -1806,7 +1890,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Salary advance request submitted and routed for approval\",\n  \"salaryAdvance\": {\n    \"id\": \"adv-123\",\n    \"amount\": 100000,\n    \"repaymentMonths\": 2,\n    \"monthlyDeduction\": 50000,\n    \"status\": \"PENDING\"\n  },\n  \"approvalRequest\": {\n    \"id\": \"appr-adv-123\",\n    \"type\": \"SALARY_ADVANCE\",\n    \"status\": \"PENDING\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Salary advance request submitted and routed for approval\",\n    \"salaryAdvance\": {\n      \"id\": \"adv-123\",\n      \"amount\": 100000,\n      \"repaymentMonths\": 2,\n      \"monthlyDeduction\": 50000,\n      \"status\": \"PENDING\"\n    },\n    \"approvalRequest\": {\n      \"id\": \"appr-adv-123\",\n      \"type\": \"SALARY_ADVANCE\",\n      \"status\": \"PENDING\"\n    }\n  }\n}"
             }
           ]
         },
@@ -1854,7 +1938,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Receipt URL attached to expense claim successfully\",\n  \"expense\": {\n    \"id\": \"exp-123\",\n    \"receiptUrl\": \"https://storage.stackhr.app/receipts/exp-123.pdf\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Receipt URL attached to expense claim successfully\",\n    \"expense\": {\n      \"id\": \"exp-123\",\n      \"receiptUrl\": \"https://storage.stackhr.app/receipts/exp-123.pdf\"\n    }\n  }\n}"
             }
           ]
         },
@@ -1892,7 +1976,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"advances\": [\n    {\n      \"id\": \"adv-123\",\n      \"amount\": 100000,\n      \"repaymentMonths\": 2,\n      \"monthlyDeduction\": 50000,\n      \"status\": \"PENDING\"\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"advances\": [\n      {\n        \"id\": \"adv-123\",\n        \"amount\": 100000,\n        \"repaymentMonths\": 2,\n        \"monthlyDeduction\": 50000,\n        \"status\": \"PENDING\"\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -1930,7 +2014,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"reimbursements\": [\n    {\n      \"id\": \"reimb-123\",\n      \"expenseId\": \"exp-123\",\n      \"amount\": 25000,\n      \"currency\": \"NGN\",\n      \"status\": \"PENDING\"\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"reimbursements\": [\n      {\n        \"id\": \"reimb-123\",\n        \"expenseId\": \"exp-123\",\n        \"amount\": 25000,\n        \"currency\": \"NGN\",\n        \"status\": \"PENDING\"\n      }\n    ]\n  }\n}"
             }
           ]
         }
@@ -1981,7 +2065,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Compensation record set successfully\",\n  \"compensationRecord\": {\n    \"id\": \"comp-123\",\n    \"employeeId\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"basicSalary\": 30000000,\n    \"housingAllowance\": 10000000,\n    \"transportAllowance\": 5000000,\n    \"otherAllowances\": 2000000,\n    \"effectiveFrom\": \"2026-09-09T13:00:00.000Z\",\n    \"effectiveTo\": null\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Compensation record set successfully\",\n    \"compensationRecord\": {\n      \"id\": \"comp-123\",\n      \"employeeId\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"basicSalary\": 30000000,\n      \"housingAllowance\": 10000000,\n      \"transportAllowance\": 5000000,\n      \"otherAllowances\": 2000000,\n      \"effectiveFrom\": \"2026-09-09T13:00:00.000Z\",\n      \"effectiveTo\": null\n    }\n  }\n}"
             }
           ]
         },
@@ -2020,7 +2104,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"history\": [\n    {\n      \"id\": \"comp-123\",\n      \"basicSalary\": 30000000,\n      \"effectiveFrom\": \"2026-09-09T13:00:00.000Z\",\n      \"effectiveTo\": null\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"history\": [\n      {\n        \"id\": \"comp-123\",\n        \"basicSalary\": 30000000,\n        \"effectiveFrom\": \"2026-09-09T13:00:00.000Z\",\n        \"effectiveTo\": null\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -2066,7 +2150,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Payroll run created in DRAFT state\",\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"periodMonth\": 9,\n    \"periodYear\": 2026,\n    \"title\": \"September 2026 Regular Payroll\",\n    \"status\": \"DRAFT\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Payroll run created in DRAFT state\",\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"title\": \"September 2026 Regular Payroll\",\n      \"status\": \"DRAFT\"\n    }\n  }\n}"
             }
           ]
         },
@@ -2106,7 +2190,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Payroll run calculated successfully for 5 employees\",\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"status\": \"CALCULATED\",\n    \"totalGross\": 225000000,\n    \"totalTax\": 0,\n    \"totalPension\": 18000000,\n    \"totalNet\": 207000000\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Payroll run calculated successfully for 5 employees\",\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"status\": \"CALCULATED\",\n      \"totalGross\": 225000000,\n      \"totalTax\": 0,\n      \"totalPension\": 18000000,\n      \"totalNet\": 207000000\n    }\n  }\n}"
             }
           ]
         },
@@ -2146,7 +2230,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Payroll run submitted for approval and locked from edits\",\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"status\": \"PENDING_APPROVAL\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Payroll run submitted for approval and locked from edits\",\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"status\": \"PENDING_APPROVAL\"\n    }\n  }\n}"
             }
           ]
         },
@@ -2194,7 +2278,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Funding check passed successfully. Ready for payment execution.\",\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"status\": \"FUNDING_CHECK_PASSED\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Funding check passed successfully. Ready for payment execution.\",\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"status\": \"FUNDING_CHECK_PASSED\"\n    }\n  }\n}"
             }
           ]
         },
@@ -2234,7 +2318,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Payment execution recorded and bank transfer file exported\",\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"status\": \"EXECUTED\",\n    \"executedAt\": \"2026-09-09T13:30:00.000Z\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Payment execution recorded and bank transfer file exported\",\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"status\": \"EXECUTED\",\n      \"executedAt\": \"2026-09-09T13:30:00.000Z\"\n    }\n  }\n}"
             }
           ]
         },
@@ -2274,7 +2358,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Payroll run successfully reconciled\",\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"status\": \"RECONCILED\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Payroll run successfully reconciled\",\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"status\": \"RECONCILED\"\n    }\n  }\n}"
             }
           ]
         },
@@ -2312,7 +2396,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"payrollRuns\": [\n    {\n      \"id\": \"run-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"status\": \"RECONCILED\"\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payrollRuns\": [\n      {\n        \"id\": \"run-123\",\n        \"periodMonth\": 9,\n        \"periodYear\": 2026,\n        \"status\": \"RECONCILED\"\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -2351,7 +2435,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"payrollRun\": {\n    \"id\": \"run-123\",\n    \"status\": \"RECONCILED\",\n    \"items\": [],\n    \"payslips\": []\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"status\": \"RECONCILED\",\n      \"items\": [],\n      \"payslips\": []\n    }\n  }\n}"
             }
           ]
         }
@@ -2394,7 +2478,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"profile\": {\n    \"id\": \"emp-123\",\n    \"fullName\": \"Jane Doe\",\n    \"email\": \"jane@acme.com\",\n    \"department\": \"Engineering\",\n    \"jobTitle\": \"Software Engineer\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"profile\": {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane@acme.com\",\n      \"department\": \"Engineering\",\n      \"jobTitle\": \"Software Engineer\"\n    }\n  }\n}"
             }
           ]
         },
@@ -2432,7 +2516,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"payslips\": [\n    {\n      \"id\": \"pay-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"netSalary\": 41400000\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payslips\": [\n      {\n        \"id\": \"pay-123\",\n        \"periodMonth\": 9,\n        \"periodYear\": 2026,\n        \"netSalary\": 41400000\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -2470,7 +2554,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"leaveBalances\": [\n    {\n      \"allocatedDays\": 20,\n      \"usedDays\": 5,\n      \"remainingDays\": 15\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveBalances\": [\n      {\n        \"allocatedDays\": 20,\n        \"usedDays\": 5,\n        \"remainingDays\": 15\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -2508,7 +2592,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"leaveRequests\": []\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveRequests\": []\n  }\n}"
             }
           ]
         },
@@ -2546,7 +2630,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"expenses\": []\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"expenses\": []\n  }\n}"
             }
           ]
         },
@@ -2584,7 +2668,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"salaryAdvances\": []\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"salaryAdvances\": []\n  }\n}"
             }
           ]
         }
@@ -2631,7 +2715,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "[\n  {\n    \"id\": \"TRS-NTA-2026\",\n    \"country\": \"NG\",\n    \"name\": \"Nigeria Tax Act 2025/2026 (NTA)\",\n    \"effectiveFrom\": \"2026-01-01T00:00:00.000Z\",\n    \"effectiveTo\": null,\n    \"isDefault\": true,\n    \"rentReliefPercentage\": 0.2,\n    \"rentReliefCap\": 500000,\n    \"pensionEmployeeRate\": 0.08,\n    \"pensionEmployerRate\": 0.1,\n    \"pensionBasisFields\": \"BASIC,HOUSING,TRANSPORT\",\n    \"nhfRate\": 0.025,\n    \"nhfBasisField\": \"BASIC\",\n    \"taxFreeThreshold\": 800000,\n    \"taxRules\": [\n      {\n        \"id\": \"TR-NTA-1\",\n        \"bandOrder\": 1,\n        \"bandName\": \"First ₦800,000\",\n        \"lowerLimit\": 0,\n        \"upperLimit\": 800000,\n        \"taxRate\": 0.0\n      },\n      {\n        \"id\": \"TR-NTA-2\",\n        \"bandOrder\": 2,\n        \"bandName\": \"Next ₦2,200,000\",\n        \"lowerLimit\": 800000,\n        \"upperLimit\": 3000000,\n        \"taxRate\": 0.15\n      }\n    ]\n  }\n]"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": [\n    {\n      \"id\": \"TRS-NTA-2026\",\n      \"country\": \"NG\",\n      \"name\": \"Nigeria Tax Act 2025/2026 (NTA)\",\n      \"effectiveFrom\": \"2026-01-01T00:00:00.000Z\",\n      \"effectiveTo\": null,\n      \"isDefault\": true,\n      \"rentReliefPercentage\": 0.2,\n      \"rentReliefCap\": 500000,\n      \"pensionEmployeeRate\": 0.08,\n      \"pensionEmployerRate\": 0.1,\n      \"pensionBasisFields\": \"BASIC,HOUSING,TRANSPORT\",\n      \"nhfRate\": 0.025,\n      \"nhfBasisField\": \"BASIC\",\n      \"taxFreeThreshold\": 800000,\n      \"taxRules\": [\n        {\n          \"id\": \"TR-NTA-1\",\n          \"bandOrder\": 1,\n          \"bandName\": \"First ₦800,000\",\n          \"lowerLimit\": 0,\n          \"upperLimit\": 800000,\n          \"taxRate\": 0\n        },\n        {\n          \"id\": \"TR-NTA-2\",\n          \"bandOrder\": 2,\n          \"bandName\": \"Next ₦2,200,000\",\n          \"lowerLimit\": 800000,\n          \"upperLimit\": 3000000,\n          \"taxRate\": 0.15\n        }\n      ]\n    }\n  ]\n}"
             }
           ]
         },
@@ -2673,7 +2757,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"id\": \"TRS-NTA-2026\",\n  \"country\": \"NG\",\n  \"name\": \"Nigeria Tax Act 2025/2026 (NTA)\",\n  \"effectiveFrom\": \"2026-01-01T00:00:00.000Z\",\n  \"effectiveTo\": null,\n  \"isDefault\": true,\n  \"rentReliefPercentage\": 0.2,\n  \"rentReliefCap\": 500000,\n  \"pensionEmployeeRate\": 0.08,\n  \"pensionEmployerRate\": 0.1,\n  \"pensionBasisFields\": \"BASIC,HOUSING,TRANSPORT\",\n  \"nhfRate\": 0.025,\n  \"nhfBasisField\": \"BASIC\",\n  \"taxFreeThreshold\": 800000,\n  \"taxRules\": []\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"TRS-NTA-2026\",\n    \"country\": \"NG\",\n    \"name\": \"Nigeria Tax Act 2025/2026 (NTA)\",\n    \"effectiveFrom\": \"2026-01-01T00:00:00.000Z\",\n    \"effectiveTo\": null,\n    \"isDefault\": true,\n    \"rentReliefPercentage\": 0.2,\n    \"rentReliefCap\": 500000,\n    \"pensionEmployeeRate\": 0.08,\n    \"pensionEmployerRate\": 0.1,\n    \"pensionBasisFields\": \"BASIC,HOUSING,TRANSPORT\",\n    \"nhfRate\": 0.025,\n    \"nhfBasisField\": \"BASIC\",\n    \"taxFreeThreshold\": 800000,\n    \"taxRules\": []\n  }\n}"
             }
           ]
         },
@@ -2716,7 +2800,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"id\": \"TRS-1725916000000\",\n  \"name\": \"Nigeria Tax Act 2027 Amendment\",\n  \"effectiveFrom\": \"2027-01-01T00:00:00.000Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"TRS-1725916000000\",\n    \"name\": \"Nigeria Tax Act 2027 Amendment\",\n    \"effectiveFrom\": \"2027-01-01T00:00:00.000Z\"\n  }\n}"
             }
           ]
         },
@@ -2767,7 +2851,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"id\": \"TRS-NTA-2026\",\n  \"rentReliefCap\": 600000,\n  \"pensionEmployerRate\": 0.12\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"TRS-NTA-2026\",\n    \"rentReliefCap\": 600000,\n    \"pensionEmployerRate\": 0.12\n  }\n}"
             }
           ]
         },
@@ -2801,7 +2885,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"id\": \"TRS-NTA-2026\",\n  \"name\": \"Nigeria Tax Act 2025/2026 (NTA)\",\n  \"isDefault\": true\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"TRS-NTA-2026\",\n    \"name\": \"Nigeria Tax Act 2025/2026 (NTA)\",\n    \"isDefault\": true\n  }\n}"
             }
           ]
         }
