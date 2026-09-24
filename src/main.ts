@@ -20,7 +20,6 @@ async function bootstrap() {
   // Security HTTP headers
   app.use(helmet());
 
-  // Set tight default JSON limit to prevent body payload flooding DoS
   app.useBodyParser('json', { limit: '100kb' });
 
   app.setGlobalPrefix('v1/api');
