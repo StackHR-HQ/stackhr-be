@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../database/prisma.service';
 import { EmailService } from './email.service';
-import { ApprovalDecidedEvent } from '../approvals/events/approval-decided.event';
+import {
+  APPROVAL_EVENTS,
+  ApprovalDecidedEvent,
+} from '../approvals/events/approval-decided.event';
 
 @Injectable()
 export class NotificationsListener {
@@ -13,7 +16,7 @@ export class NotificationsListener {
     private readonly emailService: EmailService,
   ) {}
 
-  @OnEvent('approval.decided')
+  @OnEvent(APPROVAL_EVENTS.DECIDED)
   async handleApprovalDecided(event: ApprovalDecidedEvent): Promise<void> {
     try {
       const requester = await this.prisma.user.findUnique({

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 const DEV_ALLOWED_ORIGINS = [
@@ -22,7 +23,9 @@ const PROD_DEFAULT_ORIGINS = [
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Set tight default JSON limit to prevent body payload flooding DoS
+  // Security HTTP headers
+  app.use(helmet());
+
   app.useBodyParser('json', { limit: '100kb' });
 
   app.setGlobalPrefix('v1/api');
@@ -49,7 +52,10 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const port = Number(process.env.PORT ?? 3001);
-  await app.listen(port);
+  const port = process.env.PORT ? Number(process.env.PORT) : 3001;
+
+  await app.listen(port, '0.0.0.0');
+
+  console.log(`Application is running on: ${await app.getUrl()}`);
 }
 void bootstrap();
