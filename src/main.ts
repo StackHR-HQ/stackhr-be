@@ -16,6 +16,8 @@ const PROD_DEFAULT_ORIGINS = [
   'https://stackhr-website.onrender.com',
   'https://stackhr-webapp-dev.onrender.com',
   'https://stackhr-admin.onrender.com',
+  'https://stackhr.app',
+  'https://www.stackhr.app',
   'https://app.stackhr.app',
   'https://admin.stackhr.app',
 ];
