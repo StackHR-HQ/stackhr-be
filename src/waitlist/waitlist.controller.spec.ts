@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { WaitlistController } from './waitlist.controller';
 import { WaitlistService } from './waitlist.service';
 import { PrismaService } from '../database/prisma.service';
+import { EmailService } from '../notifications/email.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 
@@ -16,12 +17,17 @@ describe('WaitlistController', () => {
     },
   };
 
+  const mockEmailService = {
+    send: jest.fn().mockResolvedValue({ id: 'msg_123' }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WaitlistController],
       providers: [
         WaitlistService,
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: EmailService, useValue: mockEmailService },
       ],
     })
       .overrideGuard(AuthGuard)

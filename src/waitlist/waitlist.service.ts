@@ -1,12 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { JoinWaitlistDto } from './dto/join-waitlist.dto';
+import { EmailService } from '../notifications/email.service';
+import { waitlistConfirmationEmail } from '../notifications/email-templates';
 
 @Injectable()
 export class WaitlistService {
   private readonly logger = new Logger(WaitlistService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   async joinWaitlist(dto: JoinWaitlistDto) {
     const existing = await this.prisma.waitlistEntry.findUnique({
@@ -41,6 +46,25 @@ export class WaitlistService {
     this.logger.log(
       `New waitlist entry created: ${entry.id} (${dto.businessEmail})`,
     );
+
+    const emailContent = waitlistConfirmationEmail(dto.name);
+    void this.emailService
+      .send({
+        to: dto.businessEmail,
+        subject: emailContent.subject,
+        html: emailContent.html,
+        text: emailContent.text,
+      })
+      .then(() => {
+        this.logger.log(
+          `Waitlist confirmation email sent to: ${dto.businessEmail}`,
+        );
+      })
+      .catch((error: any) => {
+        this.logger.error(
+          `Failed to send waitlist confirmation email to ${dto.businessEmail}: ${error?.message ?? error}`,
+        );
+      });
 
     return {
       id: entry.id,
