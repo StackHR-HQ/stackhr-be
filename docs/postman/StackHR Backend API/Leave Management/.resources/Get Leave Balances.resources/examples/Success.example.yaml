@@ -1,0 +1,28 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "employeeId": "emp-123",
+        "balances": [
+          {
+            "allocatedDays": 20,
+            "usedDays": 2,
+            "pendingDays": 5,
+            "remainingDays": 13,
+            "leaveType": {
+              "id": "lt-123",
+              "name": "Annual Paid Leave"
+            }
+          }
+        ]
+      }
+order: 1000

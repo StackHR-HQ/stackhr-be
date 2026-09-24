@@ -1,0 +1,3 @@
+$kind: collection
+description: Workspace invitation management, member onboarding, and expiration handling endpoints.
+order: 5000

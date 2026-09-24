@@ -1,0 +1,18 @@
+name: StackHR Local Development
+values:
+  - key: baseUrl
+    value: 'http://localhost:3001/v1/api'
+  - key: sessionToken
+    value: ''
+  - key: employeeId
+    value: emp-123
+  - key: invitationToken
+    value: invitation-token-123
+  - key: requestId
+    value: req-123
+  - key: departmentId
+    value: dept-123
+  - key: templateId
+    value: tpl-123
+  - key: itemId
+    value: item-123

@@ -1,0 +1,24 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "departments": [
+          {
+            "department": "Engineering",
+            "count": 5,
+            "employees": []
+          }
+        ],
+        "totalDepartments": 1,
+        "totalEmployees": 5
+      }
+order: 1000

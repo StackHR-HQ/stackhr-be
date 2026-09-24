@@ -1,0 +1,18 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 403
+  statusText: Forbidden
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "message": "You cannot approve or reject your own request",
+        "error": "Forbidden",
+        "statusCode": 403
+      }
+order: 2000

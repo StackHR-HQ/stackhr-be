@@ -1,0 +1,8 @@
+$kind: http-request
+description: Retrieve own allocated, used, and remaining leave balances.
+url: "{{baseUrl}}/me/leave-balances"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Get Own Leave Balances.resources/examples
+order: 3000

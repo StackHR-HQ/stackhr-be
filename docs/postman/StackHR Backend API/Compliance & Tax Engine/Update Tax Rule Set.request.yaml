@@ -1,0 +1,19 @@
+$kind: http-request
+description: Update parameters or band definitions of an existing tax rule set.
+url: "{{baseUrl}}/stackhr-admin/compliance/rule-sets/:id"
+method: PATCH
+headers:
+  Content-Type: application/json
+pathVariables:
+  - key: id
+    value: TRS-NTA-2026
+    description: Tax Rule Set ID
+body:
+  type: text
+  content: |-
+    {
+      "rentReliefCap": 600000,
+      "pensionEmployerRate": 0.12
+    }
+examples: ./.resources/Update Tax Rule Set.resources/examples
+order: 4000

@@ -1,0 +1,30 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "id": "TRS-NTA-2026",
+        "country": "NG",
+        "name": "Nigeria Tax Act 2025/2026 (NTA)",
+        "effectiveFrom": "2026-01-01T00:00:00.000Z",
+        "effectiveTo": null,
+        "isDefault": true,
+        "rentReliefPercentage": 0.2,
+        "rentReliefCap": 500000,
+        "pensionEmployeeRate": 0.08,
+        "pensionEmployerRate": 0.1,
+        "pensionBasisFields": "BASIC,HOUSING,TRANSPORT",
+        "nhfRate": 0.025,
+        "nhfBasisField": "BASIC",
+        "taxFreeThreshold": 800000,
+        "taxRules": []
+      }
+order: 1000

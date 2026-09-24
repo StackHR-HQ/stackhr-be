@@ -1,0 +1,23 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "payslips": [
+          {
+            "id": "pay-123",
+            "periodMonth": 9,
+            "periodYear": 2026,
+            "netSalary": 41400000
+          }
+        ]
+      }
+order: 1000

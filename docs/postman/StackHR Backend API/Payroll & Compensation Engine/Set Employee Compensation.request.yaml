@@ -1,0 +1,21 @@
+$kind: http-request
+description: Set/update versioned effective-dated compensation record for an employee. Automatically closes previous active record.
+url: "{{baseUrl}}/payroll/compensation"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "employeeId": "550e8400-e29b-41d4-a716-446655440000",
+      "basicSalary": 30000000,
+      "housingAllowance": 10000000,
+      "transportAllowance": 5000000,
+      "otherAllowances": 2000000,
+      "currency": "NGN",
+      "paymentFrequency": "MONTHLY"
+    }
+examples: ./.resources/Set Employee Compensation.resources/examples
+order: 1000

@@ -1,0 +1,3 @@
+$kind: collection
+description: Expenses, reimbursements, and salary advance requests routed to generic Approvals Engine.
+order: 8000

@@ -1,0 +1,8 @@
+$kind: http-request
+description: List all leave types for active organization.
+url: "{{baseUrl}}/leave/types"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/List Leave Types.resources/examples
+order: 2000

@@ -1,0 +1,24 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "reimbursements": [
+          {
+            "id": "reimb-123",
+            "expenseId": "exp-123",
+            "amount": 25000,
+            "currency": "NGN",
+            "status": "PENDING"
+          }
+        ]
+      }
+order: 1000

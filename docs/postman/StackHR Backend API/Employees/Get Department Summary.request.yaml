@@ -1,0 +1,8 @@
+$kind: http-request
+description: Retrieve summary breakdown of employees grouped by department.
+url: "{{baseUrl}}/employees/departments/summary"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Get Department Summary.resources/examples
+order: 6000

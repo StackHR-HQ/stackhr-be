@@ -1,0 +1,25 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "employeeId": "emp-123",
+        "employeeName": "Jane Doe",
+        "department": "Engineering",
+        "checklist": [
+          {
+            "id": "task-eng-1",
+            "title": "Setup workstation",
+            "completed": false
+          }
+        ]
+      }
+order: 1000

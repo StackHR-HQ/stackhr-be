@@ -1,0 +1,3 @@
+$kind: collection
+description: Unified People module endpoints (Employee Directory, Leave, Documents, Organization, Onboarding).
+order: 13000

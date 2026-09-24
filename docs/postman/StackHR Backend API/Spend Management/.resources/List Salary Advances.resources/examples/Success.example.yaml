@@ -1,0 +1,24 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "advances": [
+          {
+            "id": "adv-123",
+            "amount": 100000,
+            "repaymentMonths": 2,
+            "monthlyDeduction": 50000,
+            "status": "PENDING"
+          }
+        ]
+      }
+order: 1000

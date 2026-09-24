@@ -1,0 +1,5 @@
+$kind: http-request
+description: Delete department.
+url: "{{baseUrl}}/people/departments/:departmentId"
+method: DELETE
+order: 4000

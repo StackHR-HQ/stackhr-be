@@ -1,0 +1,20 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 400
+  statusText: Bad Request
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "message": [
+          "currency must be one of: NGN, USD, GBP, EUR"
+        ],
+        "error": "Bad Request",
+        "statusCode": 400
+      }
+order: 2000

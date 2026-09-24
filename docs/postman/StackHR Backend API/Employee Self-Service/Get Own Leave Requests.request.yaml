@@ -1,0 +1,8 @@
+$kind: http-request
+description: Retrieve own leave application requests.
+url: "{{baseUrl}}/me/leave-requests"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Get Own Leave Requests.resources/examples
+order: 4000

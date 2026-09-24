@@ -1,0 +1,3 @@
+$kind: collection
+description: Employee CRUD management and offboarding endpoints.
+order: 4000

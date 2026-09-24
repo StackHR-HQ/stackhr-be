@@ -1,0 +1,21 @@
+$kind: http-request
+description: Create a new employee record under active organization.
+url: "{{baseUrl}}/employees"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "fullName": "Jane Doe",
+      "email": "jane.doe@company.com",
+      "department": "Engineering",
+      "jobTitle": "Senior Software Engineer",
+      "employmentType": "FULL_TIME",
+      "salaryAmount": 650000,
+      "startDate": "2026-01-15"
+    }
+examples: ./.resources/Create Employee.resources/examples
+order: 1000

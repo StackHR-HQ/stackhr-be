@@ -1,0 +1,13 @@
+$kind: http-request
+description: Bulk import employee records from raw CSV payload.
+url: "{{baseUrl}}/onboarding/employees/import"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "csv": "fullName,email,department,jobTitle,employmentType,salary,startDate\nJohn Doe,john@acme.com,Engineering,Software Engineer,FULL_TIME,500000,2026-01-01"
+    }
+order: 3000

@@ -1,0 +1,26 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "approvalRequest": {
+          "id": "appr-123",
+          "organizationId": "org-123",
+          "type": "LEAVE",
+          "subjectTable": "leave_request",
+          "subjectId": "leave-123",
+          "requesterId": "usr-123",
+          "status": "PENDING",
+          "stage": 1,
+          "submittedAt": "2026-09-09T10:00:00.000Z"
+        }
+      }
+order: 1000

@@ -1,0 +1,18 @@
+$kind: http-request
+description: Submit a leave request. Validates leave balance and routes through the generic Approvals Engine (ADR-003).
+url: "{{baseUrl}}/leave/requests"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "leaveTypeId": "lt-123",
+      "startDate": "2026-10-01",
+      "endDate": "2026-10-05",
+      "reason": "Annual family vacation"
+    }
+examples: ./.resources/Submit Leave Request (Routes to Approvals).resources/examples
+order: 4000

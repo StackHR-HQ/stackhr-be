@@ -1,0 +1,22 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "invitation": {
+          "id": "inv-123",
+          "email": "newmember@company.com",
+          "role": "EMPLOYEE",
+          "status": "pending",
+          "expiresAt": "2026-09-16T10:00:00.000Z"
+        }
+      }
+order: 1000

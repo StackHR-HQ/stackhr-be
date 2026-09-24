@@ -11,7 +11,13 @@ const DEV_ALLOWED_ORIGINS = [
   'http://127.0.0.1:5173',
 ];
 
-const PROD_DEFAULT_ORIGINS = ['https://app.stackhr.app'];
+const PROD_DEFAULT_ORIGINS = [
+  'https://stackhr-website.onrender.com',
+  'https://stackhr-webapp-dev.onrender.com',
+  'https://stackhr-admin.onrender.com',
+  'https://app.stackhr.app',
+  'https://admin.stackhr.app',
+];
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);

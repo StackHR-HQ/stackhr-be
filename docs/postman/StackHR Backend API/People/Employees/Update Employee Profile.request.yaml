@@ -1,0 +1,14 @@
+$kind: http-request
+description: Update employee profile details.
+url: "{{baseUrl}}/people/employees/:employeeId"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "jobTitle": "Senior Software Engineer",
+      "status": "ACTIVE"
+    }
+order: 4000

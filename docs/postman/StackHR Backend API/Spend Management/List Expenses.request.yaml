@@ -1,0 +1,8 @@
+$kind: http-request
+description: List expenses for active organization / employee.
+url: "{{baseUrl}}/spend/expenses"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/List Expenses.resources/examples
+order: 2000

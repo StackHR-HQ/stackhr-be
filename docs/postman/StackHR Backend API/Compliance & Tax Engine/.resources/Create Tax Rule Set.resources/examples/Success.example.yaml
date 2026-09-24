@@ -1,0 +1,18 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "id": "TRS-1725916000000",
+        "name": "Nigeria Tax Act 2027 Amendment",
+        "effectiveFrom": "2027-01-01T00:00:00.000Z"
+      }
+order: 1000

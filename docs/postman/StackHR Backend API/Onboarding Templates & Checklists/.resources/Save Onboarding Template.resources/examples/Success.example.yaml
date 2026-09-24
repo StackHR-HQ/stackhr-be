@@ -1,0 +1,21 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "message": "Onboarding template saved successfully",
+        "template": {
+          "department": "Engineering",
+          "title": "Engineering Onboarding",
+          "tasks": []
+        }
+      }
+order: 1000

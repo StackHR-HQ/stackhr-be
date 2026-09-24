@@ -1,0 +1,17 @@
+$kind: http-request
+description: Send a 7-day expiration workspace invitation to a new team member.
+url: "{{baseUrl}}/invitations"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "email": "newmember@company.com",
+      "role": "EMPLOYEE",
+      "department": "Engineering"
+    }
+examples: ./.resources/Send Workspace Invitation.resources/examples
+order: 1000

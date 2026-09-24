@@ -1,0 +1,8 @@
+$kind: http-request
+description: Retrieve own salary advance applications.
+url: "{{baseUrl}}/me/advances"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Get Own Salary Advances.resources/examples
+order: 6000

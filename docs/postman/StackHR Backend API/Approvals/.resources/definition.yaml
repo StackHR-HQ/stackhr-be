@@ -1,0 +1,3 @@
+$kind: collection
+description: Generic polymorphic approvals engine endpoints (US-023).
+order: 3000

@@ -1,0 +1,18 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 403
+  statusText: Forbidden
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "message": "You are not a member of the target organization",
+        "error": "Forbidden",
+        "statusCode": 403
+      }
+order: 2000

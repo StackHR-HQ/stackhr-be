@@ -1,0 +1,15 @@
+$kind: http-request
+description: Attach proof of receipt/attachment URL to an existing expense claim.
+url: "{{baseUrl}}/spend/expenses/exp-123/receipt"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "receiptUrl": "https://storage.stackhr.app/receipts/exp-123.pdf"
+    }
+examples: ./.resources/Attach Receipt to Expense Claim.resources/examples
+order: 4000

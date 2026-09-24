@@ -1,0 +1,8 @@
+$kind: http-request
+description: Retrieve current leave balances (allocated, used, pending, remaining) for logged in employee or organization.
+url: "{{baseUrl}}/leave/balances"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Get Leave Balances.resources/examples
+order: 3000

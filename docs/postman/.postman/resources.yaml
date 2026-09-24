@@ -5,5 +5,13 @@ workspace:
 localResources:
   collections:
     - ../StackHR.postman_collection.json
+    - ../StackHR Backend API
   environments:
-    - ../StackHR.postman_environment.json
+    - ../StackHR Local Development.environment.yaml
+
+# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
+
+cloudResources:
+  collections:
+    ../StackHR Backend API: stackhr-api-collection
+

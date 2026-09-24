@@ -1,0 +1,8 @@
+$kind: http-request
+description: Fetch single employee details including manager and direct reports.
+url: "{{baseUrl}}/employees/emp-123"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Get Employee Details.resources/examples
+order: 3000

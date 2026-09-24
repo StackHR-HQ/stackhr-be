@@ -1,0 +1,8 @@
+$kind: http-request
+description: Retrieve details of a single leave request.
+url: "{{baseUrl}}/leave/requests/lr-456"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Get Leave Request Details.resources/examples
+order: 6000
