@@ -83,7 +83,10 @@ export class PrismaService
                 };
               }
 
-              if (operation === 'createMany') {
+              if (
+                operation === 'createMany' ||
+                operation === 'createManyAndReturn'
+              ) {
                 if (Array.isArray((args as any).data)) {
                   (args as any).data = (args as any).data.map((item: any) => ({
                     ...item,

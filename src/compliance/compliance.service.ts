@@ -266,6 +266,8 @@ export class ComplianceService {
             lowerLimit: rule.lowerLimit,
             upperLimit: rule.upperLimit,
             taxRate: rule.taxRate,
+            createdAt: new Date(),
+            updatedAt: new Date(),
           })),
         });
       }

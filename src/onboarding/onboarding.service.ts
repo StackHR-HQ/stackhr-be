@@ -318,6 +318,8 @@ export class OnboardingService {
           // Onboarding collects a monthly amount in major units.
           annualSalaryMinor: BigInt(row.salary) * 1200n,
           startDate: row.startDate,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         })),
         select: { id: true, email: true },
       });
