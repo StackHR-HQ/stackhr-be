@@ -1,0 +1,15 @@
+$kind: http-request
+description: Reassign manager for an employee. Performs circular hierarchy check.
+url: "{{baseUrl}}/employees/emp-123/reassign-manager"
+method: PATCH
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "managerId": "emp-mgr-456"
+    }
+examples: ./.resources/Reassign Employee Manager.resources/examples
+order: 7000

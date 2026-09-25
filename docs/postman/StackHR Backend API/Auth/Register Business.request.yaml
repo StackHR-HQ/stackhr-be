@@ -1,0 +1,18 @@
+$kind: http-request
+description: Register a new business account and create organization workspace. Public endpoint.
+url: "{{baseUrl}}/auth/business/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "owner@company.com",
+      "password": "SecurePass123!",
+      "confirmPassword": "SecurePass123!",
+      "companyName": "Acme Corp",
+      "organizationSlug": "acme-corp"
+    }
+examples: ./.resources/Register Business.resources/examples
+order: 1000

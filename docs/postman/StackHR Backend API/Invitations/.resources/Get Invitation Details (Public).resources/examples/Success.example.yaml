@@ -1,0 +1,24 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "invitation": {
+          "id": "inv-123",
+          "email": "newmember@company.com",
+          "status": "pending",
+          "organization": {
+            "name": "Acme Corp",
+            "slug": "acme-corp"
+          }
+        }
+      }
+order: 1000

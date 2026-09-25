@@ -1,0 +1,20 @@
+$kind: http-request
+description: Upload document file (multipart/form-data).
+url: "{{baseUrl}}/people/documents"
+method: POST
+body:
+  type: formdata
+  content:
+    - type: file
+      key: file
+      src: ""
+    - type: text
+      key: name
+      value: Offer Letter
+    - type: text
+      key: category
+      value: EMPLOYMENT
+    - type: text
+      key: scope
+      value: company
+order: 4000

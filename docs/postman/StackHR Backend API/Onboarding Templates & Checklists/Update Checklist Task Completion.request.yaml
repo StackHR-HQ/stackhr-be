@@ -1,0 +1,15 @@
+$kind: http-request
+description: Toggle completed status for an employee onboarding checklist task.
+url: "{{baseUrl}}/onboarding/checklists/emp-123/tasks/task-eng-1"
+method: PATCH
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "completed": true
+    }
+examples: ./.resources/Update Checklist Task Completion.resources/examples
+order: 4000

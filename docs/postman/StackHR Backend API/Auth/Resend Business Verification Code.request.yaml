@@ -1,0 +1,13 @@
+$kind: http-request
+description: Resend 6-digit email verification code.
+url: "{{baseUrl}}/auth/business/resend-verification"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "owner@company.com"
+    }
+order: 7000

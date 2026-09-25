@@ -1,0 +1,23 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "user": {
+          "id": "usr-123",
+          "name": "Acme Corp",
+          "email": "owner@company.com",
+          "userType": "BUSINESS",
+          "role": "BUSINESS_OWNER",
+          "organizationId": "org-456"
+        }
+      }
+order: 1000

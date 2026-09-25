@@ -1,0 +1,26 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "message": "Compensation record set successfully",
+        "compensationRecord": {
+          "id": "comp-123",
+          "employeeId": "550e8400-e29b-41d4-a716-446655440000",
+          "basicSalary": 30000000,
+          "housingAllowance": 10000000,
+          "transportAllowance": 5000000,
+          "otherAllowances": 2000000,
+          "effectiveFrom": "2026-09-09T13:00:00.000Z",
+          "effectiveTo": null
+        }
+      }
+order: 1000

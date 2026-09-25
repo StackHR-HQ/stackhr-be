@@ -1,0 +1,5 @@
+$kind: http-request
+description: Get comprehensive employee profile, compensation, leave summary, and activity feed.
+url: "{{baseUrl}}/people/employees/:employeeId"
+method: GET
+order: 3000

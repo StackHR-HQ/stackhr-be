@@ -1,0 +1,8 @@
+$kind: http-request
+description: Get onboarding checklist tasks assigned to a specific employee.
+url: "{{baseUrl}}/onboarding/checklists/emp-123"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Get Employee Checklist.resources/examples
+order: 3000

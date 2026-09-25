@@ -1,0 +1,28 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "message": "Salary advance request submitted and routed for approval",
+        "salaryAdvance": {
+          "id": "adv-123",
+          "amount": 100000,
+          "repaymentMonths": 2,
+          "monthlyDeduction": 50000,
+          "status": "PENDING"
+        },
+        "approvalRequest": {
+          "id": "appr-adv-123",
+          "type": "SALARY_ADVANCE",
+          "status": "PENDING"
+        }
+      }
+order: 1000

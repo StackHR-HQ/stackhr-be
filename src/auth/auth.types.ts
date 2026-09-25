@@ -8,6 +8,8 @@ export interface AuthenticatedUser {
   userType: UserType;
   role: UserRole;
   organizationId: string | null;
+  orgSlug?: string | null;
+  orgName?: string | null;
 }
 
 export interface AuthenticatedRequest extends Request {

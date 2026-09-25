@@ -1,0 +1,21 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "approvalRequest": {
+          "id": "appr-123",
+          "status": "APPROVED",
+          "approverId": "mgr-456",
+          "decidedAt": "2026-09-09T10:15:00.000Z"
+        }
+      }
+order: 1000

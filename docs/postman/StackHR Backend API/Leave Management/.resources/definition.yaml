@@ -1,0 +1,3 @@
+$kind: collection
+description: Leave policies, leave type configurations, leave balances, and request submission routed to generic Approvals Engine.
+order: 7000

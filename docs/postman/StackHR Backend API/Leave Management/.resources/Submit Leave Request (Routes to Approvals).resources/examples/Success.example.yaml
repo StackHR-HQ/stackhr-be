@@ -1,0 +1,28 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "message": "Leave request submitted and routed for approval",
+        "leaveRequest": {
+          "id": "lr-456",
+          "status": "PENDING",
+          "totalDays": 5
+        },
+        "approvalRequest": {
+          "id": "appr-789",
+          "status": "PENDING",
+          "type": "LEAVE",
+          "subjectTable": "leave_request",
+          "subjectId": "lr-456"
+        }
+      }
+order: 1000

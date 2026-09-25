@@ -1,0 +1,22 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "message": "Task marked completed",
+        "employeeId": "emp-123",
+        "task": {
+          "id": "task-eng-1",
+          "completed": true,
+          "completedAt": "2026-09-09T10:45:00.000Z"
+        }
+      }
+order: 1000

@@ -1,0 +1,24 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "message": "Payroll run calculated successfully for 5 employees",
+        "payrollRun": {
+          "id": "run-123",
+          "status": "CALCULATED",
+          "totalGross": 225000000,
+          "totalTax": 0,
+          "totalPension": 18000000,
+          "totalNet": 207000000
+        }
+      }
+order: 1000

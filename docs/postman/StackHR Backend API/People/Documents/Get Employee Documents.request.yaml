@@ -1,0 +1,5 @@
+$kind: http-request
+description: List employee documents.
+url: "{{baseUrl}}/people/documents/employees"
+method: GET
+order: 2000

@@ -1,0 +1,8 @@
+$kind: http-request
+description: Get detailed payroll run including line items and generated payslips.
+url: "{{baseUrl}}/payroll/runs/run-123"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Get Payroll Run Detail.resources/examples
+order: 10000

@@ -1,0 +1,23 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "history": [
+          {
+            "id": "comp-123",
+            "basicSalary": 30000000,
+            "effectiveFrom": "2026-09-09T13:00:00.000Z",
+            "effectiveTo": null
+          }
+        ]
+      }
+order: 1000

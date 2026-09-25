@@ -1,0 +1,22 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "leaveType": {
+          "id": "lt-123",
+          "name": "Annual Paid Leave",
+          "daysPerYear": 20,
+          "paid": true,
+          "requiresApproval": true
+        }
+      }
+order: 1000

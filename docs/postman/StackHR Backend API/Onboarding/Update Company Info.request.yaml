@@ -1,0 +1,19 @@
+$kind: http-request
+description: "Update organization profile details. Required roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+url: "{{baseUrl}}/onboarding/company"
+method: PATCH
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "companyName": "Acme Corp",
+      "industry": "Fintech",
+      "companySize": "11-50",
+      "currency": "NGN",
+      "payrollFrequency": "MONTHLY"
+    }
+examples: ./.resources/Update Company Info.resources/examples
+order: 1000

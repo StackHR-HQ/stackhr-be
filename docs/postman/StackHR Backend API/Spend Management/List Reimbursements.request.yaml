@@ -1,0 +1,8 @@
+$kind: http-request
+description: List generated pending/paid reimbursement records automatically created upon expense approval.
+url: "{{baseUrl}}/spend/reimbursements"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/List Reimbursements.resources/examples
+order: 6000

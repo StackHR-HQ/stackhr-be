@@ -1,0 +1,8 @@
+$kind: http-request
+description: List salary advance requests.
+url: "{{baseUrl}}/spend/advances"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/List Salary Advances.resources/examples
+order: 5000

@@ -1,0 +1,21 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "message": "Invitation accepted successfully",
+        "user": {
+          "id": "usr-789",
+          "name": "New Member",
+          "email": "newmember@company.com"
+        }
+      }
+order: 1000

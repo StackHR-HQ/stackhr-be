@@ -1,0 +1,23 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "employee": {
+          "id": "emp-123",
+          "organizationId": "org-123",
+          "fullName": "Jane Doe",
+          "email": "jane@acme.com",
+          "department": "Engineering",
+          "salaryAmount": 850000
+        }
+      }
+order: 1000

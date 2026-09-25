@@ -1,0 +1,16 @@
+$kind: http-request
+description: Update specific details of an employee record.
+url: "{{baseUrl}}/employees/emp-123"
+method: PATCH
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "jobTitle": "Staff Engineer",
+      "salaryAmount": 750000
+    }
+examples: ./.resources/Update Employee.resources/examples
+order: 4000

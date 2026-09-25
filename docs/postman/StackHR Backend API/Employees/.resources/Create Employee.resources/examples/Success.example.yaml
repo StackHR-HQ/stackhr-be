@@ -1,0 +1,27 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "employee": {
+          "id": "emp-123",
+          "organizationId": "org-456",
+          "fullName": "Jane Doe",
+          "email": "jane.doe@company.com",
+          "department": "Engineering",
+          "jobTitle": "Senior Software Engineer",
+          "employmentType": "FULL_TIME",
+          "salaryAmount": 650000,
+          "startDate": "2026-01-15T00:00:00.000Z",
+          "status": "ACTIVE"
+        }
+      }
+order: 1000

@@ -1,0 +1,13 @@
+$kind: http-request
+description: Update department.
+url: "{{baseUrl}}/people/departments/:departmentId"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "name": "Software Engineering"
+    }
+order: 3000

@@ -1,0 +1,26 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "leaveRequest": {
+          "id": "lr-456",
+          "startDate": "2026-10-01T00:00:00.000Z",
+          "endDate": "2026-10-05T00:00:00.000Z",
+          "totalDays": 5,
+          "status": "APPROVED",
+          "employee": {
+            "id": "emp-123",
+            "fullName": "Jane Doe"
+          }
+        }
+      }
+order: 1000

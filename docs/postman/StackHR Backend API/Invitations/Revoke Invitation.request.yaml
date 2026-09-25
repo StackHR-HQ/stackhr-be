@@ -1,0 +1,8 @@
+$kind: http-request
+description: Revoke a pending workspace invitation.
+url: "{{baseUrl}}/invitations/inv-123"
+method: DELETE
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Revoke Invitation.resources/examples
+order: 5000

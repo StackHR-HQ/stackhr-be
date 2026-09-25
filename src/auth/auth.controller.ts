@@ -2,90 +2,141 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Post,
   Req,
   Res,
   UseGuards,
+  ValidationPipe,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
-import { readOptionalString, readString } from '../common/input';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import type { AuthenticatedRequest } from './auth.types';
+import { AcceptInvitationDto } from './dto/accept-invitation.dto';
+import { SignupBusinessDto } from './dto/signup-business.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { LoginDto } from './dto/login.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('business/register')
-  @Post('business/signup')
-  async signupBusiness(@Body() body: Record<string, unknown>) {
-    return this.authService.signupBusiness({
-      email: readString(body.email),
-      password: readString(body.password),
-      confirmPassword: readString(body.confirmPassword),
-      companyName: readString(body.companyName ?? body.organizationName),
-      organizationSlug: readOptionalString(body.organizationSlug),
-    });
+  /** Public: the accept page checks the link before asking for a password. */
+  @Get('invitations/:token')
+  previewInvitation(@Param('token') token: string) {
+    return this.authService.previewInvitation(token);
   }
 
-  @Post('business/verify-email')
-  async verifyBusinessEmail(
-    @Body() body: Record<string, unknown>,
+  /** Public: sets a password (or confirms an existing one) and signs the employee in. */
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Post('invitations/accept')
+  async acceptInvitation(
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    )
+    body: AcceptInvitationDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.authService.verifyBusinessEmail(
-      readString(body.email),
-      readString(body.code),
+    const result = await this.authService.acceptEmployeeInvitation(
+      body,
       this.sessionOptions(request),
     );
     this.authService.setSessionCookie(response, result.token);
     return {
-      user: result.user,
+      user: this.authService.toFrontendUser(result.user),
+      token: result.token,
+    };
+  }
+
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Post(['business/register', 'business/signup'])
+  async signupBusiness(@Body() dto: SignupBusinessDto) {
+    return this.authService.signupBusiness({
+      email: dto.email,
+      password: dto.password,
+      confirmPassword: dto.confirmPassword,
+      companyName: dto.companyName || dto.organizationName || '',
+      organizationSlug: dto.organizationSlug,
+    });
+  }
+
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Post('business/verify-email')
+  async verifyBusinessEmail(
+    @Body() dto: VerifyEmailDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.verifyBusinessEmail(
+      dto.email,
+      dto.code,
+      this.sessionOptions(request),
+    );
+    this.authService.setSessionCookie(response, result.token);
+    return {
+      user: this.authService.toFrontendUser(result.user),
+      token: result.token,
       onboarding: result.onboarding,
     };
   }
 
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('business/resend-verification')
-  resendBusinessVerification(@Body() body: Record<string, unknown>) {
-    return this.authService.resendBusinessVerification(readString(body.email));
+  resendBusinessVerification(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendBusinessVerification(dto.email);
   }
 
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('business/login')
   async loginBusiness(
-    @Body() body: Record<string, unknown>,
+    @Body() dto: LoginDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authService.loginBusiness(
       {
-        email: readString(body.email),
-        password: readString(body.password),
+        email: dto.email,
+        password: dto.password,
+        orgSlug: dto.orgSlug,
       },
       this.sessionOptions(request),
     );
 
     this.authService.setSessionCookie(response, result.token);
-    return { user: result.user };
+    return {
+      user: this.authService.toFrontendUser(result.user),
+      token: result.token,
+    };
   }
 
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('admin/login')
   async loginAdmin(
-    @Body() body: Record<string, unknown>,
+    @Body() dto: LoginDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authService.loginStackhrAdmin(
       {
-        email: readString(body.email),
-        password: readString(body.password),
+        email: dto.email,
+        password: dto.password,
       },
       this.sessionOptions(request),
     );
 
     this.authService.setSessionCookie(response, result.token);
-    return { user: result.user };
+    return {
+      user: this.authService.toFrontendUser(result.user),
+      token: result.token,
+    };
   }
 
   @UseGuards(AuthGuard)
@@ -105,7 +156,7 @@ export class AuthController {
   @UseGuards(AuthGuard)
   @Get('me')
   getCurrentUser(@Req() request: AuthenticatedRequest) {
-    return { user: request.user };
+    return { user: this.authService.toFrontendUser(request.user!) };
   }
 
   private sessionOptions(request: Request) {

@@ -1,0 +1,23 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "expenses": [
+          {
+            "id": "exp-123",
+            "category": "Travel",
+            "amount": 25000,
+            "status": "PENDING"
+          }
+        ]
+      }
+order: 1000

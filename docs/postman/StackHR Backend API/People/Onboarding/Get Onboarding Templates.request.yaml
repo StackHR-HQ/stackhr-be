@@ -1,0 +1,5 @@
+$kind: http-request
+description: List onboarding checklist templates.
+url: "{{baseUrl}}/people/onboarding/templates"
+method: GET
+order: 1000

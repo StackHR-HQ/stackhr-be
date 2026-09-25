@@ -1,0 +1,14 @@
+$kind: http-request
+description: Assign onboarding template to employee.
+url: "{{baseUrl}}/people/onboarding/employees"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "employeeId": "{{employeeId}}",
+      "templateId": "{{templateId}}"
+    }
+order: 3000

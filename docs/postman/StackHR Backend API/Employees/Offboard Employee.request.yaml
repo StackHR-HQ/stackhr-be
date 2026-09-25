@@ -1,0 +1,16 @@
+$kind: http-request
+description: Offboard an employee and mark status as OFFBOARDED.
+url: "{{baseUrl}}/employees/emp-123/offboard"
+method: PATCH
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "offboardDate": "2026-12-31",
+      "reason": "Resigned for personal reasons"
+    }
+examples: ./.resources/Offboard Employee.resources/examples
+order: 8000

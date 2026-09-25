@@ -1,0 +1,17 @@
+$kind: http-request
+description: Create a new payroll run in DRAFT status.
+url: "{{baseUrl}}/payroll/runs"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "periodMonth": 9,
+      "periodYear": 2026,
+      "title": "September 2026 Regular Payroll"
+    }
+examples: ./.resources/Create Payroll Run (Draft).resources/examples
+order: 3000

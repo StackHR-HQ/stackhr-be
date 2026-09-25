@@ -1,0 +1,27 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 201
+  statusText: Created
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "message": "Expense submission recorded and routed for approval",
+        "expense": {
+          "id": "exp-123",
+          "category": "Travel",
+          "amount": 25000,
+          "status": "PENDING"
+        },
+        "approvalRequest": {
+          "id": "appr-exp-123",
+          "type": "EXPENSE",
+          "status": "PENDING"
+        }
+      }
+order: 1000
