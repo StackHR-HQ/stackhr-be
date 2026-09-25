@@ -123,3 +123,68 @@ export function invitationEmail(
     }),
   };
 }
+
+export function waitlistConfirmationEmail(
+  fullName: string,
+): TransactionalEmail {
+  const rawFirstName = fullName.trim().split(' ')[0] || 'there';
+  const firstName = escapeHtml(rawFirstName);
+  const previewText =
+    'You’re officially on the list. Here’s what happens next.';
+
+  const text = `Hi ${rawFirstName},
+
+Welcome to the StackHR waitlist.
+
+We’re building StackHR to make HR, payroll and spend management simpler for Nigerian businesses, and we’re glad to have you joining us early.
+
+As a member of our waitlist, you’ll be among the first to receive:
+• Important StackHR product updates
+• Early looks at what we’re building
+• Updates as we get closer to launch
+• An invitation when StackHR is ready for you to get started
+
+For now, there’s nothing else you need to do. We’ll keep you updated as we move closer to launch.
+
+If you’re joining on behalf of a business and would like to tell us about your current HR, payroll or expense-management process, simply reply to this email. We’d love to hear from you.
+
+Thank you for joining us early.
+
+The StackHR Team
+HR. Payroll. Spend. One platform.
+
+https://stackhr.app`;
+
+  const html = layout({
+    eyebrow: 'WAITLIST CONFIRMATION',
+    title: `Welcome to the list, ${firstName}.`,
+    body: previewText,
+    content: `
+      <p style="margin:0 0 20px;color:${COLORS.ink};font-size:16px;line-height:1.6;">Hi ${firstName},</p>
+      <p style="margin:0 0 20px;color:${COLORS.ink};font-size:15px;line-height:1.6;">Welcome to the StackHR waitlist.</p>
+      <p style="margin:0 0 24px;color:${COLORS.muted};font-size:15px;line-height:1.65;">We’re building StackHR to make HR, payroll and spend management simpler for Nigerian businesses, and we’re glad to have you joining us early.</p>
+
+      <p style="margin:0 0 16px;color:${COLORS.ink};font-size:15px;font-weight:700;">As a member of our waitlist, you’ll be among the first to receive:</p>
+      <ul style="margin:0 0 28px;padding-left:20px;color:${COLORS.muted};font-size:15px;line-height:1.8;">
+        <li style="margin-bottom:8px;">Important StackHR product updates</li>
+        <li style="margin-bottom:8px;">Early looks at what we’re building</li>
+        <li style="margin-bottom:8px;">Updates as we get closer to launch</li>
+        <li style="margin-bottom:8px;">An invitation when StackHR is ready for you to get started</li>
+      </ul>
+
+      <p style="margin:0 0 20px;color:${COLORS.muted};font-size:15px;line-height:1.65;">For now, there’s nothing else you need to do. We’ll keep you updated as we move closer to launch.</p>
+      <p style="margin:0 0 28px;color:${COLORS.muted};font-size:15px;line-height:1.65;">If you’re joining on behalf of a business and would like to tell us about your current HR, payroll or expense-management process, simply reply to this email. We’d love to hear from you.</p>
+
+      <p style="margin:0 0 8px;color:${COLORS.ink};font-size:15px;font-weight:700;">Thank you for joining us early.</p>
+      <p style="margin:0 0 24px;color:${COLORS.teal};font-size:15px;font-weight:700;">The StackHR Team<br><span style="color:${COLORS.muted};font-size:13px;font-weight:400;">HR. Payroll. Spend. One platform.</span></p>
+
+      <a href="https://stackhr.app" style="display:inline-block;background:${COLORS.tealBright};color:#fff;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:2px;padding:15px 24px;">VISIT STACKHR.APP &nbsp; →</a>
+    `,
+  });
+
+  return {
+    subject: 'Welcome to the StackHR Waitlist 💙',
+    text,
+    html,
+  };
+}
