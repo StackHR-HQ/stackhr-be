@@ -248,6 +248,8 @@ export class PayrollService {
         rentReliefApplied,
         otherDeductions,
         netSalary,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
     }
 
