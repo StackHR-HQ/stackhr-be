@@ -653,7 +653,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"appr-123\",\n        \"type\": \"LEAVE\",\n        \"status\": \"PENDING\",\n        \"requesterId\": \"usr-123\"\n      }\n    ],\n    \"meta\": {\n      \"total\": 1,\n      \"page\": 1,\n      \"limit\": 20,\n      \"totalPages\": 1\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"appr-123\",\n        \"organizationId\": \"org-123\",\n        \"type\": \"LEAVE\",\n        \"subjectTable\": \"leave_request\",\n        \"subjectId\": \"leave-100\",\n        \"requesterId\": \"usr-123\",\n        \"requester\": {\n          \"id\": \"usr-123\",\n          \"fullName\": \"Chukwuemeka Okafor\"\n        },\n        \"approverId\": null,\n        \"approver\": null,\n        \"status\": \"PENDING\",\n        \"amountSnapshot\": 3,\n        \"unit\": \"DAYS\",\n        \"currency\": null,\n        \"subjectSummary\": {\n          \"leaveType\": \"Annual Leave\",\n          \"startDate\": \"2026-10-01T00:00:00.000Z\",\n          \"endDate\": \"2026-10-03T00:00:00.000Z\",\n          \"totalDays\": 3,\n          \"reason\": \"Family vacation\"\n        },\n        \"metadata\": null,\n        \"stage\": 1,\n        \"submittedAt\": \"2026-09-25T15:13:43.979Z\",\n        \"decidedAt\": null,\n        \"rejectionReason\": null\n      }\n    ],\n    \"meta\": {\n      \"total\": 1,\n      \"page\": 1,\n      \"limit\": 20,\n      \"totalPages\": 1\n    }\n  }\n}"
             }
           ]
         },
