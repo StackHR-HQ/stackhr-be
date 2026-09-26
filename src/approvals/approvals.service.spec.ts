@@ -16,6 +16,27 @@ describe('ApprovalsService', () => {
       findFirst: jest.Mock;
       update: jest.Mock;
     };
+    user: {
+      findMany: jest.Mock;
+    };
+    employee: {
+      findMany: jest.Mock;
+    };
+    leaveRequest: {
+      findMany: jest.Mock;
+    };
+    expense: {
+      findMany: jest.Mock;
+    };
+    reimbursement: {
+      findMany: jest.Mock;
+    };
+    salaryAdvance: {
+      findMany: jest.Mock;
+    };
+    payrollRun: {
+      findMany: jest.Mock;
+    };
   };
 
   const mockAdminUser: AuthenticatedUser = {
@@ -46,6 +67,27 @@ describe('ApprovalsService', () => {
         count: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
+      },
+      user: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      employee: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      leaveRequest: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      expense: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      reimbursement: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      salaryAdvance: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      payrollRun: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
     };
 
@@ -108,11 +150,37 @@ describe('ApprovalsService', () => {
   });
 
   describe('listRequests', () => {
-    it('should list paginated requests for admin', async () => {
+    it('should list paginated requests for admin with enriched requester, approver, and subject details', async () => {
       prismaMock.approvalRequest.findMany.mockResolvedValue([
-        { id: 'appr-1', type: 'LEAVE' },
+        {
+          id: 'appr-1',
+          type: 'LEAVE',
+          subjectTable: 'leave_request',
+          subjectId: 'leave-100',
+          requesterId: 'user-employee-1',
+          approverId: 'user-admin-1',
+          amountSnapshot: 3,
+        },
       ]);
       prismaMock.approvalRequest.count.mockResolvedValue(1);
+
+      prismaMock.user.findMany.mockResolvedValue([
+        { id: 'user-employee-1', name: 'Employee User', email: 'emp@acme.com' },
+        { id: 'user-admin-1', name: 'Admin User', email: 'admin@acme.com' },
+      ]);
+      prismaMock.employee.findMany.mockResolvedValue([
+        { userId: 'user-employee-1', fullName: 'Jane Doe' },
+      ]);
+      prismaMock.leaveRequest.findMany.mockResolvedValue([
+        {
+          id: 'leave-100',
+          leaveType: { name: 'Annual Leave' },
+          startDate: new Date('2026-10-01'),
+          endDate: new Date('2026-10-03'),
+          totalDays: 3,
+          reason: 'Vacation',
+        },
+      ]);
 
       const result = await service.listRequests(mockAdminUser, {
         page: 1,
@@ -121,6 +189,24 @@ describe('ApprovalsService', () => {
 
       expect(result.items.length).toBe(1);
       expect(result.meta.total).toBe(1);
+      const item = result.items[0];
+      expect(item.requester).toEqual({
+        id: 'user-employee-1',
+        fullName: 'Jane Doe',
+      });
+      expect(item.approver).toEqual({
+        id: 'user-admin-1',
+        fullName: 'Admin User',
+      });
+      expect(item.unit).toBe('DAYS');
+      expect(item.currency).toBeNull();
+      expect(item.subjectSummary).toEqual({
+        leaveType: 'Annual Leave',
+        startDate: expect.any(Date),
+        endDate: expect.any(Date),
+        totalDays: 3,
+        reason: 'Vacation',
+      });
       expect(prismaMock.approvalRequest.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ organizationId: 'org-123' }),
