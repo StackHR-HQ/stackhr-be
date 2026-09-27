@@ -16,6 +16,7 @@ import {
   APPROVAL_EVENTS,
   ApprovalDecidedEvent,
 } from './events/approval-decided.event';
+import type { ApprovalRequest } from '../../generated/prisma/client';
 
 @Injectable()
 export class ApprovalsService {
@@ -116,7 +117,7 @@ export class ApprovalsService {
       where.requesterId = user.id;
     }
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       this.prisma.approvalRequest.findMany({
         where,
         orderBy: { submittedAt: 'desc' },
@@ -125,6 +126,11 @@ export class ApprovalsService {
       }),
       this.prisma.approvalRequest.count({ where }),
     ]);
+
+    const items = await this.enrichApprovalRequests(
+      user.organizationId,
+      rawItems,
+    );
 
     return {
       items,
@@ -135,6 +141,231 @@ export class ApprovalsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  private async enrichApprovalRequests(
+    orgId: string,
+    items: ApprovalRequest[],
+  ) {
+    if (items.length === 0) {
+      return [];
+    }
+
+    const userIds = new Set<string>();
+    for (const item of items) {
+      if (item.requesterId) userIds.add(item.requesterId);
+      if (item.approverId) userIds.add(item.approverId);
+    }
+
+    const userIdList = Array.from(userIds);
+
+    const leaveIds: string[] = [];
+    const expenseIds: string[] = [];
+    const reimbursementIds: string[] = [];
+    const advanceIds: string[] = [];
+    const payrollIds: string[] = [];
+
+    for (const item of items) {
+      if (!item.subjectId) continue;
+      switch (item.subjectTable) {
+        case 'leave_request':
+          leaveIds.push(item.subjectId);
+          break;
+        case 'expense':
+          expenseIds.push(item.subjectId);
+          break;
+        case 'reimbursement':
+          reimbursementIds.push(item.subjectId);
+          break;
+        case 'salary_advance':
+          advanceIds.push(item.subjectId);
+          break;
+        case 'payroll_run':
+          payrollIds.push(item.subjectId);
+          break;
+      }
+    }
+
+    const users =
+      userIdList.length > 0
+        ? await this.prisma.user.findMany({
+            where: { id: { in: userIdList } },
+            select: { id: true, name: true, email: true },
+          })
+        : [];
+
+    const employees =
+      userIdList.length > 0
+        ? await this.prisma.employee.findMany({
+            where: { organizationId: orgId, userId: { in: userIdList } },
+            select: { userId: true, fullName: true },
+          })
+        : [];
+
+    const leaveRequests =
+      leaveIds.length > 0
+        ? await this.prisma.leaveRequest.findMany({
+            where: { id: { in: leaveIds } },
+            include: { leaveType: true },
+          })
+        : [];
+
+    const expenses =
+      expenseIds.length > 0
+        ? await this.prisma.expense.findMany({
+            where: { id: { in: expenseIds } },
+          })
+        : [];
+
+    const reimbursements =
+      reimbursementIds.length > 0
+        ? await this.prisma.reimbursement.findMany({
+            where: { id: { in: reimbursementIds } },
+            include: { expense: true },
+          })
+        : [];
+
+    const salaryAdvances =
+      advanceIds.length > 0
+        ? await this.prisma.salaryAdvance.findMany({
+            where: { id: { in: advanceIds } },
+          })
+        : [];
+
+    const payrollRuns =
+      payrollIds.length > 0
+        ? await this.prisma.payrollRun.findMany({
+            where: { id: { in: payrollIds } },
+          })
+        : [];
+
+    const userMap = new Map<string, (typeof users)[number]>(
+      users.map((u) => [u.id, u]),
+    );
+    const employeeMap = new Map<string, (typeof employees)[number]>(
+      employees
+        .filter((e): e is typeof e & { userId: string } => Boolean(e.userId))
+        .map((e) => [e.userId, e]),
+    );
+
+    const resolveUserInfo = (id: string | null) => {
+      if (!id) return null;
+      const emp = employeeMap.get(id);
+      const usr = userMap.get(id);
+      const fullName = emp?.fullName ?? usr?.name ?? 'Unknown';
+      return { id, fullName };
+    };
+
+    const leaveMap = new Map<string, (typeof leaveRequests)[number]>(
+      leaveRequests.map((l) => [l.id, l]),
+    );
+    const expenseMap = new Map<string, (typeof expenses)[number]>(
+      expenses.map((e) => [e.id, e]),
+    );
+    const reimbursementMap = new Map<string, (typeof reimbursements)[number]>(
+      reimbursements.map((r) => [r.id, r]),
+    );
+    const advanceMap = new Map<string, (typeof salaryAdvances)[number]>(
+      salaryAdvances.map((a) => [a.id, a]),
+    );
+    const payrollMap = new Map<string, (typeof payrollRuns)[number]>(
+      payrollRuns.map((p) => [p.id, p]),
+    );
+
+    return items.map((item) => {
+      const requester = resolveUserInfo(item.requesterId);
+      const approver = resolveUserInfo(item.approverId);
+
+      let unit = 'CURRENCY';
+      let currency: string | null = 'NGN';
+      let subjectSummary: Record<string, any> | null = null;
+
+      switch (item.subjectTable) {
+        case 'leave_request': {
+          unit = 'DAYS';
+          currency = null;
+          const leave = leaveMap.get(item.subjectId);
+          if (leave) {
+            subjectSummary = {
+              leaveType: leave.leaveType?.name ?? 'Leave',
+              startDate: leave.startDate,
+              endDate: leave.endDate,
+              totalDays: leave.totalDays,
+              reason: leave.reason,
+            };
+          }
+          break;
+        }
+        case 'expense': {
+          unit = 'CURRENCY';
+          const exp = expenseMap.get(item.subjectId);
+          if (exp) {
+            currency = exp.currency ?? 'NGN';
+            subjectSummary = {
+              category: exp.category,
+              description: exp.description,
+              amount: exp.amount,
+              currency: exp.currency ?? 'NGN',
+              receiptUrl: exp.receiptUrl,
+            };
+          }
+          break;
+        }
+        case 'reimbursement': {
+          unit = 'CURRENCY';
+          const reimb = reimbursementMap.get(item.subjectId);
+          if (reimb) {
+            currency = reimb.currency ?? 'NGN';
+            subjectSummary = {
+              amount: reimb.amount,
+              currency: reimb.currency ?? 'NGN',
+              category: reimb.expense?.category,
+              description: reimb.expense?.description,
+            };
+          }
+          break;
+        }
+        case 'salary_advance': {
+          unit = 'CURRENCY';
+          currency = 'NGN';
+          const adv = advanceMap.get(item.subjectId);
+          if (adv) {
+            subjectSummary = {
+              amount: adv.amount,
+              currency: 'NGN',
+              reason: adv.reason,
+              repaymentMonths: adv.repaymentMonths,
+              monthlyDeduction: adv.monthlyDeduction,
+            };
+          }
+          break;
+        }
+        case 'payroll_run': {
+          unit = 'CURRENCY';
+          currency = 'NGN';
+          const pay = payrollMap.get(item.subjectId);
+          if (pay) {
+            subjectSummary = {
+              title: pay.title,
+              periodMonth: pay.periodMonth,
+              periodYear: pay.periodYear,
+              totalGross: pay.totalGross,
+              totalNet: pay.totalNet,
+            };
+          }
+          break;
+        }
+      }
+
+      return {
+        ...item,
+        requester,
+        approver,
+        unit,
+        currency,
+        subjectSummary,
+      };
+    });
   }
 
   async decideRequest(
