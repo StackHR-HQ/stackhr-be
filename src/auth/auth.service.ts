@@ -433,27 +433,46 @@ export class AuthService implements OnModuleInit {
     return cookie?.trim().slice(SESSION_COOKIE_NAME.length + 1) || null;
   }
 
-  setSessionCookie(response: Response, token: string): void {
-    const attributes = [
-      `${SESSION_COOKIE_NAME}=${token}`,
+  private cookieOptions(): {
+    sameSite: 'None' | 'Lax' | 'Strict';
+    secure: boolean;
+  } {
+    const isProd = process.env.NODE_ENV === 'production';
+    const raw = (process.env.COOKIE_SAMESITE ?? (isProd ? 'None' : 'Lax'))
+      .trim()
+      .toLowerCase();
+
+    const sameSite =
+      raw === 'none' ? 'None' : raw === 'strict' ? 'Strict' : 'Lax';
+
+    const secure =
+      process.env.COOKIE_SECURE === 'true' || sameSite === 'None' || isProd;
+
+    return { sameSite, secure };
+  }
+
+  private buildCookie(value: string, maxAgeSeconds: number): string {
+    const { sameSite, secure } = this.cookieOptions();
+    const parts = [
+      `${SESSION_COOKIE_NAME}=${value}`,
       'HttpOnly',
       'Path=/v1/api',
-      `Max-Age=${Math.floor(SESSION_DURATION_MS / 1000)}`,
-      'SameSite=Lax',
+      `Max-Age=${maxAgeSeconds}`,
+      `SameSite=${sameSite}`,
     ];
+    if (secure) parts.push('Secure');
+    return parts.join('; ');
+  }
 
-    if (process.env.NODE_ENV === 'production') {
-      attributes.push('Secure');
-    }
-
-    response.setHeader('Set-Cookie', attributes.join('; '));
+  setSessionCookie(response: Response, token: string): void {
+    response.append(
+      'Set-Cookie',
+      this.buildCookie(token, Math.floor(SESSION_DURATION_MS / 1000)),
+    );
   }
 
   clearSessionCookie(response: Response): void {
-    response.setHeader(
-      'Set-Cookie',
-      `${SESSION_COOKIE_NAME}=; HttpOnly; Path=/v1/api; Max-Age=0; SameSite=Lax`,
-    );
+    response.append('Set-Cookie', this.buildCookie('', 0));
   }
 
   async ensureConfiguredAdmin(): Promise<void> {
