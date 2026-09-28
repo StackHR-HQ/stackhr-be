@@ -11,14 +11,18 @@ response:
     type: json
     content: |-
       {
-        "departments": [
-          {
-            "department": "Engineering",
-            "count": 5,
-            "employees": []
-          }
-        ],
-        "totalDepartments": 1,
-        "totalEmployees": 5
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "departments": [
+            {
+              "department": "Engineering",
+              "count": 5,
+              "employees": []
+            }
+          ],
+          "totalDepartments": 1,
+          "totalEmployees": 5
+        }
       }
 order: 1000

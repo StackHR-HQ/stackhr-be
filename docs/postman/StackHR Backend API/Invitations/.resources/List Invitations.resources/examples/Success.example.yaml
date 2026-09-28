@@ -11,12 +11,16 @@ response:
     type: json
     content: |-
       {
-        "invitations": [
-          {
-            "id": "inv-123",
-            "email": "newmember@company.com",
-            "status": "pending"
-          }
-        ]
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "invitations": [
+            {
+              "id": "inv-123",
+              "email": "newmember@company.com",
+              "status": "pending"
+            }
+          ]
+        }
       }
 order: 1000

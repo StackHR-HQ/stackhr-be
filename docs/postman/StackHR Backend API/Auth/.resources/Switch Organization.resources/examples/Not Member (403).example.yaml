@@ -11,8 +11,12 @@ response:
     type: json
     content: |-
       {
+        "success": false,
         "message": "You are not a member of the target organization",
-        "error": "Forbidden",
-        "statusCode": 403
+        "data": null,
+        "error": {
+          "error": "Forbidden",
+          "statusCode": 403
+        }
       }
 order: 2000

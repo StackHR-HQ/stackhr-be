@@ -11,11 +11,15 @@ response:
     type: json
     content: |-
       {
-        "message": "Invitation accepted successfully",
-        "user": {
-          "id": "usr-789",
-          "name": "New Member",
-          "email": "newmember@company.com"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "message": "Invitation accepted successfully",
+          "user": {
+            "id": "usr-789",
+            "name": "New Member",
+            "email": "newmember@company.com"
+          }
         }
       }
 order: 1000

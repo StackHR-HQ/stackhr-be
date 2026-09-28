@@ -11,17 +11,21 @@ response:
     type: json
     content: |-
       {
-        "message": "Expense submission recorded and routed for approval",
-        "expense": {
-          "id": "exp-123",
-          "category": "Travel",
-          "amount": 25000,
-          "status": "PENDING"
-        },
-        "approvalRequest": {
-          "id": "appr-exp-123",
-          "type": "EXPENSE",
-          "status": "PENDING"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "message": "Expense submission recorded and routed for approval",
+          "expense": {
+            "id": "exp-123",
+            "category": "Travel",
+            "amount": 25000,
+            "status": "PENDING"
+          },
+          "approvalRequest": {
+            "id": "appr-exp-123",
+            "type": "EXPENSE",
+            "status": "PENDING"
+          }
         }
       }
 order: 1000

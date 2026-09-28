@@ -11,19 +11,23 @@ response:
     type: json
     content: |-
       {
-        "items": [
-          {
-            "id": "appr-123",
-            "type": "LEAVE",
-            "status": "PENDING",
-            "requesterId": "usr-123"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "items": [
+            {
+              "id": "appr-123",
+              "type": "LEAVE",
+              "status": "PENDING",
+              "requesterId": "usr-123"
+            }
+          ],
+          "meta": {
+            "total": 1,
+            "page": 1,
+            "limit": 20,
+            "totalPages": 1
           }
-        ],
-        "meta": {
-          "total": 1,
-          "page": 1,
-          "limit": 20,
-          "totalPages": 1
         }
       }
 order: 1000

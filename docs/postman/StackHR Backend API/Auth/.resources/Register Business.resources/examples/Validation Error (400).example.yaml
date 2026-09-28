@@ -11,12 +11,12 @@ response:
     type: json
     content: |-
       {
-        "message": [
-          "A valid email is required",
-          "Password must be between 12 and 128 characters",
-          "property unknownField should not exist"
-        ],
-        "error": "Bad Request",
-        "statusCode": 400
+        "success": false,
+        "message": "A valid email is required",
+        "data": null,
+        "error": {
+          "error": "Bad Request",
+          "statusCode": 400
+        }
       }
 order: 2000

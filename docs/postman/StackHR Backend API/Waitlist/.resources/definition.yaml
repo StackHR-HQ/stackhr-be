@@ -1,0 +1,3 @@
+$kind: collection
+description: Public waitlist registration and admin entry management endpoints.
+order: 1000

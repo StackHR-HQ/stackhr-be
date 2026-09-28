@@ -11,10 +11,12 @@ response:
     type: json
     content: |-
       {
-        "message": [
-          "currency must be one of: NGN, USD, GBP, EUR"
-        ],
-        "error": "Bad Request",
-        "statusCode": 400
+        "success": false,
+        "message": "currency must be one of: NGN, USD, GBP, EUR",
+        "data": null,
+        "error": {
+          "error": "Bad Request",
+          "statusCode": 400
+        }
       }
 order: 2000

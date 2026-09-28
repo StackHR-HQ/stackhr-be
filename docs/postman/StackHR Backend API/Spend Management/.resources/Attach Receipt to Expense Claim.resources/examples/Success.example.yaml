@@ -11,10 +11,14 @@ response:
     type: json
     content: |-
       {
-        "message": "Receipt URL attached to expense claim successfully",
-        "expense": {
-          "id": "exp-123",
-          "receiptUrl": "https://storage.stackhr.app/receipts/exp-123.pdf"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "message": "Receipt URL attached to expense claim successfully",
+          "expense": {
+            "id": "exp-123",
+            "receiptUrl": "https://storage.stackhr.app/receipts/exp-123.pdf"
+          }
         }
       }
 order: 1000

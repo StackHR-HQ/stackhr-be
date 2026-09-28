@@ -11,15 +11,19 @@ response:
     type: json
     content: |-
       {
-        "employeeId": "emp-123",
-        "employeeName": "Jane Doe",
-        "department": "Engineering",
-        "checklist": [
-          {
-            "id": "task-eng-1",
-            "title": "Setup workstation",
-            "completed": false
-          }
-        ]
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "employeeId": "emp-123",
+          "employeeName": "Jane Doe",
+          "department": "Engineering",
+          "checklist": [
+            {
+              "id": "task-eng-1",
+              "title": "Setup workstation",
+              "completed": false
+            }
+          ]
+        }
       }
 order: 1000

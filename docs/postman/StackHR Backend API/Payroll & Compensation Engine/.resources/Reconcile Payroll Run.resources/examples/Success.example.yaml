@@ -11,10 +11,14 @@ response:
     type: json
     content: |-
       {
-        "message": "Payroll run successfully reconciled",
-        "payrollRun": {
-          "id": "run-123",
-          "status": "RECONCILED"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "message": "Payroll run successfully reconciled",
+          "payrollRun": {
+            "id": "run-123",
+            "status": "RECONCILED"
+          }
         }
       }
 order: 1000

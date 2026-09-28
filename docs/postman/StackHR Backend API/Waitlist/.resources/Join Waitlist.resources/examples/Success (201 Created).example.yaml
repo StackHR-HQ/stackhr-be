@@ -14,14 +14,13 @@ response:
         "success": true,
         "message": "Request successful",
         "data": {
-          "message": "Payroll run created in DRAFT state",
-          "payrollRun": {
-            "id": "run-123",
-            "periodMonth": 9,
-            "periodYear": 2026,
-            "title": "September 2026 Regular Payroll",
-            "status": "DRAFT"
-          }
+          "id": "w_8f9a2b1c",
+          "name": "Jane Doe",
+          "position": "Head of HR",
+          "businessName": "Acme Technologies",
+          "businessEmail": "jane@acmetech.com",
+          "alreadyJoined": false,
+          "createdAt": "2026-09-21T12:00:00.000Z"
         }
       }
 order: 1000

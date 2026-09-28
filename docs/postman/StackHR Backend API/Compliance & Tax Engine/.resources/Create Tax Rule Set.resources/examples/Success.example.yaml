@@ -11,8 +11,12 @@ response:
     type: json
     content: |-
       {
-        "id": "TRS-1725916000000",
-        "name": "Nigeria Tax Act 2027 Amendment",
-        "effectiveFrom": "2027-01-01T00:00:00.000Z"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "id": "TRS-1725916000000",
+          "name": "Nigeria Tax Act 2027 Amendment",
+          "effectiveFrom": "2027-01-01T00:00:00.000Z"
+        }
       }
 order: 1000

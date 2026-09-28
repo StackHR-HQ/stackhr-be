@@ -11,13 +11,17 @@ response:
     type: json
     content: |-
       {
-        "payrollRuns": [
-          {
-            "id": "run-123",
-            "periodMonth": 9,
-            "periodYear": 2026,
-            "status": "RECONCILED"
-          }
-        ]
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "payrollRuns": [
+            {
+              "id": "run-123",
+              "periodMonth": 9,
+              "periodYear": 2026,
+              "status": "RECONCILED"
+            }
+          ]
+        }
       }
 order: 1000

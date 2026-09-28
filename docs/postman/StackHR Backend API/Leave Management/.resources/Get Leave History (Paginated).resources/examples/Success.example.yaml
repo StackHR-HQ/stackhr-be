@@ -11,24 +11,28 @@ response:
     type: json
     content: |-
       {
-        "data": [
-          {
-            "id": "lr-456",
-            "startDate": "2026-10-01T00:00:00.000Z",
-            "endDate": "2026-10-05T00:00:00.000Z",
-            "totalDays": 5,
-            "status": "APPROVED",
-            "leaveType": {
-              "id": "lt-123",
-              "name": "Annual Paid Leave"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "data": [
+            {
+              "id": "lr-456",
+              "startDate": "2026-10-01T00:00:00.000Z",
+              "endDate": "2026-10-05T00:00:00.000Z",
+              "totalDays": 5,
+              "status": "APPROVED",
+              "leaveType": {
+                "id": "lt-123",
+                "name": "Annual Paid Leave"
+              }
             }
+          ],
+          "meta": {
+            "total": 1,
+            "page": 1,
+            "limit": 10,
+            "totalPages": 1
           }
-        ],
-        "meta": {
-          "total": 1,
-          "page": 1,
-          "limit": 10,
-          "totalPages": 1
         }
       }
 order: 1000

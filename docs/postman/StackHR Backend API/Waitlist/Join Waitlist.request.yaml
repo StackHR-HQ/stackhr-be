@@ -1,0 +1,17 @@
+$kind: http-request
+description: Submit a public entry to join the StackHR waitlist. Rate-limited to 5 submissions/min.
+url: "{{baseUrl}}/waitlist"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "name": "Jane Doe",
+      "position": "Head of HR",
+      "businessName": "Acme Technologies",
+      "businessEmail": "jane@acmetech.com"
+    }
+examples: ./.resources/Join Waitlist.resources/examples
+order: 1000

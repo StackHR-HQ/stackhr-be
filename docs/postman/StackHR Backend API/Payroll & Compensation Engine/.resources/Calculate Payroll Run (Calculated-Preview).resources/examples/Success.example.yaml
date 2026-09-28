@@ -11,14 +11,18 @@ response:
     type: json
     content: |-
       {
-        "message": "Payroll run calculated successfully for 5 employees",
-        "payrollRun": {
-          "id": "run-123",
-          "status": "CALCULATED",
-          "totalGross": 225000000,
-          "totalTax": 0,
-          "totalPension": 18000000,
-          "totalNet": 207000000
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "message": "Payroll run calculated successfully for 5 employees",
+          "payrollRun": {
+            "id": "run-123",
+            "status": "CALCULATED",
+            "totalGross": 225000000,
+            "totalTax": 0,
+            "totalPension": 18000000,
+            "totalNet": 207000000
+          }
         }
       }
 order: 1000

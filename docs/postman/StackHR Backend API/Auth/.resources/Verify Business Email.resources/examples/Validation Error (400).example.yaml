@@ -11,10 +11,12 @@ response:
     type: json
     content: |-
       {
-        "message": [
-          "Verification code must be 6 digits"
-        ],
-        "error": "Bad Request",
-        "statusCode": 400
+        "success": false,
+        "message": "Verification code must be 6 digits",
+        "data": null,
+        "error": {
+          "error": "Bad Request",
+          "statusCode": 400
+        }
       }
 order: 2000

@@ -11,10 +11,14 @@ response:
     type: json
     content: |-
       {
-        "message": "Manager reassigned successfully",
-        "employee": {
-          "id": "emp-123",
-          "managerId": "emp-mgr-456"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "message": "Manager reassigned successfully",
+          "employee": {
+            "id": "emp-123",
+            "managerId": "emp-mgr-456"
+          }
         }
       }
 order: 1000

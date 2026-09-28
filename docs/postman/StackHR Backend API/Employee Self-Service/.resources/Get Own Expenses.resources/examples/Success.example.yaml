@@ -11,6 +11,10 @@ response:
     type: json
     content: |-
       {
-        "expenses": []
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "expenses": []
+        }
       }
 order: 1000

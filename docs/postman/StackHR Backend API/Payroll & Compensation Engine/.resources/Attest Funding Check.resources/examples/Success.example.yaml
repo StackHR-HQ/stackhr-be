@@ -11,10 +11,14 @@ response:
     type: json
     content: |-
       {
-        "message": "Funding check passed successfully. Ready for payment execution.",
-        "payrollRun": {
-          "id": "run-123",
-          "status": "FUNDING_CHECK_PASSED"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "message": "Funding check passed successfully. Ready for payment execution.",
+          "payrollRun": {
+            "id": "run-123",
+            "status": "FUNDING_CHECK_PASSED"
+          }
         }
       }
 order: 1000

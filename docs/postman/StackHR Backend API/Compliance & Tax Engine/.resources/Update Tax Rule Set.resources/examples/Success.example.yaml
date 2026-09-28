@@ -11,8 +11,12 @@ response:
     type: json
     content: |-
       {
-        "id": "TRS-NTA-2026",
-        "rentReliefCap": 600000,
-        "pensionEmployerRate": 0.12
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "id": "TRS-NTA-2026",
+          "rentReliefCap": 600000,
+          "pensionEmployerRate": 0.12
+        }
       }
 order: 1000

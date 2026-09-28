@@ -11,8 +11,12 @@ response:
     type: json
     content: |-
       {
-        "id": "TRS-NTA-2026",
-        "name": "Nigeria Tax Act 2025/2026 (NTA)",
-        "isDefault": true
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "id": "TRS-NTA-2026",
+          "name": "Nigeria Tax Act 2025/2026 (NTA)",
+          "isDefault": true
+        }
       }
 order: 1000

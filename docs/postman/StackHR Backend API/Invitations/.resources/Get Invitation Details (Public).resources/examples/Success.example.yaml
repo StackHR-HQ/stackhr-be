@@ -11,13 +11,17 @@ response:
     type: json
     content: |-
       {
-        "invitation": {
-          "id": "inv-123",
-          "email": "newmember@company.com",
-          "status": "pending",
-          "organization": {
-            "name": "Acme Corp",
-            "slug": "acme-corp"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "invitation": {
+            "id": "inv-123",
+            "email": "newmember@company.com",
+            "status": "pending",
+            "organization": {
+              "name": "Acme Corp",
+              "slug": "acme-corp"
+            }
           }
         }
       }
