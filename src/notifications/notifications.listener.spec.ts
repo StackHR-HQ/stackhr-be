@@ -54,7 +54,10 @@ describe('NotificationsListener', () => {
     expect(emailServiceMock.send).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'requester@example.com',
-        subject: expect.stringContaining('LEAVE request has been Approved'),
+        // Template produces: "Your Leave Request has been Approved"
+        subject: expect.stringContaining('Leave Request has been Approved'),
+        html: expect.stringContaining('approved'),
+        idempotencyKey: 'approval-decided:appr-123:APPROVED',
       }),
     );
   });
@@ -75,8 +78,12 @@ describe('NotificationsListener', () => {
     expect(emailServiceMock.send).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'requester@example.com',
-        subject: expect.stringContaining('EXPENSE request has been Rejected'),
+        // Template produces: "Your Expense Claim has been Rejected"
+        subject: expect.stringContaining('Expense Claim has been Rejected'),
+        // Rejection reason appears in both text and html
         text: expect.stringContaining('Insufficient documentation'),
+        html: expect.stringContaining('Insufficient documentation'),
+        idempotencyKey: 'approval-decided:appr-124:REJECTED',
       }),
     );
   });

@@ -6,6 +6,7 @@ import {
   APPROVAL_EVENTS,
   ApprovalDecidedEvent,
 } from '../approvals/events/approval-decided.event';
+import { approvalDecisionEmail } from './email-templates';
 
 @Injectable()
 export class NotificationsListener {
@@ -28,18 +29,19 @@ export class NotificationsListener {
         return;
       }
 
-      const isApproved = event.status === 'APPROVED';
-      const statusText = isApproved ? 'Approved' : 'Rejected';
-      const subject = `Your ${event.type} request has been ${statusText}`;
-      const text = isApproved
-        ? `Hello ${requester.name}, your ${event.type} request (${event.approvalRequestId}) has been approved.`
-        : `Hello ${requester.name}, your ${event.type} request (${event.approvalRequestId}) was rejected.${event.rejectionReason ? ` Reason: ${event.rejectionReason}` : ''}`;
+      const emailContent = approvalDecisionEmail({
+        requesterName: requester.name ?? 'there',
+        requestType: event.type,
+        status: event.status,
+        rejectionReason: event.rejectionReason,
+        approvalRequestId: event.approvalRequestId,
+      });
 
       await this.emailService.send({
         to: requester.email,
-        subject,
-        text,
-        html: `<p>${text}</p>`,
+        subject: emailContent.subject,
+        text: emailContent.text,
+        html: emailContent.html,
         idempotencyKey: `approval-decided:${event.approvalRequestId}:${event.status}`,
       });
     } catch (error) {
