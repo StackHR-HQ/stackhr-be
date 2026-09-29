@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UseGuards,
@@ -19,6 +20,9 @@ import { SignupBusinessDto } from './dto/signup-business.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -157,6 +161,32 @@ export class AuthController {
   @Get('me')
   getCurrentUser(@Req() request: AuthenticatedRequest) {
     return { user: this.authService.toFrontendUser(request.user!) };
+  }
+
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Get('reset-password/verify')
+  verifyResetToken(@Query('token') token: string) {
+    return this.authService.verifyResetToken(token);
+  }
+
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('change-password')
+  changePassword(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(request.user!.id, dto);
   }
 
   private sessionOptions(request: Request) {

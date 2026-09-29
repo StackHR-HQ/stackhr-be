@@ -414,6 +414,190 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Forgot Password (Public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@company.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "Request a password reset link sent via transactional email. Returns a generic success response to prevent email enumeration."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"If an account exists with this email, a password reset link has been sent.\",\n  \"data\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify Password Reset Token (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password/verify?token=sample-reset-token-123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password",
+                "verify"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "sample-reset-token-123",
+                  "description": "Password reset token sent in email link"
+                }
+              ]
+            },
+            "description": "Public endpoint to verify password reset token validity before presenting password form."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"valid\": true,\n    \"email\": \"owner@company.com\"\n  }\n}"
+            },
+            {
+              "name": "Invalid or Expired Token (400)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Invalid or expired password reset link\",\n  \"data\": null,\n  \"error\": {\n    \"error\": \"Bad Request\",\n    \"statusCode\": 400\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Reset Password (Public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"sample-reset-token-123\",\n  \"password\": \"NewSecurePass123!\",\n  \"confirmPassword\": \"NewSecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "Reset user password using single-use verification token. Revokes all active sessions for security."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Password has been reset successfully. Please log in with your new password.\",\n  \"data\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Change Password (Protected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"OldSecurePass123!\",\n  \"newPassword\": \"NewSecurePass123!\",\n  \"confirmPassword\": \"NewSecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "change-password"
+              ]
+            },
+            "description": "Change caller password. Verifies current password using Argon2id and revokes other sessions."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Password changed successfully. Please log in again.\",\n  \"data\": null\n}"
+            }
+          ]
         }
       ]
     },

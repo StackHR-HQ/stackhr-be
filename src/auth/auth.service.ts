@@ -26,7 +26,13 @@ import {
   type UserType,
 } from './auth.constants';
 import type { AuthenticatedUser } from './auth.types';
-import { verificationEmail } from '../notifications/email-templates';
+import {
+  passwordResetEmail,
+  verificationEmail,
+} from '../notifications/email-templates';
+import type { ForgotPasswordDto } from './dto/forgot-password.dto';
+import type { ResetPasswordDto } from './dto/reset-password.dto';
+import type { ChangePasswordDto } from './dto/change-password.dto';
 
 interface SignupBusinessInput {
   email: string;
@@ -376,6 +382,165 @@ export class AuthService implements OnModuleInit {
 
   async loginStackhrAdmin(input: LoginInput, options: SessionOptions) {
     return this.login(input, USER_TYPES.STACKHR_ADMIN, options);
+  }
+
+  async forgotPassword(emailInput: ForgotPasswordDto) {
+    const email = this.normalizeEmail(emailInput.email);
+    const genericResponse = {
+      success: true,
+      message:
+        'If an account exists with this email, a password reset link has been sent.',
+    };
+
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return genericResponse;
+    }
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = this.hashToken(rawToken);
+    const identifier = `password-reset:${email}`;
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    await this.prisma.verification.deleteMany({
+      where: { identifier },
+    });
+
+    await this.prisma.verification.create({
+      data: {
+        id: randomUUID(),
+        identifier,
+        value: tokenHash,
+        expiresAt,
+      },
+    });
+
+    const resetUrl = `${process.env.STACKHR_APP_URL || 'https://app.stackhr.app'}/reset-password?token=${rawToken}`;
+
+    const apiKey = process.env.SENDBYTE_API_KEY ?? process.env.SENDBYTE_KEY;
+    if (apiKey) {
+      await this.emailService.send({
+        to: email,
+        ...passwordResetEmail(resetUrl),
+        idempotencyKey: `password-reset:${email}:${expiresAt.getTime()}`,
+      });
+    }
+
+    return genericResponse;
+  }
+
+  async verifyResetToken(rawToken: string) {
+    if (!rawToken || typeof rawToken !== 'string') {
+      throw new BadRequestException('A valid reset token is required');
+    }
+
+    const tokenHash = this.hashToken(rawToken);
+    const verification = await this.prisma.verification.findFirst({
+      where: {
+        value: tokenHash,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (
+      !verification ||
+      !verification.identifier.startsWith('password-reset:')
+    ) {
+      throw new BadRequestException('Invalid or expired password reset link');
+    }
+
+    const email = verification.identifier.slice('password-reset:'.length);
+    return { valid: true, email };
+  }
+
+  async resetPassword(input: ResetPasswordDto) {
+    const password = this.validatePassword(input.password);
+    if (password !== input.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    if (!input.token || typeof input.token !== 'string') {
+      throw new BadRequestException('A valid reset token is required');
+    }
+
+    const tokenHash = this.hashToken(input.token);
+    const verification = await this.prisma.verification.findFirst({
+      where: {
+        value: tokenHash,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (
+      !verification ||
+      !verification.identifier.startsWith('password-reset:')
+    ) {
+      throw new BadRequestException('Invalid or expired password reset link');
+    }
+
+    const email = verification.identifier.slice('password-reset:'.length);
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      throw new BadRequestException('User account no longer exists');
+    }
+
+    const passwordHash = await this.hashPassword(password);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    await this.prisma.session.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    this.evictUserSessions(user.id);
+
+    await this.prisma.verification.delete({ where: { id: verification.id } });
+
+    return {
+      success: true,
+      message:
+        'Password has been reset successfully. Please log in with your new password.',
+    };
+  }
+
+  async changePassword(userId: string, input: ChangePasswordDto) {
+    const newPassword = this.validatePassword(input.newPassword);
+    if (newPassword !== input.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Invalid user or password not set');
+    }
+
+    const isCurrentValid = await this.verifyPassword(
+      input.currentPassword,
+      user.passwordHash,
+    );
+    if (!isCurrentValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const newPasswordHash = await this.hashPassword(newPassword);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: newPasswordHash },
+    });
+
+    await this.prisma.session.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    this.evictUserSessions(user.id);
+
+    return {
+      success: true,
+      message: 'Password changed successfully. Please log in again.',
+    };
   }
 
   async logout(token: string): Promise<void> {
@@ -815,6 +980,15 @@ export class AuthService implements OnModuleInit {
   /** Removes a single entry — call on logout or organisation switch. */
   private evictSession(tokenHash: string): void {
     this.sessionCache.delete(tokenHash);
+  }
+
+  /** Removes all cached session entries for a specific user ID. */
+  private evictUserSessions(userId: string): void {
+    for (const [tokenHash, entry] of this.sessionCache.entries()) {
+      if (entry.user.id === userId) {
+        this.sessionCache.delete(tokenHash);
+      }
+    }
   }
 
   private deriveKey(
