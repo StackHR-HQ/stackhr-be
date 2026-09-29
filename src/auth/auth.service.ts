@@ -60,8 +60,15 @@ interface UserRecord {
   }>;
 }
 
+interface SessionCacheEntry {
+  user: AuthenticatedUser;
+  expiresAt: number; // Date.now() ms
+}
+
 @Injectable()
 export class AuthService implements OnModuleInit {
+  private readonly sessionCache = new Map<string, SessionCacheEntry>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
@@ -372,15 +379,26 @@ export class AuthService implements OnModuleInit {
   }
 
   async logout(token: string): Promise<void> {
+    const tokenHash = this.hashToken(token);
     await this.prisma.session.updateMany({
-      where: { token: this.hashToken(token), revokedAt: null },
+      where: { token: tokenHash, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    this.evictSession(tokenHash);
   }
 
   async validateSession(token: string): Promise<AuthenticatedUser | null> {
+    const tokenHash = this.hashToken(token);
+
+    // --- Cache read ---
+    const cached = this.getCachedSession(tokenHash);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    // --- Cache miss: query Postgres ---
     const session = await this.prisma.session.findUnique({
-      where: { token: this.hashToken(token) },
+      where: { token: tokenHash },
       include: {
         user: {
           include: {
@@ -412,7 +430,16 @@ export class AuthService implements OnModuleInit {
       )
     )
       return null;
-    return this.toAuthenticatedUser(session.user, session.activeOrganizationId);
+
+    const user = this.toAuthenticatedUser(
+      session.user,
+      session.activeOrganizationId,
+    );
+
+    // --- Cache write: TTL = remaining session lifetime ---
+    this.setCachedSession(tokenHash, user, session.expiresAt);
+
+    return user;
   }
 
   getTokenFromRequest(request: Request): string | null {
@@ -755,6 +782,39 @@ export class AuthService implements OnModuleInit {
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Session cache helpers — to be replaced later with Redis calls when
+  // moving to a shared cache (e.g. ioredis + @nestjs/cache-manager).
+  // ---------------------------------------------------------------------------
+
+  /** Returns the cached AuthenticatedUser, or undefined on miss/expiry. */
+  private getCachedSession(tokenHash: string): AuthenticatedUser | undefined {
+    const entry = this.sessionCache.get(tokenHash);
+    if (!entry) return undefined;
+    if (Date.now() >= entry.expiresAt) {
+      this.sessionCache.delete(tokenHash);
+      return undefined;
+    }
+    return entry.user;
+  }
+
+  /** Writes a cache entry whose TTL matches the session's DB expiry. */
+  private setCachedSession(
+    tokenHash: string,
+    user: AuthenticatedUser,
+    sessionExpiresAt: Date,
+  ): void {
+    this.sessionCache.set(tokenHash, {
+      user,
+      expiresAt: sessionExpiresAt.getTime(),
+    });
+  }
+
+  /** Removes a single entry — call on logout or organisation switch. */
+  private evictSession(tokenHash: string): void {
+    this.sessionCache.delete(tokenHash);
   }
 
   private deriveKey(
