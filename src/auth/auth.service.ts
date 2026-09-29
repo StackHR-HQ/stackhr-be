@@ -60,8 +60,15 @@ interface UserRecord {
   }>;
 }
 
+interface SessionCacheEntry {
+  user: AuthenticatedUser;
+  expiresAt: number; // Date.now() ms
+}
+
 @Injectable()
 export class AuthService implements OnModuleInit {
+  private readonly sessionCache = new Map<string, SessionCacheEntry>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
@@ -372,15 +379,26 @@ export class AuthService implements OnModuleInit {
   }
 
   async logout(token: string): Promise<void> {
+    const tokenHash = this.hashToken(token);
     await this.prisma.session.updateMany({
-      where: { token: this.hashToken(token), revokedAt: null },
+      where: { token: tokenHash, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    this.evictSession(tokenHash);
   }
 
   async validateSession(token: string): Promise<AuthenticatedUser | null> {
+    const tokenHash = this.hashToken(token);
+
+    // --- Cache read ---
+    const cached = this.getCachedSession(tokenHash);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    // --- Cache miss: query Postgres ---
     const session = await this.prisma.session.findUnique({
-      where: { token: this.hashToken(token) },
+      where: { token: tokenHash },
       include: {
         user: {
           include: {
@@ -412,7 +430,16 @@ export class AuthService implements OnModuleInit {
       )
     )
       return null;
-    return this.toAuthenticatedUser(session.user, session.activeOrganizationId);
+
+    const user = this.toAuthenticatedUser(
+      session.user,
+      session.activeOrganizationId,
+    );
+
+    // --- Cache write: TTL = remaining session lifetime ---
+    this.setCachedSession(tokenHash, user, session.expiresAt);
+
+    return user;
   }
 
   getTokenFromRequest(request: Request): string | null {
@@ -433,27 +460,46 @@ export class AuthService implements OnModuleInit {
     return cookie?.trim().slice(SESSION_COOKIE_NAME.length + 1) || null;
   }
 
-  setSessionCookie(response: Response, token: string): void {
-    const attributes = [
-      `${SESSION_COOKIE_NAME}=${token}`,
+  private cookieOptions(): {
+    sameSite: 'None' | 'Lax' | 'Strict';
+    secure: boolean;
+  } {
+    const isProd = process.env.NODE_ENV === 'production';
+    const raw = (process.env.COOKIE_SAMESITE ?? (isProd ? 'None' : 'Lax'))
+      .trim()
+      .toLowerCase();
+
+    const sameSite =
+      raw === 'none' ? 'None' : raw === 'strict' ? 'Strict' : 'Lax';
+
+    const secure =
+      process.env.COOKIE_SECURE === 'true' || sameSite === 'None' || isProd;
+
+    return { sameSite, secure };
+  }
+
+  private buildCookie(value: string, maxAgeSeconds: number): string {
+    const { sameSite, secure } = this.cookieOptions();
+    const parts = [
+      `${SESSION_COOKIE_NAME}=${value}`,
       'HttpOnly',
       'Path=/v1/api',
-      `Max-Age=${Math.floor(SESSION_DURATION_MS / 1000)}`,
-      'SameSite=Lax',
+      `Max-Age=${maxAgeSeconds}`,
+      `SameSite=${sameSite}`,
     ];
+    if (secure) parts.push('Secure');
+    return parts.join('; ');
+  }
 
-    if (process.env.NODE_ENV === 'production') {
-      attributes.push('Secure');
-    }
-
-    response.setHeader('Set-Cookie', attributes.join('; '));
+  setSessionCookie(response: Response, token: string): void {
+    response.append(
+      'Set-Cookie',
+      this.buildCookie(token, Math.floor(SESSION_DURATION_MS / 1000)),
+    );
   }
 
   clearSessionCookie(response: Response): void {
-    response.setHeader(
-      'Set-Cookie',
-      `${SESSION_COOKIE_NAME}=; HttpOnly; Path=/v1/api; Max-Age=0; SameSite=Lax`,
-    );
+    response.append('Set-Cookie', this.buildCookie('', 0));
   }
 
   async ensureConfiguredAdmin(): Promise<void> {
@@ -736,6 +782,39 @@ export class AuthService implements OnModuleInit {
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Session cache helpers — to be replaced later with Redis calls when
+  // moving to a shared cache (e.g. ioredis + @nestjs/cache-manager).
+  // ---------------------------------------------------------------------------
+
+  /** Returns the cached AuthenticatedUser, or undefined on miss/expiry. */
+  private getCachedSession(tokenHash: string): AuthenticatedUser | undefined {
+    const entry = this.sessionCache.get(tokenHash);
+    if (!entry) return undefined;
+    if (Date.now() >= entry.expiresAt) {
+      this.sessionCache.delete(tokenHash);
+      return undefined;
+    }
+    return entry.user;
+  }
+
+  /** Writes a cache entry whose TTL matches the session's DB expiry. */
+  private setCachedSession(
+    tokenHash: string,
+    user: AuthenticatedUser,
+    sessionExpiresAt: Date,
+  ): void {
+    this.sessionCache.set(tokenHash, {
+      user,
+      expiresAt: sessionExpiresAt.getTime(),
+    });
+  }
+
+  /** Removes a single entry — call on logout or organisation switch. */
+  private evictSession(tokenHash: string): void {
+    this.sessionCache.delete(tokenHash);
   }
 
   private deriveKey(
