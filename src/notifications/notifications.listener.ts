@@ -32,7 +32,7 @@ export class NotificationsListener {
       const emailContent = approvalDecisionEmail({
         requesterName: requester.name ?? 'there',
         requestType: event.type,
-        status: event.status as 'APPROVED' | 'REJECTED',
+        status: event.status,
         rejectionReason: event.rejectionReason,
         approvalRequestId: event.approvalRequestId,
       });
@@ -52,4 +52,3 @@ export class NotificationsListener {
     }
   }
 }
-

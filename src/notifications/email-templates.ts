@@ -204,7 +204,8 @@ export function verificationEmail(code: string): TransactionalEmail {
       preheader: `Your one-time code is ${code}. It expires in 10 minutes.`,
       eyebrow: 'Email Verification',
       headline: 'Confirm your email address.',
-      intro: 'Use the one-time code below to finish setting up your StackHR account.',
+      intro:
+        'Use the one-time code below to finish setting up your StackHR account.',
       bodyHtml: `
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;">
           <tr>
@@ -327,7 +328,9 @@ export function approvalDecisionEmail(input: {
 // ---------------------------------------------------------------------------
 // Email: Waitlist confirmation
 // ---------------------------------------------------------------------------
-export function waitlistConfirmationEmail(fullName: string): TransactionalEmail {
+export function waitlistConfirmationEmail(
+  fullName: string,
+): TransactionalEmail {
   const rawFirstName = fullName.trim().split(' ')[0] || 'there';
   const firstName = escapeHtml(rawFirstName);
   const subject = 'Welcome to the StackHR Waitlist 💙';
