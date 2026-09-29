@@ -386,3 +386,29 @@ https://stackhr.app`;
     }),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Email: Password reset link
+// ---------------------------------------------------------------------------
+export function passwordResetEmail(resetUrl: string): TransactionalEmail {
+  const subject = 'Reset your StackHR password';
+
+  return {
+    subject,
+    text: `Reset your StackHR password by visiting the following link: ${resetUrl}\n\nThis link expires in 15 minutes. If you did not request a password reset, you can safely ignore this email.`,
+    html: layout({
+      subject,
+      preheader: 'A password reset was requested for your StackHR account.',
+      eyebrow: 'Password Reset',
+      headline: 'Reset your password.',
+      intro:
+        'We received a request to reset your password. Click the button below to choose a new password.',
+      bodyHtml: `
+        <p style="margin:0 0 18px 0;font-size:15px;line-height:25px;color:${COLORS.muted};">This password reset link is valid for <strong style="color:${COLORS.heading};">15 minutes</strong> and can only be used once.</p>
+        <p style="margin:0;font-size:14px;line-height:22px;color:${COLORS.subtle};">If you did not request a password reset, you can safely ignore this email — your password will remain unchanged.</p>
+      `,
+      ctaUrl: escapeHtml(resetUrl),
+      ctaText: 'Reset Password',
+    }),
+  };
+}
