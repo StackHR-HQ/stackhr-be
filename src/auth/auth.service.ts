@@ -453,7 +453,7 @@ export class AuthService implements OnModuleInit {
     return { valid: true, email };
   }
 
-  async resetPassword(input: ResetPasswordDto) {
+  async resetPassword(input: ResetPasswordDto, options?: SessionOptions) {
     const password = this.validatePassword(input.password);
     if (password !== input.confirmPassword) {
       throw new BadRequestException('Passwords do not match');
@@ -479,7 +479,18 @@ export class AuthService implements OnModuleInit {
     }
 
     const email = verification.identifier.slice('password-reset:'.length);
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: {
+        memberships: {
+          select: {
+            organizationId: true,
+            role: true,
+            organization: { select: { name: true, slug: true } },
+          },
+        },
+      },
+    });
     if (!user) {
       throw new BadRequestException('User account no longer exists');
     }
@@ -499,20 +510,45 @@ export class AuthService implements OnModuleInit {
 
     await this.prisma.verification.delete({ where: { id: verification.id } });
 
+    const authenticatedUser = this.toAuthenticatedUser(
+      user,
+      user.memberships[0]?.organizationId,
+    );
+    const token = await this.createSession(
+      user.id,
+      options,
+      authenticatedUser.organizationId,
+    );
+
     return {
-      success: true,
-      message:
-        'Password has been reset successfully. Please log in with your new password.',
+      user: authenticatedUser,
+      token,
+      message: 'Password has been reset successfully.',
     };
   }
 
-  async changePassword(userId: string, input: ChangePasswordDto) {
+  async changePassword(
+    currentUser: AuthenticatedUser,
+    input: ChangePasswordDto,
+    options?: SessionOptions,
+  ) {
     const newPassword = this.validatePassword(input.newPassword);
     if (newPassword !== input.confirmPassword) {
       throw new BadRequestException('Passwords do not match');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: currentUser.id },
+      include: {
+        memberships: {
+          select: {
+            organizationId: true,
+            role: true,
+            organization: { select: { name: true, slug: true } },
+          },
+        },
+      },
+    });
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid user or password not set');
     }
@@ -537,9 +573,20 @@ export class AuthService implements OnModuleInit {
     });
     this.evictUserSessions(user.id);
 
+    const authenticatedUser = this.toAuthenticatedUser(
+      user,
+      currentUser.organizationId,
+    );
+    const token = await this.createSession(
+      user.id,
+      options,
+      authenticatedUser.organizationId,
+    );
+
     return {
-      success: true,
-      message: 'Password changed successfully. Please log in again.',
+      user: authenticatedUser,
+      token,
+      message: 'Password changed successfully.',
     };
   }
 
@@ -778,8 +825,8 @@ export class AuthService implements OnModuleInit {
 
   private async createSession(
     userId: string,
-    options: SessionOptions,
-    organizationId: string | null,
+    options: SessionOptions = {},
+    organizationId: string | null = null,
   ): Promise<string> {
     const token = randomBytes(32).toString('base64url');
 
@@ -790,8 +837,8 @@ export class AuthService implements OnModuleInit {
         userId,
         activeOrganizationId: organizationId,
         expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
-        ipAddress: options.ipAddress,
-        userAgent: options.userAgent,
+        ipAddress: options?.ipAddress,
+        userAgent: options?.userAgent,
       },
     });
 

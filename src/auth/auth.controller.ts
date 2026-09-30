@@ -176,17 +176,41 @@ export class AuthController {
 
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('reset-password')
-  resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto);
+  async resetPassword(
+    @Body() dto: ResetPasswordDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.resetPassword(
+      dto,
+      this.sessionOptions(request),
+    );
+    this.authService.setSessionCookie(response, result.token);
+    return {
+      user: this.authService.toFrontendUser(result.user),
+      token: result.token,
+      message: result.message,
+    };
   }
 
   @UseGuards(AuthGuard)
   @Post('change-password')
-  changePassword(
+  async changePassword(
     @Req() request: AuthenticatedRequest,
     @Body() dto: ChangePasswordDto,
+    @Res({ passthrough: true }) response: Response,
   ) {
-    return this.authService.changePassword(request.user!.id, dto);
+    const result = await this.authService.changePassword(
+      request.user!,
+      dto,
+      this.sessionOptions(request),
+    );
+    this.authService.setSessionCookie(response, result.token);
+    return {
+      user: this.authService.toFrontendUser(result.user),
+      token: result.token,
+      message: result.message,
+    };
   }
 
   private sessionOptions(request: Request) {

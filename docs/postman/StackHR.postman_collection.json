@@ -549,7 +549,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Password has been reset successfully. Please log in with your new password.\",\n  \"data\": null\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Password has been reset successfully.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"usr-123\",\n      \"name\": \"Acme Corp\",\n      \"email\": \"owner@company.com\",\n      \"userType\": \"BUSINESS\",\n      \"role\": \"BUSINESS_OWNER\",\n      \"organizationId\": \"org-123\"\n    },\n    \"token\": \"new-session-token-xyz\"\n  }\n}"
             }
           ]
         },
@@ -581,7 +581,7 @@
                 "change-password"
               ]
             },
-            "description": "Change caller password. Verifies current password using Argon2id and revokes other sessions."
+            "description": "Change caller password. Verifies current password using Argon2id, revokes old sessions, and re-issues a new session token & HTTP cookie."
           },
           "response": [
             {
@@ -595,7 +595,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Password changed successfully. Please log in again.\",\n  \"data\": null\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Password changed successfully.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"usr-123\",\n      \"name\": \"Acme Corp\",\n      \"email\": \"owner@company.com\",\n      \"userType\": \"BUSINESS\",\n      \"role\": \"BUSINESS_OWNER\",\n      \"organizationId\": \"org-123\"\n    },\n    \"token\": \"new-session-token-xyz\"\n  }\n}"
             }
           ]
         }

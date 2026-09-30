@@ -20,7 +20,10 @@ Status values: `Not Started` · `In Progress` · `Blocked` · `Awaiting Review` 
 - [x] Migrate password hashing to argon2id (ADR-008) — Status: Done
 - [x] `KeyProvider` + AES-256-GCM field encryption utility (ADR-010) — Status: Done
 - [x] `AuditLog` Prisma model + global `AuditInterceptor` — Status: Done
-- [x] Postman: Auth collection updated for switch-organization endpoint — Status: Done
+- [x] In-memory session cache (`Map<string, SessionCacheEntry>`) in `AuthService` — Status: Done
+- [x] Secured Password Reset flow (`POST /auth/forgot-password`, `GET /auth/reset-password/verify`, `POST /auth/reset-password`) — Status: Done
+- [x] Secured Password Change flow (`POST /auth/change-password`) — Status: Done
+- [x] Postman: Auth collection updated for password reset & session cache — Status: Done
 
 ### Phase 1 — Generic Approvals Engine (ADR-003)
 *Every subsequent domain module's approval flow depends on this.*
