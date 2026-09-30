@@ -25,6 +25,9 @@ const PROD_DEFAULT_ORIGINS = [
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Enable graceful shutdown hooks for PM2, Docker, and system signals (SIGINT/SIGTERM)
+  app.enableShutdownHooks();
+
   // Security HTTP headers
   app.use(helmet());
 

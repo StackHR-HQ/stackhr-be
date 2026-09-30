@@ -4,6 +4,8 @@ import * as argon2 from 'argon2';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../database/prisma.service';
 import { EmailService } from '../notifications/email.service';
+import type { AuthenticatedUser } from './auth.types';
+import { USER_ROLES, USER_TYPES } from './auth.constants';
 
 describe('AuthService — Password Reset & Change Flow', () => {
   let service: AuthService;
@@ -20,6 +22,7 @@ describe('AuthService — Password Reset & Change Flow', () => {
     };
     session: {
       updateMany: jest.Mock;
+      create: jest.Mock;
     };
   };
   let emailServiceMock: {
@@ -40,6 +43,9 @@ describe('AuthService — Password Reset & Change Flow', () => {
       },
       session: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        create: jest
+          .fn()
+          .mockResolvedValue({ id: 'sess-123', token: 'new-token' }),
       },
     };
 
@@ -179,7 +185,17 @@ describe('AuthService — Password Reset & Change Flow', () => {
       });
       prismaMock.user.findUnique.mockResolvedValue({
         id: 'usr-123',
+        name: 'Test User',
         email: 'user@example.com',
+        userType: 'BUSINESS',
+        role: 'BUSINESS_OWNER',
+        memberships: [
+          {
+            organizationId: 'org-123',
+            role: 'BUSINESS_OWNER',
+            organization: { name: 'Acme Corp', slug: 'acme-corp' },
+          },
+        ],
       });
       prismaMock.user.update.mockResolvedValue({ id: 'usr-123' });
 
@@ -189,7 +205,8 @@ describe('AuthService — Password Reset & Change Flow', () => {
         confirmPassword: 'NewStrongPassword123!',
       });
 
-      expect(res.success).toBe(true);
+      expect(res.user.id).toBe('usr-123');
+      expect(res.token).toBeDefined();
       expect(prismaMock.user.update).toHaveBeenCalledWith({
         where: { id: 'usr-123' },
         data: { passwordHash: expect.any(String) },
@@ -205,9 +222,20 @@ describe('AuthService — Password Reset & Change Flow', () => {
   });
 
   describe('changePassword', () => {
+    const mockUserPayload: AuthenticatedUser = {
+      id: 'usr-123',
+      name: 'Test User',
+      email: 'user@example.com',
+      userType: USER_TYPES.BUSINESS,
+      role: USER_ROLES.BUSINESS_OWNER,
+      organizationId: 'org-123',
+      orgSlug: 'acme-corp',
+      orgName: 'Acme Corp',
+    };
+
     it('throws BadRequestException if new password and confirmPassword mismatch', async () => {
       await expect(
-        service.changePassword('usr-123', {
+        service.changePassword(mockUserPayload, {
           currentPassword: 'OldPassword123!',
           newPassword: 'NewPassword123!',
           confirmPassword: 'MismatchPassword123!',
@@ -217,12 +245,12 @@ describe('AuthService — Password Reset & Change Flow', () => {
 
     it('throws UnauthorizedException if user has no password set', async () => {
       prismaMock.user.findUnique.mockResolvedValue({
-        id: 'usr-123',
+        ...mockUserPayload,
         passwordHash: null,
       });
 
       await expect(
-        service.changePassword('usr-123', {
+        service.changePassword(mockUserPayload, {
           currentPassword: 'SomePassword123!',
           newPassword: 'NewPassword123!',
           confirmPassword: 'NewPassword123!',
@@ -235,12 +263,12 @@ describe('AuthService — Password Reset & Change Flow', () => {
         type: argon2.argon2id,
       });
       prismaMock.user.findUnique.mockResolvedValue({
-        id: 'usr-123',
+        ...mockUserPayload,
         passwordHash: oldHash,
       });
 
       await expect(
-        service.changePassword('usr-123', {
+        service.changePassword(mockUserPayload, {
           currentPassword: 'WrongOldPassword123!',
           newPassword: 'NewStrongPassword123!',
           confirmPassword: 'NewStrongPassword123!',
@@ -253,18 +281,26 @@ describe('AuthService — Password Reset & Change Flow', () => {
         type: argon2.argon2id,
       });
       prismaMock.user.findUnique.mockResolvedValue({
-        id: 'usr-123',
+        ...mockUserPayload,
         passwordHash: oldHash,
+        memberships: [
+          {
+            organizationId: 'org-123',
+            role: 'BUSINESS_OWNER',
+            organization: { name: 'Acme Corp', slug: 'acme-corp' },
+          },
+        ],
       });
       prismaMock.user.update.mockResolvedValue({ id: 'usr-123' });
 
-      const res = await service.changePassword('usr-123', {
+      const res = await service.changePassword(mockUserPayload, {
         currentPassword: 'RealOldPassword123!',
         newPassword: 'NewStrongPassword123!',
         confirmPassword: 'NewStrongPassword123!',
       });
 
-      expect(res.success).toBe(true);
+      expect(res.user.id).toBe('usr-123');
+      expect(res.token).toBeDefined();
       expect(prismaMock.user.update).toHaveBeenCalledWith({
         where: { id: 'usr-123' },
         data: { passwordHash: expect.any(String) },
