@@ -176,7 +176,7 @@ export class PayrollService {
     const periodDate = new Date(run.periodYear, run.periodMonth - 1, 1);
 
     const employees = await this.prisma.employee.findMany({
-      where: { organizationId: orgId },
+      where: { organizationId: orgId, status: 'ACTIVE' },
       include: {
         compensationRecords: {
           where: { effectiveTo: null },

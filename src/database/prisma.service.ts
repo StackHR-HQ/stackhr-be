@@ -3,6 +3,12 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { getTenantContext } from './tenant-context';
 
+if (!('toJSON' in BigInt.prototype)) {
+  (BigInt.prototype as any).toJSON = function () {
+    return Number(this);
+  };
+}
+
 const TENANT_SCOPED_MODELS = [
   'Employee',
   'Member',

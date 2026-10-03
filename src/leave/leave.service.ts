@@ -193,6 +193,7 @@ export class LeaveService {
         startDate,
         endDate,
         totalDays,
+        days: totalDays,
         reason: dto.reason ?? null,
         status: leaveType.requiresApproval ? 'PENDING' : 'APPROVED',
       },
