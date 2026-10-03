@@ -598,6 +598,44 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Password changed successfully.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"usr-123\",\n      \"name\": \"Acme Corp\",\n      \"email\": \"owner@company.com\",\n      \"userType\": \"BUSINESS\",\n      \"role\": \"BUSINESS_OWNER\",\n      \"organizationId\": \"org-123\"\n    },\n    \"token\": \"new-session-token-xyz\"\n  }\n}"
             }
           ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Invalidates the active session token on server-side DB/cache and clears authentication cookies."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true\n}"
+            }
+          ]
         }
       ]
     },
@@ -2662,7 +2700,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"profile\": {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane@acme.com\",\n      \"department\": \"Engineering\",\n      \"jobTitle\": \"Software Engineer\"\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"profile\": {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane@acme.com\",\n      \"department\": \"Engineering\",\n      \"jobTitle\": \"Software Engineer\",\n      \"employmentStatus\": \"ACTIVE\",\n      \"workLocation\": \"Lagos, Nigeria\",\n      \"startDate\": \"2024-01-15T00:00:00.000Z\",\n      \"nextPayDate\": \"2026-10-25\",\n      \"manager\": {\n        \"id\": \"mgr-456\",\n        \"fullName\": \"John Manager\",\n        \"email\": \"john@acme.com\",\n        \"jobTitle\": \"Engineering Manager\"\n      }\n    }\n  }\n}"
             }
           ]
         },

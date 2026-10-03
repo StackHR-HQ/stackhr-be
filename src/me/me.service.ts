@@ -41,9 +41,42 @@ export class MeService {
     return employee;
   }
 
+  private calculateNextPayDate(now: Date = new Date()): string {
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const date = now.getDate();
+
+    let payYear = year;
+    let payMonth = month;
+
+    if (date > 25) {
+      payMonth += 1;
+      if (payMonth > 11) {
+        payMonth = 0;
+        payYear += 1;
+      }
+    }
+
+    const payDate = new Date(Date.UTC(payYear, payMonth, 25));
+    return payDate.toISOString().split('T')[0];
+  }
+
   async getProfile(user: AuthenticatedUser) {
     const employee = await this.getEmployeeForUser(user);
-    return { profile: employee };
+    const nextPayDate = this.calculateNextPayDate();
+    return {
+      profile: {
+        ...employee,
+        annualSalaryMinor:
+          employee.annualSalaryMinor !== undefined
+            ? Number(employee.annualSalaryMinor)
+            : undefined,
+        employmentStatus: employee.status,
+        workLocation: employee.workLocation ?? null,
+        startDate: employee.startDate ? employee.startDate.toISOString() : null,
+        nextPayDate,
+      },
+    };
   }
 
   async getPayslips(user: AuthenticatedUser) {

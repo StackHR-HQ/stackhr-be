@@ -298,12 +298,29 @@ function toLeaveRequestView(
     startDate: Date;
     endDate: Date;
     days: number;
+    totalDays?: number;
     status: string;
   },
   lookups: Lookups,
 ): LeaveRequestWithEmployee {
   const employeeName =
     lookups.employees.get(request.employeeId)?.fullName ?? '';
+
+  let duration = (request as any).totalDays ?? request.days;
+  if (!duration || duration <= 1) {
+    if (request.startDate && request.endDate) {
+      const start = new Date(request.startDate).getTime();
+      const end = new Date(request.endDate).getTime();
+      if (!isNaN(start) && !isNaN(end) && end >= start) {
+        const diffMs = end - start;
+        const calculated = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
+        if (calculated > 1) {
+          duration = calculated;
+        }
+      }
+    }
+  }
+
   return {
     id: request.id,
     employeeId: request.employeeId,
@@ -312,7 +329,7 @@ function toLeaveRequestView(
     type: lookups.leaveTypes.get(request.leaveTypeId)?.name ?? '',
     startDate: toDateOnly(request.startDate),
     endDate: toDateOnly(request.endDate),
-    days: request.days,
+    days: duration ?? 1,
     status: request.status.toLowerCase(),
   };
 }

@@ -5,6 +5,12 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
+if (!('toJSON' in BigInt.prototype)) {
+  (BigInt.prototype as any).toJSON = function () {
+    return Number(this);
+  };
+}
+
 const DEV_ALLOWED_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:5173',
