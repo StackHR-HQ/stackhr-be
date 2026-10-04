@@ -1,0 +1,26 @@
+name: Postman Auto Sync
+
+on:
+  push:
+    paths:
+      - 'docs/postman/StackHR.postman_collection.json'
+    branches: [ main, dev ]
+
+jobs:
+  sync-postman:
+    name: Sync Postman Collection & Published Docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Sync Collection to Postman API
+        env:
+          POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+          POSTMAN_COLLECTION_ID: '58337625-2d718f97-1116-4ed7-94ab-72351b04aaad'
+        run: node scripts/sync-postman.js
