@@ -62,7 +62,11 @@ export class LeaveListener {
       await Promise.all([
         this.prisma.leaveRequest.update({
           where: { id: leaveRequestId },
-          data: { status: 'APPROVED' },
+          data: {
+            status: 'APPROVED',
+            decidedAt: new Date(),
+            decidedByUserId: event.approverId,
+          },
         }),
         this.prisma.leaveBalance.update({
           where: { id: balance.id },
@@ -88,7 +92,11 @@ export class LeaveListener {
       await Promise.all([
         this.prisma.leaveRequest.update({
           where: { id: leaveRequestId },
-          data: { status: 'REJECTED' },
+          data: {
+            status: 'REJECTED',
+            decidedAt: new Date(),
+            decidedByUserId: event.approverId,
+          },
         }),
         this.prisma.leaveBalance.update({
           where: { id: balance.id },

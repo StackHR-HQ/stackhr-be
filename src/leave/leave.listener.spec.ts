@@ -75,7 +75,11 @@ describe('LeaveListener', () => {
 
     expect(prismaMock.leaveRequest.update).toHaveBeenCalledWith({
       where: { id: 'lr-1' },
-      data: { status: 'APPROVED' },
+      data: {
+        status: 'APPROVED',
+        decidedAt: expect.any(Date),
+        decidedByUserId: 'admin-1',
+      },
     });
     expect(prismaMock.leaveBalance.update).toHaveBeenCalledWith({
       where: { id: 'lb-1' },
@@ -121,7 +125,11 @@ describe('LeaveListener', () => {
 
     expect(prismaMock.leaveRequest.update).toHaveBeenCalledWith({
       where: { id: 'lr-1' },
-      data: { status: 'REJECTED' },
+      data: {
+        status: 'REJECTED',
+        decidedAt: expect.any(Date),
+        decidedByUserId: 'admin-1',
+      },
     });
     expect(prismaMock.leaveBalance.update).toHaveBeenCalledWith({
       where: { id: 'lb-1' },

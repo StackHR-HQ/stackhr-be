@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import { CreateTaxRuleSetDto } from './dto/create-tax-rule-set.dto';
 import { UpdateTaxRuleSetDto } from './dto/update-tax-rule-set.dto';
 
@@ -383,5 +384,69 @@ export class ComplianceService {
         },
       },
     });
+  }
+  private checkOrgContext(user: AuthenticatedUser): string {
+    if (!user.organizationId) {
+      throw new BadRequestException(
+        'An active organization context is required',
+      );
+    }
+    return user.organizationId;
+  }
+
+  async getAlerts(user: AuthenticatedUser) {
+    const orgId = this.checkOrgContext(user);
+    const [missingTin, missingPensionRsa] = await Promise.all([
+      this.prisma.employee.findMany({
+        where: {
+          organizationId: orgId,
+          status: 'ACTIVE',
+          OR: [{ tin: null }, { tin: '' }],
+        },
+        select: { id: true, fullName: true, email: true, department: true },
+      }),
+      this.prisma.employee.findMany({
+        where: {
+          organizationId: orgId,
+          status: 'ACTIVE',
+          OR: [{ pensionRsaNumber: null }, { pensionRsaNumber: '' }],
+        },
+        select: { id: true, fullName: true, email: true, department: true },
+      }),
+    ]);
+
+    const now = new Date();
+    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    return {
+      alerts: [
+        {
+          type: 'MISSING_TAX_ID',
+          severity: 'MEDIUM',
+          count: missingTin.length,
+          message:
+            missingTin.length +
+            ' active employees are missing a Tax Identification Number (TIN)',
+          affectedEmployees: missingTin,
+        },
+        {
+          type: 'MISSING_PENSION_RSA',
+          severity: 'MEDIUM',
+          count: missingPensionRsa.length,
+          message:
+            missingPensionRsa.length +
+            ' active employees are missing a Pension RSA Number',
+          affectedEmployees: missingPensionRsa,
+        },
+        {
+          type: 'UPCOMING_STATUTORY_DEADLINE',
+          severity: 'INFO',
+          dueDate: lastDayOfMonth.toISOString().split('T')[0],
+          message:
+            'Statutory remittance deadline for current month is ' +
+            lastDayOfMonth.toISOString().split('T')[0],
+        },
+      ],
+    };
   }
 }

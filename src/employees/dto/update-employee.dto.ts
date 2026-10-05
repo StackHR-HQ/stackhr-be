@@ -45,4 +45,8 @@ export class UpdateEmployeeDto {
 
   @IsOptional()
   nhfOptIn?: boolean;
+
+  @IsString()
+  @IsOptional()
+  employeeNumber?: string;
 }

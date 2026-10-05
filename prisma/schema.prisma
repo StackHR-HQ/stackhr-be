@@ -93,6 +93,7 @@ model Organization {
   companySize                   String?
   currency                      String                         @default("NGN")
   payrollFrequency              String                         @default("MONTHLY")
+  payDate                       Int                            @default(25)
   taxId                         String?
   pensionEmployeeRateOverride   Float?
   pensionEmployerRateOverride   Float?
@@ -244,6 +245,7 @@ model PositionLevel {
 
 model Employee {
   id                           String                         @id @default(dbgenerated("(uuidv7())::text"))
+  employeeNumber               String?
   organizationId               String
   organization                 Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userId                       String?                        @unique
@@ -316,6 +318,7 @@ model Employee {
   @@unique([organizationId, email])
   @@index([organizationId, status])
   @@index([managerId])
+  @@index([organizationId, employeeNumber])
   @@map("employee")
 }
 

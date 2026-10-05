@@ -357,6 +357,17 @@ export class ApprovalsService {
         }
       }
 
+      // Fallback: if subject record was deleted or not matched, avoid returning null
+      if (subjectSummary === null && item.subjectTable) {
+        const readableType = item.subjectTable
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+        subjectSummary = {
+          type: item.subjectTable,
+          label: `${readableType} (Archived)`,
+        };
+      }
+
       return {
         ...item,
         requester,

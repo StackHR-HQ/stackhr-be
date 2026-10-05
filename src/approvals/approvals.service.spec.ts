@@ -229,6 +229,35 @@ describe('ApprovalsService', () => {
         }),
       );
     });
+    it('should return archived fallback when subject record is deleted', async () => {
+      prismaMock.approvalRequest.findMany.mockResolvedValue([
+        {
+          id: 'appr-2',
+          type: 'LEAVE',
+          subjectTable: 'leave_request',
+          subjectId: 'leave-deleted-999',
+          requesterId: 'user-employee-1',
+          approverId: null,
+          amountSnapshot: null,
+        },
+      ]);
+      prismaMock.approvalRequest.count.mockResolvedValue(1);
+      prismaMock.user.findMany.mockResolvedValue([
+        { id: 'user-employee-1', name: 'Employee User', email: 'emp@acme.com' },
+      ]);
+      prismaMock.employee.findMany.mockResolvedValue([]);
+      // subject no longer exists
+      prismaMock.leaveRequest.findMany.mockResolvedValue([]);
+
+      const result = await service.listRequests(mockAdminUser, {});
+
+      const item = result.items[0];
+      expect(item.subjectSummary).not.toBeNull();
+      expect(item.subjectSummary).toEqual({
+        type: 'leave_request',
+        label: 'Leave Request (Archived)',
+      });
+    });
   });
 
   describe('decideRequest', () => {
