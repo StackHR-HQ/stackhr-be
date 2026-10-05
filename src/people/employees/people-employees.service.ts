@@ -216,9 +216,15 @@ export class PeopleEmployeesService {
           }
         }
 
+        const employeeCount = await client.employee.count({
+          where: { organizationId },
+        });
+        const employeeNumber = `EMP-${String(employeeCount + 1).padStart(4, '0')}`;
+
         const employee = await client.employee.create({
           data: {
             organizationId,
+            employeeNumber,
             firstName: personal.firstName,
             lastName: personal.lastName,
             fullName: `${personal.firstName} ${personal.lastName}`,

@@ -75,6 +75,14 @@ export class EmployeesService {
       }
     }
 
+    let employeeNumber = dto.employeeNumber;
+    if (!employeeNumber) {
+      const count = await this.prisma.employee.count({
+        where: { organizationId: orgId },
+      });
+      employeeNumber = `EMP-${String(count + 1).padStart(4, '0')}`;
+    }
+
     const employee = await this.prisma.employee.create({
       data: {
         id: randomUUID(),
@@ -87,7 +95,7 @@ export class EmployeesService {
         salaryAmount: dto.salaryAmount,
         startDate: new Date(dto.startDate),
         managerId: dto.managerId ?? null,
-        employeeNumber: dto.employeeNumber ?? null,
+        employeeNumber,
         status: 'ACTIVE',
       },
     });
