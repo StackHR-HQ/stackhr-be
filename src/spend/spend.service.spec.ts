@@ -35,7 +35,14 @@ describe('SpendService', () => {
         findMany: jest.fn(),
       },
       reimbursement: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
+        update: jest.fn(),
+        aggregate: jest.fn(),
+      },
+      approvalRequest: {
+        updateMany: jest.fn(),
       },
       employee: {
         findFirst: jest.fn(),
@@ -196,6 +203,87 @@ describe('SpendService', () => {
       const result = await service.getReimbursements(mockUser);
 
       expect(result.reimbursements).toHaveLength(1);
+    });
+  });
+
+  describe('createReimbursement', () => {
+    it('should create a reimbursement request and route for approval', async () => {
+      prismaMock.employee.findFirst.mockResolvedValue({ id: 'emp-1' });
+      prismaMock.reimbursement.create.mockResolvedValue({
+        id: 'rmb-1',
+        amount: 15000,
+        status: 'PENDING',
+      });
+      approvalsServiceMock.submitRequest.mockResolvedValue({
+        approvalRequest: { id: 'appr-1' },
+      });
+
+      const result = await service.createReimbursement(mockUser, {
+        amount: 15000,
+        description: 'Office supplies reimbursement',
+      });
+
+      expect(result.reimbursement.id).toBe('rmb-1');
+      expect(approvalsServiceMock.submitRequest).toHaveBeenCalledWith(
+        mockUser,
+        expect.objectContaining({
+          type: 'EXPENSE',
+          subjectTable: 'reimbursement',
+          subjectId: 'rmb-1',
+          amountSnapshot: 15000,
+        }),
+      );
+    });
+  });
+
+  describe('getReimbursementDetails', () => {
+    it('should return single reimbursement detail', async () => {
+      prismaMock.reimbursement.findFirst.mockResolvedValue({
+        id: 'rmb-1',
+        amount: 15000,
+      });
+      const result = await service.getReimbursementDetails(mockUser, 'rmb-1');
+      expect(result.reimbursement.id).toBe('rmb-1');
+    });
+
+    it('should throw NotFoundException if reimbursement does not exist', async () => {
+      prismaMock.reimbursement.findFirst.mockResolvedValue(null);
+      await expect(
+        service.getReimbursementDetails(mockUser, 'invalid'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('cancelReimbursement', () => {
+    it('should cancel pending reimbursement', async () => {
+      prismaMock.reimbursement.findFirst.mockResolvedValue({
+        id: 'rmb-1',
+        status: 'PENDING',
+      });
+      prismaMock.approvalRequest.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.reimbursement.update.mockResolvedValue({
+        id: 'rmb-1',
+        status: 'CANCELLED',
+      });
+
+      const result = await service.cancelReimbursement(mockUser, 'rmb-1');
+      expect(result.reimbursement.status).toBe('CANCELLED');
+    });
+  });
+
+  describe('payReimbursement', () => {
+    it('should mark reimbursement as paid', async () => {
+      prismaMock.reimbursement.findFirst.mockResolvedValue({
+        id: 'rmb-1',
+        status: 'APPROVED',
+      });
+      prismaMock.reimbursement.update.mockResolvedValue({
+        id: 'rmb-1',
+        status: 'PAID',
+      });
+
+      const result = await service.payReimbursement(mockUser, 'rmb-1');
+      expect(result.reimbursement.status).toBe('PAID');
     });
   });
 });

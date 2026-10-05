@@ -47,4 +47,8 @@ export class CreateEmployeeDto {
 
   @IsOptional()
   nhfOptIn?: boolean;
+
+  @IsString()
+  @IsOptional()
+  employeeNumber?: string;
 }

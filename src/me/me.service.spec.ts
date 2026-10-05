@@ -20,8 +20,12 @@ describe('MeService', () => {
 
   beforeEach(async () => {
     prismaMock = {
+      organization: {
+        findUnique: jest.fn(),
+      },
       employee: {
         findFirst: jest.fn(),
+        update: jest.fn(),
       },
       payslip: {
         findMany: jest.fn(),
@@ -36,6 +40,18 @@ describe('MeService', () => {
         findMany: jest.fn(),
       },
       salaryAdvance: {
+        findMany: jest.fn(),
+      },
+      compensationRecord: {
+        findMany: jest.fn(),
+      },
+      compensationHistory: {
+        findMany: jest.fn(),
+      },
+      auditEvent: {
+        findMany: jest.fn(),
+      },
+      document: {
         findMany: jest.fn(),
       },
     };
@@ -89,11 +105,45 @@ describe('MeService', () => {
         id: 'emp-100',
         organizationId: 'org-123',
       });
-      prismaMock.leaveBalance.findMany.mockResolvedValue([{ id: 'bal-1' }]);
+      prismaMock.leaveBalance.findMany.mockResolvedValue([
+        {
+          id: 'bal-1',
+          leaveTypeId: 'lt-1',
+          usedDays: 5,
+          leaveType: { id: 'lt-1', name: 'Annual' },
+        },
+      ]);
+      prismaMock.leaveRequest.findMany.mockResolvedValue([]);
 
       const result = await service.getLeaveBalances(mockUser);
 
       expect(result.leaveBalances).toHaveLength(1);
+      expect(result.leaveBalances[0].usedDays).toBe(5);
+      expect(result.leaveBalances[0].upcomingDays).toBe(0);
+    });
+  });
+
+  describe('getLeaveRequests', () => {
+    it('should return leave requests with days overridden by totalDays', async () => {
+      prismaMock.employee.findFirst.mockResolvedValue({
+        id: 'emp-100',
+        organizationId: 'org-123',
+      });
+      prismaMock.leaveRequest.findMany.mockResolvedValue([
+        {
+          id: 'lr-1',
+          days: 1, // legacy column default
+          totalDays: 20, // the correct computed value
+          status: 'APPROVED',
+          leaveType: { id: 'lt-1', name: 'Annual Paid Leave' },
+        },
+      ]);
+
+      const result = await service.getLeaveRequests(mockUser);
+
+      expect(result.leaveRequests).toHaveLength(1);
+      expect(result.leaveRequests[0].days).toBe(20); // overridden
+      expect(result.leaveRequests[0].totalDays).toBe(20); // also present
     });
   });
 
@@ -108,6 +158,112 @@ describe('MeService', () => {
       const result = await service.getExpenses(mockUser);
 
       expect(result.expenses).toHaveLength(1);
+    });
+  });
+
+  describe('updateProfile', () => {
+    it('should update employee profile with provided dto fields and return updated profile', async () => {
+      prismaMock.employee.findFirst.mockResolvedValue({
+        id: 'emp-100',
+        organizationId: 'org-123',
+        email: mockUser.email,
+        firstName: 'Old',
+        lastName: 'Name',
+      });
+      prismaMock.employee.update.mockResolvedValue({} as any);
+
+      const dto = {
+        firstName: 'New',
+        phone: '+2348000000000',
+      };
+
+      const result = await service.updateProfile(mockUser, dto);
+
+      expect(prismaMock.employee.update).toHaveBeenCalledWith({
+        where: { id: 'emp-100' },
+        data: {
+          firstName: 'New',
+          phone: '+2348000000000',
+        },
+      });
+      expect(result).toHaveProperty('profile');
+    });
+  });
+
+  describe('getCompensationHistory', () => {
+    it('should return compensation history for current employee', async () => {
+      prismaMock.employee.findFirst.mockResolvedValue({
+        id: 'emp-100',
+        organizationId: 'org-123',
+      });
+      prismaMock.compensationRecord.findMany.mockResolvedValue([
+        { id: 'cr-1', employeeId: 'emp-100', baseSalary: 500000 },
+      ]);
+      prismaMock.compensationHistory.findMany.mockResolvedValue([
+        {
+          id: 'ch-1',
+          employeeId: 'emp-100',
+          previousSalary: 400000,
+          newSalary: 500000,
+        },
+      ]);
+
+      const result = await service.getCompensationHistory(mockUser);
+
+      expect(result.records).toHaveLength(1);
+      expect(result.history).toHaveLength(1);
+    });
+  });
+
+  describe('getNotifications', () => {
+    it('should return user notifications', async () => {
+      prismaMock.employee.findFirst.mockResolvedValue({
+        id: 'emp-100',
+        organizationId: 'org-123',
+      });
+      prismaMock.auditEvent.findMany.mockResolvedValue([
+        {
+          id: 'notif-1',
+          subjectEmployeeId: 'emp-100',
+          action: 'LEAVE_APPROVED',
+        },
+      ]);
+
+      const result = await service.getNotifications(mockUser);
+
+      expect(result.notifications).toHaveLength(1);
+    });
+  });
+
+  describe('getDocuments', () => {
+    it('should return documents for current employee', async () => {
+      prismaMock.employee.findFirst.mockResolvedValue({
+        id: 'emp-100',
+        organizationId: 'org-123',
+      });
+      prismaMock.document.findMany.mockResolvedValue([
+        { id: 'doc-1', employeeId: 'emp-100', title: 'Passport' },
+      ]);
+
+      const result = await service.getDocuments(mockUser);
+
+      expect(result.documents).toHaveLength(1);
+    });
+  });
+
+  describe('getActivity', () => {
+    it('should return user activity logs', async () => {
+      prismaMock.employee.findFirst.mockResolvedValue({
+        id: 'emp-100',
+        organizationId: 'org-123',
+      });
+      prismaMock.auditEvent.findMany.mockResolvedValue([
+        { id: 'audit-1', subjectId: 'emp-100', action: 'LOGIN' },
+      ]);
+
+      const result = await service.getActivity(mockUser);
+
+      expect(result.activity).toHaveLength(1);
     });
   });
 });

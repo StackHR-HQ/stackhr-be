@@ -87,6 +87,7 @@ export class EmployeesService {
         salaryAmount: dto.salaryAmount,
         startDate: new Date(dto.startDate),
         managerId: dto.managerId ?? null,
+        employeeNumber: dto.employeeNumber ?? null,
         status: 'ACTIVE',
       },
     });
@@ -141,7 +142,11 @@ export class EmployeesService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      data: employees,
+      data: employees.map((emp) => {
+        const copy = { ...emp };
+        delete (copy as any).invitationToken;
+        return copy;
+      }),
       meta: {
         total,
         page,
@@ -180,7 +185,9 @@ export class EmployeesService {
       throw new NotFoundException(`Employee with ID "${id}" not found`);
     }
 
-    return { employee };
+    const safeEmployee = { ...employee };
+    delete (safeEmployee as any).invitationToken;
+    return { employee: safeEmployee };
   }
 
   async updateEmployee(
@@ -237,6 +244,9 @@ export class EmployeesService {
         ...(dto.startDate && { startDate: new Date(dto.startDate) }),
         ...(dto.managerId !== undefined && { managerId: dto.managerId }),
         ...(dto.status && { status: dto.status }),
+        ...(dto.employeeNumber !== undefined && {
+          employeeNumber: dto.employeeNumber,
+        }),
       },
     });
 

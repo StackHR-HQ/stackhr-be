@@ -10,6 +10,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateSalaryAdvanceDto } from './dto/create-salary-advance.dto';
 import { AttachReceiptDto } from './dto/attach-receipt.dto';
+import { CreateReimbursementDto } from './dto/create-reimbursement.dto';
 
 @Injectable()
 export class SpendService {
@@ -211,5 +212,165 @@ export class SpendService {
     });
 
     return { reimbursements };
+  }
+
+  async createReimbursement(
+    user: AuthenticatedUser,
+    dto: CreateReimbursementDto,
+  ) {
+    const orgId = this.checkOrgContext(user);
+    const employee = await this.getEmployeeForUser(user);
+
+    const reimbursement = await this.prisma.reimbursement.create({
+      data: {
+        id: randomUUID(),
+        organizationId: orgId,
+        employeeId: employee.id,
+        expenseId: dto.expenseId ?? null,
+        amount: dto.amount,
+        currency: dto.currency ?? 'NGN',
+        status: 'PENDING',
+      },
+    });
+
+    const approvalResult = await this.approvalsService.submitRequest(user, {
+      type: 'EXPENSE',
+      subjectTable: 'reimbursement',
+      subjectId: reimbursement.id,
+      amountSnapshot: dto.amount,
+    });
+
+    return {
+      message: 'Reimbursement claim submitted and routed for approval',
+      reimbursement,
+      approvalRequest: approvalResult.approvalRequest,
+    };
+  }
+
+  async getReimbursementDetails(user: AuthenticatedUser, id: string) {
+    const orgId = this.checkOrgContext(user);
+
+    const reimbursement = await this.prisma.reimbursement.findFirst({
+      where: { id, organizationId: orgId },
+      include: {
+        employee: {
+          select: { id: true, fullName: true, email: true, department: true },
+        },
+        expense: true,
+      },
+    });
+
+    if (!reimbursement) {
+      throw new NotFoundException(
+        'Reimbursement claim with ID ' + id + ' not found',
+      );
+    }
+
+    return { reimbursement };
+  }
+
+  async cancelReimbursement(user: AuthenticatedUser, id: string) {
+    const orgId = this.checkOrgContext(user);
+
+    const reimbursement = await this.prisma.reimbursement.findFirst({
+      where: { id, organizationId: orgId },
+    });
+
+    if (!reimbursement) {
+      throw new NotFoundException(
+        'Reimbursement claim with ID ' + id + ' not found',
+      );
+    }
+
+    if (reimbursement.status === 'CANCELLED') {
+      throw new BadRequestException('Reimbursement claim is already cancelled');
+    }
+
+    if (reimbursement.status === 'PAID') {
+      throw new BadRequestException('Cannot cancel a paid reimbursement claim');
+    }
+
+    await this.prisma.approvalRequest.updateMany({
+      where: {
+        subjectTable: 'reimbursement',
+        subjectId: id,
+        status: 'PENDING',
+      },
+      data: { status: 'CANCELLED' },
+    });
+
+    const updated = await this.prisma.reimbursement.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
+
+    return { reimbursement: updated };
+  }
+
+  async getReimbursementsSummary(user: AuthenticatedUser) {
+    const orgId = this.checkOrgContext(user);
+
+    const [totalPending, totalApproved, totalPaid] = await Promise.all([
+      this.prisma.reimbursement.aggregate({
+        where: { organizationId: orgId, status: 'PENDING' },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+      this.prisma.reimbursement.aggregate({
+        where: { organizationId: orgId, status: 'APPROVED' },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+      this.prisma.reimbursement.aggregate({
+        where: { organizationId: orgId, status: 'PAID' },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+    ]);
+
+    return {
+      summary: {
+        pending: {
+          count: totalPending._count.id,
+          amountMinor: totalPending._sum.amount ?? 0,
+        },
+        approved: {
+          count: totalApproved._count.id,
+          amountMinor: totalApproved._sum.amount ?? 0,
+        },
+        paid: {
+          count: totalPaid._count.id,
+          amountMinor: totalPaid._sum.amount ?? 0,
+        },
+      },
+    };
+  }
+
+  async payReimbursement(user: AuthenticatedUser, id: string) {
+    const orgId = this.checkOrgContext(user);
+
+    const reimbursement = await this.prisma.reimbursement.findFirst({
+      where: { id, organizationId: orgId },
+    });
+
+    if (!reimbursement) {
+      throw new NotFoundException(
+        'Reimbursement claim with ID ' + id + ' not found',
+      );
+    }
+
+    if (reimbursement.status === 'PAID') {
+      throw new BadRequestException('Reimbursement claim is already paid');
+    }
+
+    const updated = await this.prisma.reimbursement.update({
+      where: { id },
+      data: {
+        status: 'PAID',
+        paidAt: new Date(),
+      },
+    });
+
+    return { reimbursement: updated };
   }
 }

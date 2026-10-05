@@ -73,7 +73,13 @@ export class InvitationsService {
       },
     });
 
-    return { invitations };
+    return {
+      invitations: invitations.map((inv) => {
+        const copy = { ...inv };
+        delete (copy as any).tokenHash;
+        return copy;
+      }),
+    };
   }
 
   async getInvitationDetails(id: string) {

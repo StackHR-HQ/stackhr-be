@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ComplianceService } from './compliance.service';
 import { PrismaService } from '../database/prisma.service';
+import { USER_ROLES, USER_TYPES } from '../auth/auth.constants';
+import type { AuthenticatedUser } from '../auth/auth.types';
 
 describe('ComplianceService', () => {
   let service: ComplianceService;
@@ -91,6 +93,9 @@ describe('ComplianceService', () => {
               deleteMany: jest.fn().mockResolvedValue({ count: 6 }),
               createMany: jest.fn().mockResolvedValue({ count: 6 }),
             },
+            employee: {
+              findMany: jest.fn(),
+            },
             $transaction: jest.fn((cb) => cb(prisma)),
           },
         },
@@ -175,6 +180,29 @@ describe('ComplianceService', () => {
     it('should return existing rule set if already seeded', async () => {
       const result = await service.seedNta2026RuleSet();
       expect(result).toEqual(mockTaxRuleSet);
+    });
+  });
+
+  describe('getAlerts', () => {
+    it('should return compliance alerts for organization', async () => {
+      (prisma.employee.findMany as jest.Mock)
+        .mockResolvedValueOnce([{ id: 'emp-1', fullName: 'No TIN' }])
+        .mockResolvedValueOnce([{ id: 'emp-2', fullName: 'No RSA' }]);
+
+      const mockUser: AuthenticatedUser = {
+        id: 'u-1',
+        name: 'Admin User',
+        email: 'admin@acme.com',
+        userType: USER_TYPES.BUSINESS,
+        role: USER_ROLES.BUSINESS_OWNER,
+        organizationId: 'org-123',
+      };
+
+      const result = await service.getAlerts(mockUser);
+
+      expect(result.alerts).toHaveLength(3); // MISSING_TAX_ID, MISSING_PENSION_RSA, PAYE_REMITTANCE_DUE
+      expect(result.alerts[0].count).toBe(1);
+      expect(result.alerts[1].count).toBe(1);
     });
   });
 });

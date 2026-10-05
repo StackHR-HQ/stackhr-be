@@ -105,3 +105,5 @@ Status values: `Not Started` · `In Progress` · `Blocked` · `Awaiting Review` 
 | Date | Change |
 |---|---|
 | 2026-09-09 | File created from backend audit report + architecture decisions. |
+| 2026-10-05 | Implemented PATCH /me/profile, PATCH /leave/requests/:id/cancel, PATCH /leave/types/:id, Reimbursements module (6 endpoints), GET /billing/status, and updated Postman collection with 87 requests and example responses. |
+| 2026-10-05 | Implemented Bug 2.3 `days` fallback on leave requests, `subjectSummary` null fallback in approvals, `GET /me/compensation-history`, `GET /me/notifications`, `GET /me/documents`, `GET /me/activity`, `GET /compliance/alerts`, added `employeeNumber` to employee details and `payDate` to payslip schema, added unit tests (319/319 passing), and updated Postman collection with all 5 new endpoints. |
