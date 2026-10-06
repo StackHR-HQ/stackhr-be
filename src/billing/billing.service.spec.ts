@@ -52,6 +52,8 @@ describe('BillingService', () => {
       const result = await service.getStatus(mockUser);
 
       expect(result.status).toBe('TRIALING');
+      expect(result.trialStartedAt).toBeDefined();
+      expect(result.trialLengthDays).toBe(30);
       expect(result.activeEmployeeCount).toBe(12);
       expect(result.seatLimit).toBe(50);
     });

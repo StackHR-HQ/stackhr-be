@@ -600,6 +600,44 @@
           ]
         },
         {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Retrieve currently authenticated user session details and organization context."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"user\": {\n    \"id\": \"usr-123\",\n    \"name\": \"Jane Doe\",\n    \"email\": \"jane@company.com\",\n    \"role\": \"BUSINESS_ADMIN\",\n    \"userType\": \"BUSINESS\",\n    \"organizationId\": \"org-123\"\n  }\n}"
+            }
+          ]
+        },
+        {
           "name": "Logout",
           "request": {
             "method": "POST",
@@ -776,6 +814,90 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Get Onboarding Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboarding/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding",
+                "status"
+              ]
+            },
+            "description": "Fetch organization onboarding checklist progress and completion state."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"IN_PROGRESS\",\n  \"companyInfoCompleted\": true,\n  \"employeesAdded\": 3,\n  \"payrollConfigured\": false,\n  \"isComplete\": false\n}"
+            }
+          ]
+        },
+        {
+          "name": "Complete Onboarding",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyInfo\": {\n    \"companyName\": \"Acme Corp\",\n    \"industry\": \"Technology\",\n    \"companySize\": \"11-50\",\n    \"currency\": \"NGN\"\n  },\n  \"employees\": [\n    {\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane@acme.com\",\n      \"jobTitle\": \"Engineer\",\n      \"salary\": 500000,\n      \"startDate\": \"2026-01-15\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboarding/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding",
+                "complete"
+              ]
+            },
+            "description": "Finalize and complete initial business onboarding setup."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Onboarding completed successfully\",\n  \"organization\": {\n    \"id\": \"org-123\",\n    \"name\": \"Acme Corp\",\n    \"onboardingStatus\": \"COMPLETED\"\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -2756,7 +2878,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Payroll run created in DRAFT state\",\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"title\": \"September 2026 Regular Payroll\",\n      \"status\": \"DRAFT\"\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Payroll run created in DRAFT state\",\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"payDate\": \"2026-09-25\",\n      \"title\": \"September 2026 Regular Payroll\",\n      \"status\": \"DRAFT\"\n    }\n  }\n}"
             }
           ]
         },
@@ -3002,7 +3124,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payrollRuns\": [\n      {\n        \"id\": \"run-123\",\n        \"periodMonth\": 9,\n        \"periodYear\": 2026,\n        \"status\": \"RECONCILED\"\n      }\n    ]\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payrollRuns\": [\n      {\n        \"id\": \"run-123\",\n        \"periodMonth\": 9,\n        \"periodYear\": 2026,\n        \"payDate\": \"2026-09-25\",\n        \"status\": \"RECONCILED\"\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -3041,7 +3163,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"status\": \"RECONCILED\",\n      \"items\": [],\n      \"payslips\": []\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"payDate\": \"2026-09-25\",\n      \"status\": \"RECONCILED\",\n      \"items\": [],\n      \"payslips\": []\n    }\n  }\n}"
             }
           ]
         }
@@ -3084,7 +3206,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"profile\": {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane@acme.com\",\n      \"department\": \"Engineering\",\n      \"jobTitle\": \"Software Engineer\",\n      \"employmentStatus\": \"ACTIVE\",\n      \"workLocation\": \"Lagos, Nigeria\",\n      \"startDate\": \"2024-01-15T00:00:00.000Z\",\n      \"nextPayDate\": \"2026-10-25\",\n      \"manager\": {\n        \"id\": \"mgr-456\",\n        \"fullName\": \"John Manager\",\n        \"email\": \"john@acme.com\",\n        \"jobTitle\": \"Engineering Manager\"\n      }\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"profile\": {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane@acme.com\",\n      \"department\": \"Engineering\",\n      \"jobTitle\": \"Software Engineer\",\n      \"employmentStatus\": \"ACTIVE\",\n      \"workLocation\": \"Lagos, Nigeria\",\n      \"startDate\": \"2024-01-15T00:00:00.000Z\",\n      \"nextPayDate\": \"2026-10-25\",\n      \"bankName\": \"First Bank of Nigeria\",\n      \"accountNumber\": \"0123456789\",\n      \"bankAccountLast4\": \"6789\",\n      \"manager\": {\n        \"id\": \"mgr-456\",\n        \"fullName\": \"John Manager\",\n        \"email\": \"john@acme.com\",\n        \"jobTitle\": \"Engineering Manager\"\n      },\n      \"compensation\": {\n        \"basicSalary\": 400000,\n        \"housingAllowance\": 50000,\n        \"transportAllowance\": 30000,\n        \"otherAllowances\": 20000,\n        \"effectiveFrom\": \"2024-01-15\"\n      }\n    }\n  }\n}"
             }
           ]
         },
@@ -3160,7 +3282,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveBalances\": [\n      {\n        \"allocatedDays\": 20,\n        \"usedDays\": 2,\n        \"approvedFutureDays\": 5,\n        \"pendingDays\": 3,\n        \"remainingDays\": 15,\n        \"leaveType\": {\n          \"id\": \"lt-123\",\n          \"name\": \"Annual Paid Leave\"\n        }\n      }\n    ]\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveBalances\": [\n      {\n        \"allocatedDays\": 20,\n        \"usedDays\": 2,\n        \"upcomingDays\": 5,\n        \"approvedFutureDays\": 5,\n        \"pendingDays\": 3,\n        \"remainingDays\": 15,\n        \"leaveType\": {\n          \"id\": \"lt-123\",\n          \"name\": \"Annual Paid Leave\"\n        }\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -3320,7 +3442,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"profile\": {\n    \"id\": \"emp-100\",\n    \"firstName\": \"Jane\",\n    \"lastName\": \"Doe\",\n    \"phone\": \"+2348012345678\",\n    \"address\": \"123 Victoria Island, Lagos\",\n    \"bankName\": \"First Bank of Nigeria\",\n    \"accountNumber\": \"0123456789\",\n    \"employmentStatus\": \"ACTIVE\",\n    \"nextPayDate\": \"2026-10-25\"\n  }\n}"
+              "body": "{\n  \"profile\": {\n    \"id\": \"emp-100\",\n    \"firstName\": \"Jane\",\n    \"lastName\": \"Doe\",\n    \"phone\": \"+2348012345678\",\n    \"address\": \"123 Victoria Island, Lagos\",\n    \"bankName\": \"First Bank of Nigeria\",\n    \"accountNumber\": \"0123456789\",\n    \"bankAccountLast4\": \"6789\",\n    \"employmentStatus\": \"ACTIVE\",\n    \"nextPayDate\": \"2026-10-25\"\n  }\n}"
             },
             {
               "name": "Error (400 Bad Request / 404 Not Found)",
@@ -3740,7 +3862,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"alerts\": [\n    {\n      \"type\": \"MISSING_TAX_ID\",\n      \"severity\": \"MEDIUM\",\n      \"count\": 2,\n      \"message\": \"2 active employees are missing a Tax Identification Number (TIN)\",\n      \"affectedEmployees\": [\n        {\n          \"id\": \"emp-1\",\n          \"fullName\": \"John Doe\",\n          \"email\": \"john@acme.com\",\n          \"department\": \"Engineering\"\n        }\n      ]\n    },\n    {\n      \"type\": \"MISSING_PENSION_RSA\",\n      \"severity\": \"MEDIUM\",\n      \"count\": 1,\n      \"message\": \"1 active employee is missing a Pension RSA Number\",\n      \"affectedEmployees\": [\n        {\n          \"id\": \"emp-2\",\n          \"fullName\": \"Jane Smith\",\n          \"email\": \"jane@acme.com\",\n          \"department\": \"Design\"\n        }\n      ]\n    },\n    {\n      \"type\": \"PAYE_REMITTANCE_DUE\",\n      \"severity\": \"HIGH\",\n      \"count\": 1,\n      \"message\": \"Monthly PAYE tax remittance is due by the 10th of next month\",\n      \"deadline\": \"2026-10-10T00:00:00.000Z\"\n    }\n  ]\n}"
+              "body": "{\n  \"alerts\": [\n    {\n      \"type\": \"MISSING_TAX_ID\",\n      \"title\": \"Missing Tax IDs (TIN)\",\n      \"severity\": \"HIGH\",\n      \"count\": 2,\n      \"message\": \"2 active employees are missing a Tax Identification Number (TIN)\",\n      \"affectedEmployees\": [\n        {\n          \"id\": \"emp-1\",\n          \"fullName\": \"John Doe\",\n          \"email\": \"john@acme.com\",\n          \"department\": \"Engineering\"\n        }\n      ]\n    },\n    {\n      \"type\": \"MISSING_PENSION_RSA\",\n      \"title\": \"Missing Pension PINs\",\n      \"severity\": \"MEDIUM\",\n      \"count\": 1,\n      \"message\": \"1 active employee is missing a Pension RSA PIN\",\n      \"affectedEmployees\": [\n        {\n          \"id\": \"emp-2\",\n          \"fullName\": \"Jane Smith\",\n          \"email\": \"jane@acme.com\",\n          \"department\": \"Design\"\n        }\n      ]\n    },\n    {\n      \"type\": \"UPCOMING_STATUTORY_DEADLINE\",\n      \"title\": \"PAYE Tax Remittance Due\",\n      \"severity\": \"MEDIUM\",\n      \"count\": 1,\n      \"message\": \"Monthly PAYE tax remittance is due on the 10th of each month\",\n      \"dueDate\": \"2026-10-10\"\n    }\n  ]\n}"
             }
           ]
         }
@@ -3751,10 +3873,52 @@
       "description": "Organization workspace management endpoints.",
       "item": [
         {
+          "name": "List Organizations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/organizations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organizations"
+              ]
+            },
+            "description": "Retrieve organization details for active session context."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"organization\": {\n    \"id\": \"org-123\",\n    \"name\": \"Acme Corp\",\n    \"slug\": \"acme-corp\",\n    \"currency\": \"NGN\",\n    \"payrollFrequency\": \"MONTHLY\"\n  }\n}"
+            }
+          ]
+        },
+        {
           "name": "Get Current Organization",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/organizations/current",
               "host": [
@@ -3767,7 +3931,21 @@
             },
             "description": "Retrieve active organization profile for current business session."
           },
-          "response": []
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"organization\": {\n    \"id\": \"org-123\",\n    \"name\": \"Acme Corp\",\n    \"slug\": \"acme-corp\",\n    \"currency\": \"NGN\",\n    \"payrollFrequency\": \"MONTHLY\"\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -3847,30 +4025,10 @@
               "name": "Get Employee Profile",
               "request": {
                 "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/people/employees/:employeeId",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "people",
-                    "employees",
-                    ":employeeId"
-                  ]
-                },
-                "description": "Get comprehensive employee profile, compensation, leave summary, and activity feed."
-              },
-              "response": []
-            },
-            {
-              "name": "Update Employee Profile",
-              "request": {
-                "method": "PATCH",
                 "header": [
                   {
-                    "key": "Content-Type",
-                    "value": "application/json"
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
                   }
                 ],
                 "url": {
@@ -3884,13 +4042,83 @@
                     ":employeeId"
                   ]
                 },
-                "description": "Update employee profile details.",
+                "description": "Get comprehensive employee profile, compensation, leave summary, and activity feed. Returns bankAccountLast4 masked for security."
+              },
+              "response": [
+                {
+                  "name": "Success (200 OK)",
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"profile\": {\n    \"id\": \"emp_ada\",\n    \"fullName\": \"Ada Lovelace\",\n    \"firstName\": \"Ada\",\n    \"lastName\": \"Lovelace\",\n    \"email\": \"ada@example.com\",\n    \"jobTitle\": \"Lead Engineer\",\n    \"department\": \"Engineering\",\n    \"departmentId\": \"dept_123\",\n    \"employmentType\": \"Full-Time\",\n    \"employmentStatus\": \"active\",\n    \"startDate\": \"2026-03-01\",\n    \"managerId\": \"emp_456\",\n    \"workLocation\": \"Lagos\",\n    \"personal\": {\n      \"phone\": \"+2348012345678\"\n    },\n    \"compensation\": {\n      \"annualSalaryMinor\": 600000000,\n      \"currency\": \"NGN\",\n      \"payFrequency\": \"MONTHLY\",\n      \"bankName\": \"GTBank\",\n      \"bankAccountLast4\": \"6789\"\n    }\n  }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Update Employee Profile",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/employees/:employeeId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "employees",
+                    ":employeeId"
+                  ]
+                },
+                "description": "Update employee profile details using nested personal, employment (departmentId, employmentType, startDate, status, jobTitle), compensation, and payment sections.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"jobTitle\": \"Senior Software Engineer\",\n  \"status\": \"ACTIVE\"\n}"
+                  "raw": "{\n  \"personal\": {\n    \"firstName\": \"Ada\",\n    \"lastName\": \"Lovelace\",\n    \"phone\": \"+2348012345678\"\n  },\n  \"employment\": {\n    \"jobTitle\": \"Lead Engineer\",\n    \"departmentId\": \"dept_123\",\n    \"employmentType\": \"FULL_TIME\",\n    \"startDate\": \"2026-03-01\",\n    \"status\": \"ACTIVE\",\n    \"managerId\": \"emp_456\",\n    \"workLocation\": \"Lagos\"\n  },\n  \"compensation\": {\n    \"annualSalaryMinor\": 600000000,\n    \"currency\": \"NGN\",\n    \"payFrequency\": \"MONTHLY\",\n    \"effectiveDate\": \"2026-11-01\"\n  },\n  \"payment\": {\n    \"bankName\": \"GTBank\",\n    \"accountNumber\": \"0123456789\"\n  }\n}"
                 }
               },
-              "response": []
+              "response": [
+                {
+                  "name": "Success (200 OK)",
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"profile\": {\n    \"id\": \"emp_ada\",\n    \"fullName\": \"Ada Lovelace\",\n    \"email\": \"ada@example.com\",\n    \"jobTitle\": \"Lead Engineer\",\n    \"departmentId\": \"dept_123\",\n    \"employmentType\": \"Full-Time\",\n    \"employmentStatus\": \"active\",\n    \"startDate\": \"2026-03-01\"\n  }\n}"
+                },
+                {
+                  "name": "Error (400 Bad Request)",
+                  "status": "Bad Request",
+                  "code": 400,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Department does not exist in your organization\",\n  \"error\": \"Bad Request\"\n}"
+                }
+              ]
             },
             {
               "name": "Resend Employee Invitation",
@@ -4434,7 +4662,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"status\": \"TRIALING\",\n  \"planName\": \"GROWTH_TIER\",\n  \"trialEndsAt\": \"2026-10-25T12:00:00.000Z\",\n  \"activeEmployeeCount\": 15,\n  \"seatLimit\": 50,\n  \"billingCycle\": \"MONTHLY\",\n  \"nextBillingDate\": \"2026-10-25T12:00:00.000Z\"\n}"
+              "body": "{\n  \"status\": \"TRIALING\",\n  \"planName\": \"GROWTH_TIER\",\n  \"trialStartedAt\": \"2026-09-25T12:00:00.000Z\",\n  \"trialEndsAt\": \"2026-10-25T12:00:00.000Z\",\n  \"trialLengthDays\": 30,\n  \"activeEmployeeCount\": 15,\n  \"seatLimit\": 50,\n  \"billingCycle\": \"MONTHLY\",\n  \"nextBillingDate\": \"2026-10-25T12:00:00.000Z\"\n}"
             },
             {
               "name": "Error (400 Bad Request / 404 Not Found)",

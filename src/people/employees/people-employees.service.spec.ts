@@ -280,6 +280,27 @@ describe('PeopleEmployeesService', () => {
       ]);
     });
 
+    it('updates departmentId, employmentType, startDate, and status', async () => {
+      fake.seed('employee', [employeeRow()]);
+      fake.seed('department', [
+        { id: 'dept_prod', name: 'Product', organizationId: 'org_a' },
+      ]);
+
+      await service.updateEmployee(adminUser(), 'emp_ada', {
+        employment: {
+          departmentId: 'dept_prod',
+          employmentType: 'CONTRACT',
+          startDate: '2026-03-01',
+          status: 'ACTIVE',
+        },
+      });
+
+      const updated = await service.getEmployee(adminUser(), 'emp_ada');
+      expect(updated.departmentId).toBe('dept_prod');
+      expect(updated.employmentType).toBe('Contract');
+      expect(updated.employmentStatus).toBe('active');
+    });
+
     it('records a salary change in compensation history from its effective date', async () => {
       fake.seed('employee', [employeeRow()]);
 

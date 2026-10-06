@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { UpdateMeProfileDto } from './dto/update-me-profile.dto';
@@ -67,21 +68,66 @@ export class MeService {
 
   async getProfile(user: AuthenticatedUser) {
     const employee = await this.getEmployeeForUser(user);
-    const org = user.organizationId
-      ? await this.prisma.organization.findUnique({
-          where: { id: user.organizationId },
-          select: { payDate: true },
-        })
-      : null;
+    const [org, compRecord] = await Promise.all([
+      user.organizationId
+        ? this.prisma.organization.findUnique({
+            where: { id: user.organizationId },
+            select: { payDate: true },
+          })
+        : null,
+      this.prisma.compensationRecord.findFirst({
+        where: {
+          employeeId: employee.id,
+          organizationId: employee.organizationId,
+          OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }],
+        },
+        orderBy: { effectiveFrom: 'desc' },
+      }),
+    ]);
+
     const nextPayDate = this.calculateNextPayDate(
       new Date(),
       org?.payDate ?? 25,
     );
     const employeeData = { ...employee };
     delete (employeeData as any).invitationToken;
+
+    const bankAccountLast4 =
+      employee.bankAccountLast4 ??
+      (employee.accountNumber
+        ? String(employee.accountNumber).replace(/\D/g, '').slice(-4) || null
+        : null);
+
+    const basicSalary = compRecord
+      ? compRecord.basicSalary
+      : Math.trunc(Number(employee.annualSalaryMinor) / 1200);
+    const housingAllowance = compRecord?.housingAllowance ?? 0;
+    const transportAllowance = compRecord?.transportAllowance ?? 0;
+    const otherAllowances = compRecord?.otherAllowances ?? 0;
+    const effectiveFrom = compRecord?.effectiveFrom
+      ? compRecord.effectiveFrom.toISOString().split('T')[0]
+      : employee.startDate
+        ? employee.startDate.toISOString().split('T')[0]
+        : null;
+
+    const compensation = {
+      annualSalaryMinor:
+        employee.annualSalaryMinor !== undefined
+          ? Number(employee.annualSalaryMinor)
+          : undefined,
+      currency: employee.currency ?? 'NGN',
+      payFrequency: employee.payFrequency ?? 'MONTHLY',
+      basicSalary,
+      housingAllowance,
+      transportAllowance,
+      otherAllowances,
+      effectiveFrom,
+    };
+
     return {
       profile: {
         ...employeeData,
+        bankAccountLast4,
         annualSalaryMinor:
           employee.annualSalaryMinor !== undefined
             ? Number(employee.annualSalaryMinor)
@@ -90,6 +136,7 @@ export class MeService {
         workLocation: employee.workLocation ?? null,
         startDate: employee.startDate ? employee.startDate.toISOString() : null,
         nextPayDate,
+        compensation,
       },
     };
   }
@@ -152,6 +199,7 @@ export class MeService {
         ...balance,
         usedDays: actualUsedDays,
         upcomingDays,
+        approvedFutureDays: upcomingDays,
       };
     });
 
@@ -216,15 +264,38 @@ export class MeService {
       }
     }
 
+    if (dto.accountNumber !== undefined) {
+      if (dto.accountNumber) {
+        const cleanDigits = String(dto.accountNumber).replace(/\D/g, '');
+        dataToUpdate.bankAccountLast4 = cleanDigits.slice(-4) || null;
+      } else {
+        dataToUpdate.bankAccountLast4 = null;
+      }
+    }
+
     if (Object.keys(dataToUpdate).length > 0) {
       await this.prisma.employee.update({
         where: { id: employee.id },
         data: dataToUpdate,
       });
+
+      await this.prisma.auditEvent.create({
+        data: {
+          organizationId: employee.organizationId,
+          actorUserId: user.id,
+          action: 'PROFILE_UPDATED',
+          targetType: 'employee',
+          targetId: employee.id,
+          employeeId: employee.id,
+          description: 'Profile information updated',
+          changes: { updatedFields: Object.keys(dataToUpdate) },
+        },
+      });
     }
 
     return this.getProfile(user);
   }
+
   async getCompensationHistory(user: AuthenticatedUser) {
     const employee = await this.getEmployeeForUser(user);
     const [records, history] = await Promise.all([
@@ -243,6 +314,42 @@ export class MeService {
         orderBy: { createdAt: 'desc' },
       }),
     ]);
+
+    if (records.length === 0 && employee.annualSalaryMinor > 0n) {
+      const basicSalary = Math.trunc(Number(employee.annualSalaryMinor) / 1200);
+      const effectiveFrom = employee.startDate ?? new Date();
+      const defaultRecord = await this.prisma.compensationRecord.create({
+        data: {
+          id: randomUUID(),
+          organizationId: employee.organizationId,
+          employeeId: employee.id,
+          effectiveFrom,
+          basicSalary,
+          housingAllowance: 0,
+          transportAllowance: 0,
+          otherAllowances: 0,
+          currency: employee.currency ?? 'NGN',
+          paymentFrequency: employee.payFrequency ?? 'MONTHLY',
+        },
+      });
+      records.push(defaultRecord);
+
+      if (history.length === 0) {
+        const defaultHistory = await this.prisma.compensationHistory.create({
+          data: {
+            organizationId: employee.organizationId,
+            employeeId: employee.id,
+            annualSalaryMinor: employee.annualSalaryMinor,
+            currency: employee.currency ?? 'NGN',
+            payFrequency: employee.payFrequency ?? 'MONTHLY',
+            effectiveDate: effectiveFrom,
+            changedByUserId: user.id,
+          },
+        });
+        history.push(defaultHistory);
+      }
+    }
+
     return { records, history };
   }
 

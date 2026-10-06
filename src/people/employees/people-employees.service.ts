@@ -6,6 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../generated/prisma/client';
 import type { AuthenticatedUser } from '../../auth/auth.types';
 import { EmailService } from '../../notifications/email.service';
@@ -258,6 +259,21 @@ export class PeopleEmployeesService {
           },
         });
 
+        await client.compensationRecord.create({
+          data: {
+            id: randomUUID(),
+            organizationId,
+            employeeId: employee.id,
+            effectiveFrom: employee.startDate,
+            basicSalary: Math.trunc(Number(employee.annualSalaryMinor) / 1200),
+            housingAllowance: 0,
+            transportAllowance: 0,
+            otherAllowances: 0,
+            currency: employee.currency ?? 'NGN',
+            paymentFrequency: employee.payFrequency ?? 'MONTHLY',
+          },
+        });
+
         // Field names only: compensation and contact values stay out of audit history.
         await client.auditEvent.create({
           data: {
@@ -383,6 +399,25 @@ export class PeopleEmployeesService {
         }
       }
 
+      let departmentName = existing.department;
+      if (employment?.departmentId !== undefined) {
+        if (employment.departmentId) {
+          const dept = await client.department.findFirst({
+            where: { id: employment.departmentId, organizationId },
+          });
+          if (!dept) {
+            throw new UnprocessableEntityException({
+              code: 'VALIDATION_ERROR',
+              message: 'Department was not found in this organization',
+              fields: { 'employment.departmentId': 'Department was not found' },
+            });
+          }
+          departmentName = dept.name;
+        } else {
+          departmentName = null;
+        }
+      }
+
       const { personal } = input;
       const firstName = personal?.firstName ?? existing.firstName;
       const lastName = personal?.lastName ?? existing.lastName;
@@ -438,28 +473,80 @@ export class PeopleEmployeesService {
           ...(employment?.managerId !== undefined
             ? { managerId: employment.managerId }
             : {}),
+          ...(employment?.departmentId !== undefined
+            ? {
+                departmentId: employment.departmentId,
+                department: departmentName ?? '',
+              }
+            : {}),
+          ...(employment?.employmentType !== undefined
+            ? { employmentType: employment.employmentType }
+            : {}),
+          ...(employment?.startDate !== undefined
+            ? { startDate: new Date(`${employment.startDate}T00:00:00.000Z`) }
+            : {}),
+          ...(employment?.status !== undefined
+            ? { status: employment.status }
+            : {}),
           ...(input.compensation
             ? {
                 annualSalaryMinor: BigInt(input.compensation.annualSalaryMinor),
-                currency: input.compensation.currency,
-                payFrequency: input.compensation.payFrequency,
+                currency:
+                  input.compensation.currency ?? existing.currency ?? 'NGN',
+                payFrequency:
+                  input.compensation.payFrequency ??
+                  existing.payFrequency ??
+                  'MONTHLY',
               }
             : {}),
         },
       });
 
       if (input.compensation) {
+        const currency =
+          input.compensation.currency ?? existing.currency ?? 'NGN';
+        const payFrequency =
+          input.compensation.payFrequency ?? existing.payFrequency ?? 'MONTHLY';
+        const effectiveDate = input.compensation.effectiveDate
+          ? new Date(`${input.compensation.effectiveDate}T00:00:00.000Z`)
+          : new Date();
+
         await client.compensationHistory.create({
           data: {
             organizationId,
             employeeId,
             annualSalaryMinor: BigInt(input.compensation.annualSalaryMinor),
-            currency: input.compensation.currency,
-            payFrequency: input.compensation.payFrequency,
-            effectiveDate: new Date(
-              `${input.compensation.effectiveDate}T00:00:00.000Z`,
-            ),
+            currency,
+            payFrequency,
+            effectiveDate,
             changedByUserId: user.id,
+          },
+        });
+
+        const basicSalary = Math.trunc(
+          Number(input.compensation.annualSalaryMinor) / 1200,
+        );
+        const existingComp = await client.compensationRecord.findFirst({
+          where: { employeeId, organizationId, effectiveTo: null },
+        });
+        if (existingComp) {
+          await client.compensationRecord.update({
+            where: { id: existingComp.id },
+            data: { effectiveTo: effectiveDate },
+          });
+        }
+        await client.compensationRecord.create({
+          data: {
+            id: randomUUID(),
+            organizationId,
+            employeeId,
+            effectiveFrom: effectiveDate,
+            basicSalary,
+            housingAllowance: 0,
+            transportAllowance: 0,
+            otherAllowances: 0,
+            currency,
+            paymentFrequency: payFrequency,
           },
         });
       }

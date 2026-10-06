@@ -108,6 +108,20 @@ export class PayrollService {
     return { history };
   }
 
+  private formatPayrollRun<
+    T extends { periodYear: number; periodMonth: number },
+  >(run: T | null, payDay = 25) {
+    if (!run) return run;
+    const day = Math.min(Math.max(1, payDay), 28);
+    const payDate = new Date(Date.UTC(run.periodYear, run.periodMonth - 1, day))
+      .toISOString()
+      .split('T')[0];
+    return {
+      ...run,
+      payDate,
+    };
+  }
+
   async createRun(user: AuthenticatedUser, dto: CreatePayrollRunDto) {
     const orgId = this.checkOrgContext(user);
 
@@ -129,20 +143,28 @@ export class PayrollService {
       dto.title ??
       `Payroll Run ${new Date(dto.periodYear, dto.periodMonth - 1).toLocaleString('default', { month: 'long' })} ${dto.periodYear}`;
 
-    const run = await this.prisma.payrollRun.create({
-      data: {
-        id: randomUUID(),
-        organizationId: orgId,
-        periodMonth: dto.periodMonth,
-        periodYear: dto.periodYear,
-        title,
-        status: 'DRAFT',
-      },
-    });
+    const [run, org] = await Promise.all([
+      this.prisma.payrollRun.create({
+        data: {
+          id: randomUUID(),
+          organizationId: orgId,
+          periodMonth: dto.periodMonth,
+          periodYear: dto.periodYear,
+          title,
+          status: 'DRAFT',
+        },
+      }),
+      this.prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { payDate: true },
+      }),
+    ]);
+
+    const payDay = org?.payDate ?? 25;
 
     return {
       message: 'Payroll run created in DRAFT state',
-      payrollRun: run,
+      payrollRun: this.formatPayrollRun(run, payDay),
     };
   }
 
@@ -441,40 +463,56 @@ export class PayrollService {
   async getRuns(user: AuthenticatedUser) {
     const orgId = this.checkOrgContext(user);
 
-    const runs = await this.prisma.payrollRun.findMany({
-      where: { organizationId: orgId },
-      orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
-    });
+    const [runs, org] = await Promise.all([
+      this.prisma.payrollRun.findMany({
+        where: { organizationId: orgId },
+        orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
+      }),
+      this.prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { payDate: true },
+      }),
+    ]);
 
-    return { payrollRuns: runs };
+    const payDay = org?.payDate ?? 25;
+
+    return { payrollRuns: runs.map((r) => this.formatPayrollRun(r, payDay)) };
   }
 
   async getRunById(user: AuthenticatedUser, runId: string) {
     const orgId = this.checkOrgContext(user);
 
-    const run = await this.prisma.payrollRun.findFirst({
-      where: { id: runId, organizationId: orgId },
-      include: {
-        items: {
-          include: {
-            employee: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-                department: true,
+    const [run, org] = await Promise.all([
+      this.prisma.payrollRun.findFirst({
+        where: { id: runId, organizationId: orgId },
+        include: {
+          items: {
+            include: {
+              employee: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                  department: true,
+                },
               },
             },
           },
+          payslips: true,
         },
-        payslips: true,
-      },
-    });
+      }),
+      this.prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { payDate: true },
+      }),
+    ]);
 
     if (!run) {
       throw new NotFoundException(`Payroll run ${runId} not found`);
     }
 
-    return { payrollRun: run };
+    const payDay = org?.payDate ?? 25;
+
+    return { payrollRun: this.formatPayrollRun(run, payDay) };
   }
 }

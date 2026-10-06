@@ -14,6 +14,9 @@ describe('LeaveListener', () => {
       findFirst: jest.Mock;
       update: jest.Mock;
     };
+    auditEvent: {
+      create: jest.Mock;
+    };
   };
 
   beforeEach(async () => {
@@ -25,6 +28,9 @@ describe('LeaveListener', () => {
       leaveBalance: {
         findFirst: jest.fn(),
         update: jest.fn(),
+      },
+      auditEvent: {
+        create: jest.fn(),
       },
     };
 

@@ -200,9 +200,29 @@ describe('ComplianceService', () => {
 
       const result = await service.getAlerts(mockUser);
 
-      expect(result.alerts).toHaveLength(3); // MISSING_TAX_ID, MISSING_PENSION_RSA, PAYE_REMITTANCE_DUE
+      expect(result.alerts).toHaveLength(3); // MISSING_TAX_ID, MISSING_PENSION_RSA, UPCOMING_STATUTORY_DEADLINE
       expect(result.alerts[0].count).toBe(1);
       expect(result.alerts[1].count).toBe(1);
+    });
+
+    it('should exclude alerts when count is 0', async () => {
+      (prisma.employee.findMany as jest.Mock)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const mockUser: AuthenticatedUser = {
+        id: 'u-1',
+        name: 'Admin User',
+        email: 'admin@acme.com',
+        userType: USER_TYPES.BUSINESS,
+        role: USER_ROLES.BUSINESS_OWNER,
+        organizationId: 'org-123',
+      };
+
+      const result = await service.getAlerts(mockUser);
+
+      expect(result.alerts).toHaveLength(1);
+      expect(result.alerts[0].type).toBe('UPCOMING_STATUTORY_DEADLINE');
     });
   });
 });
