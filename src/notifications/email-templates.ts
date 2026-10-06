@@ -55,8 +55,6 @@ function appUrl(): string {
   ).replace(/\/+$/, '');
 }
 
-
-
 // ---------------------------------------------------------------------------
 // Shared layout
 // Accepts preheader text, optional eyebrow label, headline, optional intro
