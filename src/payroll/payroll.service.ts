@@ -110,8 +110,14 @@ export class PayrollService {
 
   private formatPayrollRun<
     T extends { periodYear: number; periodMonth: number },
+  >(run: T, payDay?: number): T & { payDate: string };
+  private formatPayrollRun<
+    T extends { periodYear: number; periodMonth: number },
+  >(run: T | null, payDay?: number): (T & { payDate: string }) | null;
+  private formatPayrollRun<
+    T extends { periodYear: number; periodMonth: number },
   >(run: T | null, payDay = 25) {
-    if (!run) return run;
+    if (!run) return null;
     const day = Math.min(Math.max(1, payDay), 28);
     const payDate = new Date(Date.UTC(run.periodYear, run.periodMonth - 1, day))
       .toISOString()
