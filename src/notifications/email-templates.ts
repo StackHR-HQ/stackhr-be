@@ -1,5 +1,4 @@
 const DEFAULT_APP_URL = 'https://app.stackhr.app';
-const DEFAULT_UNSUBSCRIBE_URL = 'https://stackhr.app';
 
 export interface TransactionalEmail {
   subject: string;
@@ -56,9 +55,7 @@ function appUrl(): string {
   ).replace(/\/+$/, '');
 }
 
-function unsubscribeUrl(): string {
-  return process.env.STACKHR_UNSUBSCRIBE_URL ?? DEFAULT_UNSUBSCRIBE_URL;
-}
+
 
 // ---------------------------------------------------------------------------
 // Shared layout
@@ -81,7 +78,7 @@ function layout(input: {
   const safeIntro = input.intro ? escapeHtml(input.intro) : null;
   const safeCtaUrl = input.ctaUrl ? escapeHtml(input.ctaUrl) : null;
   const safeCtaText = input.ctaText ? escapeHtml(input.ctaText) : null;
-  const safeUnsubscribe = escapeHtml(unsubscribeUrl());
+
   const safeAppUrl = escapeHtml('https://stackhr.app');
 
   const eyebrowBlock = input.eyebrow
@@ -167,8 +164,6 @@ function layout(input: {
                 <a href="${safeAppUrl}/privacy" target="_blank" style="color:${COLORS.footerText};text-decoration:underline;">Privacy Policy</a>
                 &nbsp;&nbsp;·&nbsp;&nbsp;
                 <a href="${safeAppUrl}/terms" target="_blank" style="color:${COLORS.footerText};text-decoration:underline;">Terms</a>
-                &nbsp;&nbsp;·&nbsp;&nbsp;
-                <a href="${safeUnsubscribe}" target="_blank" style="color:${COLORS.footerText};text-decoration:underline;">Unsubscribe</a>
               </div>
 
               <div style="margin-top:18px;font-size:11px;line-height:17px;color:${COLORS.footerSubtle};">

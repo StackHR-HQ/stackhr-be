@@ -19,6 +19,7 @@ describe('WaitlistController', () => {
 
   const mockEmailService = {
     send: jest.fn().mockResolvedValue({ id: 'msg_123' }),
+    subscribeToList: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
