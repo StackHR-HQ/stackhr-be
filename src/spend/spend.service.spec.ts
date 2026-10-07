@@ -32,7 +32,9 @@ describe('SpendService', () => {
       },
       salaryAdvance: {
         create: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
+        update: jest.fn(),
       },
       reimbursement: {
         create: jest.fn(),
@@ -284,6 +286,76 @@ describe('SpendService', () => {
 
       const result = await service.payReimbursement(mockUser, 'rmb-1');
       expect(result.reimbursement.status).toBe('PAID');
+    });
+  });
+
+  describe('getExpenseDetails', () => {
+    it('should return expense details', async () => {
+      prismaMock.expense.findFirst.mockResolvedValue({
+        id: 'exp-1',
+        amount: 25000,
+        status: 'PENDING',
+      });
+      const result = await service.getExpenseDetails(mockUser, 'exp-1');
+      expect(result.expense.id).toBe('exp-1');
+    });
+
+    it('should throw NotFoundException if expense not found', async () => {
+      prismaMock.expense.findFirst.mockResolvedValue(null);
+      await expect(
+        service.getExpenseDetails(mockUser, 'invalid'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('cancelExpense', () => {
+    it('should cancel pending expense', async () => {
+      prismaMock.expense.findFirst.mockResolvedValue({
+        id: 'exp-1',
+        status: 'PENDING',
+      });
+      prismaMock.approvalRequest.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.expense.update.mockResolvedValue({
+        id: 'exp-1',
+        status: 'CANCELLED',
+      });
+
+      const result = await service.cancelExpense(mockUser, 'exp-1');
+      expect(result.expense.status).toBe('CANCELLED');
+    });
+  });
+
+  describe('cancelSalaryAdvance', () => {
+    it('should cancel pending advance', async () => {
+      prismaMock.salaryAdvance.findFirst.mockResolvedValue({
+        id: 'adv-1',
+        status: 'PENDING',
+      });
+      prismaMock.approvalRequest.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.salaryAdvance.update.mockResolvedValue({
+        id: 'adv-1',
+        status: 'CANCELLED',
+      });
+
+      const result = await service.cancelSalaryAdvance(mockUser, 'adv-1');
+      expect(result.advance.status).toBe('CANCELLED');
+    });
+  });
+
+  describe('disburseSalaryAdvance', () => {
+    it('should disburse approved salary advance', async () => {
+      prismaMock.salaryAdvance.findFirst.mockResolvedValue({
+        id: 'adv-1',
+        status: 'APPROVED',
+      });
+      prismaMock.salaryAdvance.update.mockResolvedValue({
+        id: 'adv-1',
+        status: 'DISBURSED',
+        disbursedAt: new Date(),
+      });
+
+      const result = await service.disburseSalaryAdvance(mockUser, 'adv-1');
+      expect(result.advance.status).toBe('DISBURSED');
     });
   });
 });

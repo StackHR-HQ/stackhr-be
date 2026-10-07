@@ -247,7 +247,10 @@ export class MeService {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return { salaryAdvances: advances };
+    return {
+      salaryAdvances: advances,
+      advances,
+    };
   }
 
   async updateProfile(user: AuthenticatedUser, dto: UpdateMeProfileDto) {
@@ -378,7 +381,12 @@ export class MeService {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return { documents };
+    const mappedDocuments = documents.map((doc) => ({
+      ...doc,
+      title: doc.name,
+      fileUrl: `/v1/api/people/documents/${doc.id}/download`,
+    }));
+    return { documents: mappedDocuments };
   }
 
   async getActivity(user: AuthenticatedUser) {
