@@ -302,4 +302,45 @@ describe('PayrollService', () => {
       expect(result.payrollRun.status).toBe('RECONCILED');
     });
   });
+
+  describe('getRuns', () => {
+    it('should return runs with payDate formatted as YYYY-MM-DD', async () => {
+      prismaMock.payrollRun.findMany.mockResolvedValue([
+        {
+          id: 'run-1',
+          periodMonth: 10,
+          periodYear: 2026,
+          status: 'DRAFT',
+        },
+      ]);
+      prismaMock.organization.findUnique.mockResolvedValue({
+        payDate: 25,
+      });
+
+      const result = await service.getRuns(mockAdminUser);
+
+      expect(result.payrollRuns).toHaveLength(1);
+      expect(result.payrollRuns[0].payDate).toBe('2026-10-25');
+    });
+  });
+
+  describe('getRunById', () => {
+    it('should return run with payDate formatted as YYYY-MM-DD', async () => {
+      prismaMock.payrollRun.findFirst.mockResolvedValue({
+        id: 'run-1',
+        periodMonth: 10,
+        periodYear: 2026,
+        status: 'DRAFT',
+        items: [],
+        payslips: [],
+      });
+      prismaMock.organization.findUnique.mockResolvedValue({
+        payDate: 25,
+      });
+
+      const result = await service.getRunById(mockAdminUser, 'run-1');
+
+      expect(result.payrollRun.payDate).toBe('2026-10-25');
+    });
+  });
 });

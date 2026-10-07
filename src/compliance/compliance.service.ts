@@ -418,35 +418,41 @@ export class ComplianceService {
     const now = new Date();
     const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-    return {
-      alerts: [
-        {
-          type: 'MISSING_TAX_ID',
-          severity: 'MEDIUM',
-          count: missingTin.length,
-          message:
-            missingTin.length +
-            ' active employees are missing a Tax Identification Number (TIN)',
-          affectedEmployees: missingTin,
-        },
-        {
-          type: 'MISSING_PENSION_RSA',
-          severity: 'MEDIUM',
-          count: missingPensionRsa.length,
-          message:
-            missingPensionRsa.length +
-            ' active employees are missing a Pension RSA Number',
-          affectedEmployees: missingPensionRsa,
-        },
-        {
-          type: 'UPCOMING_STATUTORY_DEADLINE',
-          severity: 'INFO',
-          dueDate: lastDayOfMonth.toISOString().split('T')[0],
-          message:
-            'Statutory remittance deadline for current month is ' +
-            lastDayOfMonth.toISOString().split('T')[0],
-        },
-      ],
-    };
+    const alerts: any[] = [];
+
+    if (missingTin.length > 0) {
+      alerts.push({
+        type: 'MISSING_TAX_ID',
+        severity: 'MEDIUM',
+        count: missingTin.length,
+        message:
+          missingTin.length +
+          ' active employees are missing a Tax Identification Number (TIN)',
+        affectedEmployees: missingTin,
+      });
+    }
+
+    if (missingPensionRsa.length > 0) {
+      alerts.push({
+        type: 'MISSING_PENSION_RSA',
+        severity: 'MEDIUM',
+        count: missingPensionRsa.length,
+        message:
+          missingPensionRsa.length +
+          ' active employees are missing a Pension RSA Number',
+        affectedEmployees: missingPensionRsa,
+      });
+    }
+
+    alerts.push({
+      type: 'UPCOMING_STATUTORY_DEADLINE',
+      severity: 'INFO',
+      dueDate: lastDayOfMonth.toISOString().split('T')[0],
+      message:
+        'Statutory remittance deadline for current month is ' +
+        lastDayOfMonth.toISOString().split('T')[0],
+    });
+
+    return { alerts };
   }
 }

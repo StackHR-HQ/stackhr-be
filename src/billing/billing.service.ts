@@ -43,6 +43,8 @@ export class BillingService {
     return {
       status: isTrialing ? 'TRIALING' : 'ACTIVE',
       planName: 'GROWTH_TIER',
+      trialStartedAt: createdAt.toISOString(),
+      trialLengthDays: 30,
       trialEndsAt: trialEndsAt.toISOString(),
       activeEmployeeCount,
       seatLimit: 50,

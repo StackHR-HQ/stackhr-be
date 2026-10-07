@@ -110,7 +110,9 @@ export class InvitationsService {
       invitation.status = 'expired';
     }
 
-    return { invitation };
+    const safeInvitation = { ...invitation };
+    delete (safeInvitation as any).tokenHash;
+    return { invitation: safeInvitation };
   }
 
   async acceptInvitation(id: string, dto: AcceptInvitationDto) {

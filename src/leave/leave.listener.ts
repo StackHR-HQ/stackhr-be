@@ -76,6 +76,18 @@ export class LeaveListener {
             remainingDays: newRemainingDays,
           },
         }),
+        this.prisma.auditEvent.create({
+          data: {
+            organizationId: event.organizationId,
+            actorUserId: event.approverId,
+            action: 'LEAVE_APPROVED',
+            targetType: 'leave_request',
+            targetId: leaveRequestId,
+            employeeId: leaveRequest.employeeId,
+            description: `Leave request for ${leaveRequest.totalDays} day(s) was approved`,
+            createdAt: new Date(),
+          },
+        }),
       ]);
 
       this.logger.log(
@@ -103,6 +115,18 @@ export class LeaveListener {
           data: {
             pendingDays: newPendingDays,
             remainingDays: newRemainingDays,
+          },
+        }),
+        this.prisma.auditEvent.create({
+          data: {
+            organizationId: event.organizationId,
+            actorUserId: event.approverId,
+            action: 'LEAVE_REJECTED',
+            targetType: 'leave_request',
+            targetId: leaveRequestId,
+            employeeId: leaveRequest.employeeId,
+            description: `Leave request for ${leaveRequest.totalDays} day(s) was rejected`,
+            createdAt: new Date(),
           },
         }),
       ]);

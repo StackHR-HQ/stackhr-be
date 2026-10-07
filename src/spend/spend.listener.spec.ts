@@ -20,6 +20,9 @@ describe('SpendListener', () => {
       reimbursement: {
         create: jest.fn(),
       },
+      auditEvent: {
+        create: jest.fn(),
+      },
       $transaction: jest.fn((promises: any[]) => Promise.all(promises)),
     };
 

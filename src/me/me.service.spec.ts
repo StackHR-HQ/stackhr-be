@@ -44,12 +44,16 @@ describe('MeService', () => {
       },
       compensationRecord: {
         findMany: jest.fn(),
+        findFirst: jest.fn(),
+        create: jest.fn(),
       },
       compensationHistory: {
         findMany: jest.fn(),
+        create: jest.fn(),
       },
       auditEvent: {
         findMany: jest.fn(),
+        create: jest.fn(),
       },
       document: {
         findMany: jest.fn(),
@@ -74,6 +78,38 @@ describe('MeService', () => {
       const result = await service.getProfile(mockUser);
 
       expect(result.profile.id).toBe('emp-100');
+    });
+
+    it('should return employee profile with compensation details and bankAccountLast4 fallback', async () => {
+      prismaMock.employee.findFirst.mockResolvedValue({
+        id: 'emp-100',
+        email: 'jane@acme.com',
+        fullName: 'Jane Doe',
+        accountNumber: '1234567890',
+        bankAccountLast4: null,
+        annualSalaryMinor: 360000000n,
+      });
+      prismaMock.compensationRecord.findFirst.mockResolvedValue({
+        basicSalary: 300000,
+        housingAllowance: 50000,
+        transportAllowance: 20000,
+        otherAllowances: 10000,
+        effectiveFrom: new Date('2026-01-01'),
+      });
+
+      const result = await service.getProfile(mockUser);
+
+      expect(result.profile.bankAccountLast4).toBe('7890');
+      expect(result.profile.compensation).toEqual({
+        annualSalaryMinor: 360000000,
+        currency: 'NGN',
+        payFrequency: 'MONTHLY',
+        basicSalary: 300000,
+        housingAllowance: 50000,
+        transportAllowance: 20000,
+        otherAllowances: 10000,
+        effectiveFrom: '2026-01-01',
+      });
     });
 
     it('should throw NotFoundException if employee record is not found', async () => {
@@ -120,6 +156,7 @@ describe('MeService', () => {
       expect(result.leaveBalances).toHaveLength(1);
       expect(result.leaveBalances[0].usedDays).toBe(5);
       expect(result.leaveBalances[0].upcomingDays).toBe(0);
+      expect(result.leaveBalances[0].approvedFutureDays).toBe(0);
     });
   });
 
@@ -187,6 +224,40 @@ describe('MeService', () => {
         },
       });
       expect(result).toHaveProperty('profile');
+    });
+
+    it('should derive bankAccountLast4 and create PROFILE_UPDATED audit event when accountNumber is updated', async () => {
+      prismaMock.employee.findFirst.mockResolvedValue({
+        id: 'emp-100',
+        organizationId: 'org-123',
+        email: mockUser.email,
+        firstName: 'Jane',
+        lastName: 'Doe',
+      });
+      prismaMock.employee.update.mockResolvedValue({} as any);
+
+      const dto = {
+        accountNumber: '0123456789',
+      };
+
+      await service.updateProfile(mockUser, dto);
+
+      expect(prismaMock.employee.update).toHaveBeenCalledWith({
+        where: { id: 'emp-100' },
+        data: {
+          accountNumber: '0123456789',
+          bankAccountLast4: '6789',
+        },
+      });
+
+      expect(prismaMock.auditEvent.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          organizationId: 'org-123',
+          actorUserId: mockUser.id,
+          action: 'PROFILE_UPDATED',
+          employeeId: 'emp-100',
+        }),
+      });
     });
   });
 

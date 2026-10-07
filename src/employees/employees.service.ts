@@ -75,6 +75,14 @@ export class EmployeesService {
       }
     }
 
+    let employeeNumber = dto.employeeNumber;
+    if (!employeeNumber) {
+      const count = await this.prisma.employee.count({
+        where: { organizationId: orgId },
+      });
+      employeeNumber = `EMP-${String(count + 1).padStart(4, '0')}`;
+    }
+
     const employee = await this.prisma.employee.create({
       data: {
         id: randomUUID(),
@@ -85,12 +93,42 @@ export class EmployeesService {
         jobTitle: dto.jobTitle,
         employmentType: dto.employmentType,
         salaryAmount: dto.salaryAmount,
+        annualSalaryMinor: BigInt((dto.salaryAmount ?? 0) * 1200),
         startDate: new Date(dto.startDate),
         managerId: dto.managerId ?? null,
-        employeeNumber: dto.employeeNumber ?? null,
+        employeeNumber,
         status: 'ACTIVE',
       },
     });
+
+    if (dto.salaryAmount && dto.salaryAmount > 0) {
+      await this.prisma.compensationRecord.create({
+        data: {
+          id: randomUUID(),
+          organizationId: orgId,
+          employeeId: employee.id,
+          effectiveFrom: employee.startDate,
+          basicSalary: dto.salaryAmount,
+          housingAllowance: 0,
+          transportAllowance: 0,
+          otherAllowances: 0,
+          currency: 'NGN',
+          paymentFrequency: 'MONTHLY',
+        },
+      });
+
+      await this.prisma.compensationHistory.create({
+        data: {
+          organizationId: orgId,
+          employeeId: employee.id,
+          annualSalaryMinor: BigInt(dto.salaryAmount * 1200),
+          currency: 'NGN',
+          payFrequency: 'MONTHLY',
+          effectiveDate: employee.startDate,
+          changedByUserId: user.id,
+        },
+      });
+    }
 
     return { employee };
   }
