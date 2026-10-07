@@ -1,11 +1,16 @@
 import {
+  ForbiddenException,
   Inject,
   Injectable,
+  NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { AuthenticatedUser } from '../../auth/auth.types';
-import { requirePeopleOrganization } from '../common/people-access';
+import {
+  PEOPLE_ADMIN_ROLES,
+  requirePeopleOrganization,
+} from '../common/people-access';
 import {
   avatarInitials,
   formatFileSize,
@@ -168,6 +173,53 @@ export class PeopleDocumentsService {
         category: template.category,
         description: template.description,
       }));
+    });
+  }
+
+  async getDocumentFile(
+    user: AuthenticatedUser,
+    documentId: string,
+  ): Promise<{ file: Buffer; fileName: string; mimeType: string }> {
+    if (!user.organizationId) {
+      throw new ForbiddenException('Organization context is required');
+    }
+    const organizationId = user.organizationId;
+    return this.tenant.run(organizationId, async (client) => {
+      const document = await client.document.findFirst({
+        where: { id: documentId, organizationId },
+      });
+      if (!document) {
+        throw new NotFoundException(
+          `Document with ID "${documentId}" not found`,
+        );
+      }
+
+      const isAdmin = (PEOPLE_ADMIN_ROLES as string[]).includes(user.role);
+      if (!isAdmin) {
+        const isOrgDoc =
+          document.scope === 'COMPANY' ||
+          document.scope === 'ORGANIZATION' ||
+          document.visibility === 'All employees' ||
+          document.visibility === 'ALL_EMPLOYEES';
+
+        if (!isOrgDoc) {
+          const employee = await client.employee.findFirst({
+            where: { organizationId, email: user.email },
+          });
+          if (!employee || document.employeeId !== employee.id) {
+            throw new ForbiddenException(
+              'You do not have permission to download this document',
+            );
+          }
+        }
+      }
+
+      const { body } = await this.storage.get(document.storageKey);
+      return {
+        file: body,
+        fileName: document.fileName,
+        mimeType: document.mimeType,
+      };
     });
   }
 }

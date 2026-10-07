@@ -110,6 +110,19 @@ export class SpendService {
     const orgId = this.checkOrgContext(user);
     const employee = await this.getEmployeeForUser(user);
 
+    const existingPending = await this.prisma.salaryAdvance.findFirst({
+      where: {
+        employeeId: employee.id,
+        organizationId: orgId,
+        status: 'PENDING',
+      },
+    });
+    if (existingPending) {
+      throw new BadRequestException(
+        'You already have a pending salary advance request under review',
+      );
+    }
+
     const repaymentMonths = dto.repaymentMonths > 0 ? dto.repaymentMonths : 1;
     const monthlyDeduction = Math.ceil(dto.amount / repaymentMonths);
 
@@ -138,6 +151,136 @@ export class SpendService {
       message: 'Salary advance request submitted and routed for approval',
       salaryAdvance,
       approvalRequest: approvalResult.approvalRequest,
+    };
+  }
+
+  async getExpenseDetails(user: AuthenticatedUser, id: string) {
+    const orgId = this.checkOrgContext(user);
+    const expense = await this.prisma.expense.findFirst({
+      where: { id, organizationId: orgId },
+      include: {
+        employee: {
+          select: { id: true, fullName: true, email: true, department: true },
+        },
+        reimbursements: true,
+      },
+    });
+
+    if (!expense) {
+      throw new NotFoundException(`Expense claim with ID "${id}" not found`);
+    }
+
+    return { expense };
+  }
+
+  async cancelExpense(user: AuthenticatedUser, id: string) {
+    const orgId = this.checkOrgContext(user);
+    const expense = await this.prisma.expense.findFirst({
+      where: { id, organizationId: orgId },
+    });
+
+    if (!expense) {
+      throw new NotFoundException(`Expense claim with ID "${id}" not found`);
+    }
+
+    if (expense.status === 'CANCELLED') {
+      throw new BadRequestException('Expense claim is already cancelled');
+    }
+
+    if (expense.status !== 'PENDING') {
+      throw new BadRequestException(
+        `Cannot cancel an expense claim with status ${expense.status}`,
+      );
+    }
+
+    await this.prisma.approvalRequest.updateMany({
+      where: {
+        subjectTable: 'expense',
+        subjectId: id,
+        status: 'PENDING',
+      },
+      data: { status: 'CANCELLED' },
+    });
+
+    const updated = await this.prisma.expense.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
+
+    return { expense: updated };
+  }
+
+  async cancelSalaryAdvance(user: AuthenticatedUser, id: string) {
+    const orgId = this.checkOrgContext(user);
+    const advance = await this.prisma.salaryAdvance.findFirst({
+      where: { id, organizationId: orgId },
+    });
+
+    if (!advance) {
+      throw new NotFoundException(`Salary advance with ID "${id}" not found`);
+    }
+
+    if (advance.status === 'CANCELLED') {
+      throw new BadRequestException('Salary advance is already cancelled');
+    }
+
+    if (advance.status !== 'PENDING') {
+      throw new BadRequestException(
+        `Cannot cancel a salary advance with status ${advance.status}`,
+      );
+    }
+
+    await this.prisma.approvalRequest.updateMany({
+      where: {
+        subjectTable: 'salary_advance',
+        subjectId: id,
+        status: 'PENDING',
+      },
+      data: { status: 'CANCELLED' },
+    });
+
+    const updated = await this.prisma.salaryAdvance.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
+
+    return { advance: updated, salaryAdvance: updated };
+  }
+
+  async disburseSalaryAdvance(user: AuthenticatedUser, id: string) {
+    const orgId = this.checkOrgContext(user);
+    const advance = await this.prisma.salaryAdvance.findFirst({
+      where: { id, organizationId: orgId },
+    });
+
+    if (!advance) {
+      throw new NotFoundException(`Salary advance with ID "${id}" not found`);
+    }
+
+    if (advance.status === 'DISBURSED') {
+      throw new BadRequestException(
+        'Salary advance has already been disbursed',
+      );
+    }
+
+    if (advance.status !== 'APPROVED') {
+      throw new BadRequestException(
+        `Cannot disburse salary advance with status ${advance.status}. It must be APPROVED first.`,
+      );
+    }
+
+    const updated = await this.prisma.salaryAdvance.update({
+      where: { id },
+      data: {
+        status: 'DISBURSED',
+        disbursedAt: new Date(),
+      },
+    });
+
+    return {
+      message: 'Salary advance marked as disbursed successfully',
+      advance: updated,
+      salaryAdvance: updated,
     };
   }
 
@@ -186,7 +329,10 @@ export class SpendService {
       },
     });
 
-    return { advances };
+    return {
+      advances,
+      salaryAdvances: advances,
+    };
   }
 
   async getReimbursements(user: AuthenticatedUser) {

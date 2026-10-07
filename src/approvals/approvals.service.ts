@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
@@ -20,6 +21,8 @@ import type { ApprovalRequest } from '../../generated/prisma/client';
 
 @Injectable()
 export class ApprovalsService {
+  private readonly logger = new Logger(ApprovalsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
@@ -132,13 +135,19 @@ export class ApprovalsService {
       rawItems,
     );
 
+    const filteredItems = query.status
+      ? items.filter((item) => item.status === query.status)
+      : items;
+
     return {
-      items,
+      items: filteredItems,
       meta: {
-        total,
+        total: query.status ? filteredItems.length : total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(
+          (query.status ? filteredItems.length : total) / limit,
+        ),
       },
     };
   }
@@ -359,6 +368,20 @@ export class ApprovalsService {
 
       // Fallback: if subject record was deleted or not matched, avoid returning null
       if (subjectSummary === null && item.subjectTable) {
+        if (item.status === 'PENDING') {
+          // Asynchronously mark orphan pending approval as CANCELLED in DB
+          void this.prisma.approvalRequest
+            .update({
+              where: { id: item.id },
+              data: { status: 'CANCELLED' },
+            })
+            .catch((err) =>
+              this.logger.warn(
+                `Failed to auto-cancel orphan approval ${item.id}: ${err?.message}`,
+              ),
+            );
+          item.status = 'CANCELLED';
+        }
         const readableType = item.subjectTable
           .replace(/_/g, ' ')
           .replace(/\b\w/g, (c) => c.toUpperCase());

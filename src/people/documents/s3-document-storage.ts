@@ -1,14 +1,19 @@
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type { DocumentStorage } from './document-storage';
 
 /**
  * Private S3-compatible storage (AWS S3, Cloudflare R2, MinIO). Objects are
- * never made public; downloads must go through short-lived signed URLs.
+ * never made public; downloads must go through authenticated streams or signed URLs.
  */
 @Injectable()
 export class S3DocumentStorage implements DocumentStorage {
@@ -27,6 +32,36 @@ export class S3DocumentStorage implements DocumentStorage {
         ContentType: input.contentType,
       }),
     );
+  }
+
+  async get(key: string): Promise<{ body: Buffer; contentType: string }> {
+    try {
+      const response = await this.getClient().send(
+        new GetObjectCommand({
+          Bucket: this.bucket(),
+          Key: key,
+        }),
+      );
+      if (!response.Body) {
+        throw new NotFoundException(
+          'Document file content not found in storage',
+        );
+      }
+      const byteArray = await (response.Body as any).transformToByteArray();
+      return {
+        body: Buffer.from(byteArray),
+        contentType: response.ContentType ?? 'application/octet-stream',
+      };
+    } catch (error: any) {
+      if (
+        error?.name === 'NoSuchKey' ||
+        error?.name === 'NotFound' ||
+        error?.$metadata?.httpStatusCode === 404
+      ) {
+        throw new NotFoundException('Document file not found in storage');
+      }
+      throw error;
+    }
   }
 
   async delete(key: string): Promise<void> {
