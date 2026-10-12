@@ -187,7 +187,8 @@ describe('ComplianceService', () => {
     it('should return compliance alerts for organization', async () => {
       (prisma.employee.findMany as jest.Mock)
         .mockResolvedValueOnce([{ id: 'emp-1', fullName: 'No TIN' }])
-        .mockResolvedValueOnce([{ id: 'emp-2', fullName: 'No RSA' }]);
+        .mockResolvedValueOnce([{ id: 'emp-2', fullName: 'No RSA' }])
+        .mockResolvedValueOnce([{ id: 'emp-3', fullName: 'No PFA' }]);
 
       const mockUser: AuthenticatedUser = {
         id: 'u-1',
@@ -200,13 +201,15 @@ describe('ComplianceService', () => {
 
       const result = await service.getAlerts(mockUser);
 
-      expect(result.alerts).toHaveLength(3); // MISSING_TAX_ID, MISSING_PENSION_RSA, UPCOMING_STATUTORY_DEADLINE
+      expect(result.alerts).toHaveLength(4); // MISSING_TAX_ID, MISSING_PENSION_RSA, MISSING_PFA_CODE, UPCOMING_STATUTORY_DEADLINE
       expect(result.alerts[0].count).toBe(1);
       expect(result.alerts[1].count).toBe(1);
+      expect(result.alerts[2].count).toBe(1);
     });
 
     it('should exclude alerts when count is 0', async () => {
       (prisma.employee.findMany as jest.Mock)
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
