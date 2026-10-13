@@ -1836,6 +1836,58 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Task marked completed\",\n    \"employeeId\": \"emp-123\",\n    \"task\": {\n      \"id\": \"task-eng-1\",\n      \"completed\": true,\n      \"completedAt\": \"2026-09-09T10:45:00.000Z\"\n    }\n  }\n}"
             }
           ]
+        },
+        {
+          "name": "Complete Employee Onboarding",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/people/onboarding/employees/{{employeeId}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "people",
+                "onboarding",
+                "employees",
+                "{{employeeId}}",
+                "complete"
+              ]
+            },
+            "description": "Marks an employee onboarding checklist complete and transitions status to ACTIVE."
+          },
+          "response": [
+            {
+              "name": "200 OK - Onboarding Completed",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/onboarding/employees/{{employeeId}}/complete"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Onboarding completed and employee activated successfully\",\n  \"employeeId\": \"emp-1\",\n  \"status\": \"ACTIVE\"\n}"
+            }
+          ]
         }
       ]
     },
@@ -3009,6 +3061,55 @@
           ]
         },
         {
+          "name": "List All Employee Compensations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/compensation",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "compensation"
+              ]
+            },
+            "description": "Returns all employees active compensation breakdown in the organization."
+          },
+          "response": [
+            {
+              "name": "200 OK - All Compensations",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/payroll/compensation"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"compensations\": [\n      {\n        \"employeeId\": \"emp-1\",\n        \"fullName\": \"Ada Okafor\",\n        \"email\": \"ada@acme.com\",\n        \"jobTitle\": \"Software Engineer\",\n        \"department\": \"Engineering\",\n        \"status\": \"ACTIVE\",\n        \"annualSalaryMinor\": 1200000000,\n        \"currency\": \"NGN\",\n        \"paymentFrequency\": \"MONTHLY\",\n        \"basicSalary\": 600000,\n        \"housingAllowance\": 250000,\n        \"transportAllowance\": 100000,\n        \"otherAllowances\": 50000,\n        \"grossMonthlySalary\": 1000000,\n        \"effectiveFrom\": \"2026-01-01\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
           "name": "Get Compensation History",
           "request": {
             "method": "GET",
@@ -3375,6 +3476,66 @@
                 }
               ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"payDate\": \"2026-09-25\",\n      \"status\": \"RECONCILED\",\n      \"items\": [],\n      \"payslips\": []\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Generated Payslips",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/payslips?payrollRunId={{runId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "payslips"
+              ],
+              "query": [
+                {
+                  "key": "payrollRunId",
+                  "value": "{{runId}}"
+                },
+                {
+                  "key": "employeeId",
+                  "value": "{{employeeId}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lists all employee payslips generated for a specific payroll run or employee."
+          },
+          "response": [
+            {
+              "name": "200 OK - Payslips List",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/payroll/payslips?payrollRunId={{runId}}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"payslips\": [\n      {\n        \"id\": \"slip-1\",\n        \"organizationId\": \"org-123\",\n        \"payrollRunId\": \"run-1\",\n        \"employeeId\": \"emp-1\",\n        \"periodMonth\": 10,\n        \"periodYear\": 2026,\n        \"grossSalary\": 1000000,\n        \"netSalary\": 771900,\n        \"breakdownJson\": \"{\\\"basicSalary\\\":600000,\\\"grossSalary\\\":1000000,\\\"taxDeduction\\\":148100,\\\"pensionDeduction\\\":80000,\\\"netSalary\\\":771900}\",\n        \"generatedAt\": \"2026-10-12T12:00:00.000Z\",\n        \"employee\": {\n          \"id\": \"emp-1\",\n          \"fullName\": \"Ada Okafor\",\n          \"email\": \"ada@acme.com\",\n          \"department\": \"Engineering\",\n          \"jobTitle\": \"Software Engineer\"\n        }\n      }\n    ]\n  }\n}"
             }
           ]
         }
@@ -3829,6 +3990,61 @@
       "description": "Statutory compliance rule sets, PAYE progressive tax bands, pension basis, NHF opt-in, and rent relief configuration managed by StackHR Admin users.",
       "item": [
         {
+          "name": "Get Active Tax Rule Set (Tenant)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/compliance/active-rule-set?country=NG",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "compliance",
+                "active-rule-set"
+              ],
+              "query": [
+                {
+                  "key": "country",
+                  "value": "NG"
+                }
+              ]
+            },
+            "description": "Tenant read-only endpoint returning the active tax rule set and statutory contribution rates."
+          },
+          "response": [
+            {
+              "name": "200 OK - Active Tax Rules",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/compliance/active-rule-set?country=NG"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"ng-nta-2026-v1\",\n    \"country\": \"NG\",\n    \"name\": \"Nigeria Tax Act 2026 (NTAA)\",\n    \"effectiveFrom\": \"2026-01-01T00:00:00.000Z\",\n    \"rentReliefPercentage\": 0.2,\n    \"rentReliefCap\": 500000,\n    \"pensionEmployeeRate\": 0.08,\n    \"pensionEmployerRate\": 0.1,\n    \"nhfRate\": 0.025,\n    \"taxFreeThreshold\": 800000\n  }\n}"
+            }
+          ]
+        },
+        {
           "name": "List Tax Rule Sets",
           "request": {
             "method": "GET",
@@ -3865,7 +4081,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": [\n    {\n      \"id\": \"TRS-NTA-2026\",\n      \"country\": \"NG\",\n      \"name\": \"Nigeria Tax Act 2025/2026 (NTA)\",\n      \"effectiveFrom\": \"2026-01-01T00:00:00.000Z\",\n      \"effectiveTo\": null,\n      \"isDefault\": true,\n      \"rentReliefPercentage\": 0.2,\n      \"rentReliefCap\": 500000,\n      \"pensionEmployeeRate\": 0.08,\n      \"pensionEmployerRate\": 0.1,\n      \"pensionBasisFields\": \"BASIC,HOUSING,TRANSPORT\",\n      \"nhfRate\": 0.025,\n      \"nhfBasisField\": \"BASIC\",\n      \"taxFreeThreshold\": 800000,\n      \"taxRules\": [\n        {\n          \"id\": \"TR-NTA-1\",\n          \"bandOrder\": 1,\n          \"bandName\": \"First \u20a6800,000\",\n          \"lowerLimit\": 0,\n          \"upperLimit\": 800000,\n          \"taxRate\": 0\n        },\n        {\n          \"id\": \"TR-NTA-2\",\n          \"bandOrder\": 2,\n          \"bandName\": \"Next \u20a62,200,000\",\n          \"lowerLimit\": 800000,\n          \"upperLimit\": 3000000,\n          \"taxRate\": 0.15\n        }\n      ]\n    }\n  ]\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": [\n    {\n      \"id\": \"TRS-NTA-2026\",\n      \"country\": \"NG\",\n      \"name\": \"Nigeria Tax Act 2025/2026 (NTA)\",\n      \"effectiveFrom\": \"2026-01-01T00:00:00.000Z\",\n      \"effectiveTo\": null,\n      \"isDefault\": true,\n      \"rentReliefPercentage\": 0.2,\n      \"rentReliefCap\": 500000,\n      \"pensionEmployeeRate\": 0.08,\n      \"pensionEmployerRate\": 0.1,\n      \"pensionBasisFields\": \"BASIC,HOUSING,TRANSPORT\",\n      \"nhfRate\": 0.025,\n      \"nhfBasisField\": \"BASIC\",\n      \"taxFreeThreshold\": 800000,\n      \"taxRules\": [\n        {\n          \"id\": \"TR-NTA-1\",\n          \"bandOrder\": 1,\n          \"bandName\": \"First ₦800,000\",\n          \"lowerLimit\": 0,\n          \"upperLimit\": 800000,\n          \"taxRate\": 0\n        },\n        {\n          \"id\": \"TR-NTA-2\",\n          \"bandOrder\": 2,\n          \"bandName\": \"Next ₦2,200,000\",\n          \"lowerLimit\": 800000,\n          \"upperLimit\": 3000000,\n          \"taxRate\": 0.15\n        }\n      ]\n    }\n  ]\n}"
             }
           ]
         },
@@ -3923,7 +4139,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"country\": \"NG\",\n  \"name\": \"Nigeria Tax Act 2027 Amendment\",\n  \"effectiveFrom\": \"2027-01-01T00:00:00.000Z\",\n  \"isDefault\": true,\n  \"rentReliefPercentage\": 0.20,\n  \"rentReliefCap\": 500000,\n  \"pensionEmployeeRate\": 0.08,\n  \"pensionEmployerRate\": 0.10,\n  \"pensionBasisFields\": \"BASIC,HOUSING,TRANSPORT\",\n  \"nhfRate\": 0.025,\n  \"nhfBasisField\": \"BASIC\",\n  \"taxFreeThreshold\": 800000,\n  \"taxRules\": [\n    {\n      \"bandOrder\": 1,\n      \"bandName\": \"First \u20a6800,000\",\n      \"lowerLimit\": 0,\n      \"upperLimit\": 800000,\n      \"taxRate\": 0.0\n    },\n    {\n      \"bandOrder\": 2,\n      \"bandName\": \"Next \u20a62,200,000\",\n      \"lowerLimit\": 800000,\n      \"upperLimit\": 3000000,\n      \"taxRate\": 0.15\n    }\n  ]\n}"
+              "raw": "{\n  \"country\": \"NG\",\n  \"name\": \"Nigeria Tax Act 2027 Amendment\",\n  \"effectiveFrom\": \"2027-01-01T00:00:00.000Z\",\n  \"isDefault\": true,\n  \"rentReliefPercentage\": 0.20,\n  \"rentReliefCap\": 500000,\n  \"pensionEmployeeRate\": 0.08,\n  \"pensionEmployerRate\": 0.10,\n  \"pensionBasisFields\": \"BASIC,HOUSING,TRANSPORT\",\n  \"nhfRate\": 0.025,\n  \"nhfBasisField\": \"BASIC\",\n  \"taxFreeThreshold\": 800000,\n  \"taxRules\": [\n    {\n      \"bandOrder\": 1,\n      \"bandName\": \"First ₦800,000\",\n      \"lowerLimit\": 0,\n      \"upperLimit\": 800000,\n      \"taxRate\": 0.0\n    },\n    {\n      \"bandOrder\": 2,\n      \"bandName\": \"Next ₦2,200,000\",\n      \"lowerLimit\": 800000,\n      \"upperLimit\": 3000000,\n      \"taxRate\": 0.15\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/stackhr-admin/compliance/rule-sets",

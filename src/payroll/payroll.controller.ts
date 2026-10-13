@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { RequireRoles, CurrentUser } from '../auth/auth.decorators';
@@ -27,6 +35,12 @@ export class PayrollController {
     @Body() dto: SetCompensationDto,
   ) {
     return this.payrollService.setCompensation(user, dto);
+  }
+
+  @Get('compensation')
+  @RequireRoles(...ADMIN_ROLES)
+  getAllCompensations(@CurrentUser() user: AuthenticatedUser) {
+    return this.payrollService.getAllCompensations(user);
   }
 
   @Get('compensation/:employeeId')
@@ -105,5 +119,15 @@ export class PayrollController {
     @Param('id') runId: string,
   ) {
     return this.payrollService.getRunById(user, runId);
+  }
+
+  @Get('payslips')
+  @RequireRoles(...ADMIN_ROLES)
+  getPayslips(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('payrollRunId') payrollRunId?: string,
+    @Query('employeeId') employeeId?: string,
+  ) {
+    return this.payrollService.getPayslips(user, { payrollRunId, employeeId });
   }
 }

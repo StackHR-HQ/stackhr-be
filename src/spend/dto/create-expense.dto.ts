@@ -28,4 +28,12 @@ export class CreateExpenseDto {
   @IsOptional()
   @IsUrl()
   receiptUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  expenseDate?: string;
+
+  @IsString()
+  @IsOptional()
+  paymentMethod?: string;
 }

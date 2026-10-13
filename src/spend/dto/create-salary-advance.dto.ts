@@ -12,4 +12,8 @@ export class CreateSalaryAdvanceDto {
   @IsString()
   @IsOptional()
   reason?: string;
+
+  @IsString()
+  @IsOptional()
+  currency?: string;
 }
