@@ -30,8 +30,9 @@ export interface LeaveRequestWithEmployee {
 }
 
 function parseDecision(value: unknown): 'APPROVED' | 'REJECTED' {
-  if (value === 'approved') return 'APPROVED';
-  if (value === 'rejected') return 'REJECTED';
+  const normalized = typeof value === 'string' ? value.toLowerCase() : value;
+  if (normalized === 'approved') return 'APPROVED';
+  if (normalized === 'rejected') return 'REJECTED';
   const message = 'status must be approved or rejected';
   throw new UnprocessableEntityException({
     code: 'VALIDATION_ERROR',

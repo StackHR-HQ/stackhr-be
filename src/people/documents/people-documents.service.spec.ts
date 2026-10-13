@@ -1,5 +1,7 @@
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { createInMemoryTenant } from '../testing/in-memory-tenant';
-import { adminUser, employeeRow } from '../testing/fixtures';
+import { adminUser, employeeRow, ORG_A } from '../testing/fixtures';
+import type { AuthenticatedUser } from '../../auth/auth.types';
 import type { DocumentStorage } from './document-storage';
 import { PeopleDocumentsService } from './people-documents.service';
 
@@ -9,6 +11,13 @@ function createInMemoryStorage() {
     put: ({ key, body, contentType }) => {
       objects.set(key, { body, contentType });
       return Promise.resolve();
+    },
+    get: (key) => {
+      const obj = objects.get(key);
+      if (!obj) {
+        return Promise.reject(new Error('Document not found in storage'));
+      }
+      return Promise.resolve(obj);
     },
     delete: (key) => {
       objects.delete(key);
@@ -139,6 +148,88 @@ describe('PeopleDocumentsService', () => {
           description: 'Standard offer',
         },
       ]);
+    });
+  });
+
+  describe('getDocumentFile', () => {
+    const employeeUser = (email = 'ada@acme.test'): AuthenticatedUser => ({
+      id: 'user_ada',
+      name: 'Ada Okafor',
+      email,
+      userType: 'BUSINESS',
+      role: 'EMPLOYEE',
+      organizationId: ORG_A,
+    });
+
+    it('allows admin to download company and employee documents', async () => {
+      const file = pdfFile(1024);
+      const upload = await service.uploadDocument(adminUser(), file, {
+        name: 'Company Handbook',
+        category: 'Policy',
+        scope: 'company',
+      });
+
+      const downloaded = await service.getDocumentFile(
+        adminUser(),
+        upload.document.id,
+      );
+      expect(downloaded.file).toEqual(file.buffer);
+      expect(downloaded.mimeType).toBe('application/pdf');
+      expect(downloaded.fileName).toBe('handbook.pdf');
+    });
+
+    it('allows employee to download company documents', async () => {
+      const file = pdfFile(1024);
+      const upload = await service.uploadDocument(adminUser(), file, {
+        name: 'Company Handbook',
+        category: 'Policy',
+        scope: 'company',
+      });
+
+      const downloaded = await service.getDocumentFile(
+        employeeUser(),
+        upload.document.id,
+      );
+      expect(downloaded.file).toEqual(file.buffer);
+    });
+
+    it('allows employee to download their own employee document', async () => {
+      const file = pdfFile(512);
+      const upload = await service.uploadDocument(adminUser(), file, {
+        name: 'Ada Contract',
+        category: 'Contract',
+        scope: 'employee',
+        employeeId: 'emp_ada',
+      });
+
+      const downloaded = await service.getDocumentFile(
+        employeeUser('ada@acme.test'),
+        upload.document.id,
+      );
+      expect(downloaded.file).toEqual(file.buffer);
+    });
+
+    it('forbids employee from downloading another employee document', async () => {
+      const file = pdfFile(512);
+      const upload = await service.uploadDocument(adminUser(), file, {
+        name: 'Ada Contract',
+        category: 'Contract',
+        scope: 'employee',
+        employeeId: 'emp_ada',
+      });
+
+      await expect(
+        service.getDocumentFile(
+          employeeUser('other@acme.test'),
+          upload.document.id,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws NotFoundException if document does not exist', async () => {
+      await expect(
+        service.getDocumentFile(adminUser(), 'non_existent'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

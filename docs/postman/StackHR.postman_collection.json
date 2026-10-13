@@ -2745,6 +2745,217 @@
               "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Reimbursement claim is already paid\",\n  \"error\": \"Bad Request\"\n}"
             }
           ]
+        },
+        {
+          "name": "Get Expense Claim Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spend/expenses/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "expenses",
+                ":id"
+              ]
+            },
+            "description": "Fetch detailed information for a specific expense claim, including linked reimbursement and employee details."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"expense\": {\n      \"id\": \"exp-123\",\n      \"employeeId\": \"emp-1\",\n      \"category\": \"Travel\",\n      \"amount\": 25000,\n      \"currency\": \"NGN\",\n      \"description\": \"Client visit taxi fare\",\n      \"receiptUrl\": \"https://storage.stackhr.app/receipts/exp-123.pdf\",\n      \"status\": \"PENDING\",\n      \"employee\": {\n        \"id\": \"emp-1\",\n        \"fullName\": \"Jane Doe\",\n        \"email\": \"jane@acme.com\",\n        \"jobTitle\": \"Software Engineer\"\n      },\n      \"reimbursement\": null\n    }\n  }\n}"
+            },
+            {
+              "name": "Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Expense with ID \\\"exp-123\\\" not found\",\n  \"error\": \"Not Found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Cancel Expense Claim",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spend/expenses/:id/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "expenses",
+                ":id",
+                "cancel"
+              ]
+            },
+            "description": "Cancel a pending expense claim. Also cancels any linked approval request."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"expense\": {\n      \"id\": \"exp-123\",\n      \"status\": \"CANCELLED\"\n    }\n  }\n}"
+            },
+            {
+              "name": "Bad Request - Cannot Cancel",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Cannot cancel an expense claim with status APPROVED\",\n  \"error\": \"Bad Request\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Cancel Salary Advance",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spend/advances/:id/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "advances",
+                ":id",
+                "cancel"
+              ]
+            },
+            "description": "Cancel a pending salary advance request. Also cancels any linked approval request."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"salaryAdvance\": {\n      \"id\": \"adv-123\",\n      \"status\": \"CANCELLED\"\n    }\n  }\n}"
+            },
+            {
+              "name": "Bad Request - Cannot Cancel",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Cannot cancel a salary advance with status APPROVED\",\n  \"error\": \"Bad Request\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Disburse Salary Advance (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spend/advances/:id/disburse",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "advances",
+                ":id",
+                "disburse"
+              ]
+            },
+            "description": "Mark an approved salary advance as disbursed (Admin only). Sets status to DISBURSED and records disbursedAt timestamp."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Salary advance marked as disbursed successfully\",\n    \"salaryAdvance\": {\n      \"id\": \"adv-123\",\n      \"status\": \"DISBURSED\",\n      \"disbursedAt\": \"2026-10-07T12:00:00.000Z\"\n    }\n  }\n}"
+            },
+            {
+              "name": "Bad Request - Not Approved",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Cannot disburse salary advance with status PENDING. It must be APPROVED first.\",\n  \"error\": \"Bad Request\"\n}"
+            }
+          ]
         }
       ]
     },
@@ -4389,6 +4600,75 @@
                 }
               },
               "response": []
+            },
+            {
+              "name": "Download Document",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/documents/:id/download",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "documents",
+                    ":id",
+                    "download"
+                  ]
+                },
+                "description": "Download a document file. Accessible by admins for any document in the organization, and by employees for their own assigned documents or company-wide documents."
+              },
+              "response": [
+                {
+                  "name": "Success",
+                  "status": "OK",
+                  "code": 200,
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/pdf"
+                    },
+                    {
+                      "key": "Content-Disposition",
+                      "value": "attachment; filename=\"offer-letter.pdf\""
+                    }
+                  ],
+                  "body": "<binary file stream>"
+                },
+                {
+                  "name": "Forbidden",
+                  "status": "Forbidden",
+                  "code": 403,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"statusCode\": 403,\n  \"message\": \"You do not have permission to download this document\",\n  \"error\": \"Forbidden\"\n}"
+                },
+                {
+                  "name": "Not Found",
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Document with ID \\\"doc-123\\\" not found\",\n  \"error\": \"Not Found\"\n}"
+                }
+              ]
             }
           ]
         },
