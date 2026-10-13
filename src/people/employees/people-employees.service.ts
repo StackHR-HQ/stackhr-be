@@ -675,6 +675,15 @@ export class PeopleEmployeesService {
         id: entry.id,
         effectiveDate: toDateOnly(entry.effectiveDate),
         annualSalaryMinor: Number(entry.annualSalaryMinor),
+        previousSalary:
+          entry.previousSalary !== undefined && entry.previousSalary !== null
+            ? Number(entry.previousSalary)
+            : 0,
+        newSalary:
+          entry.newSalary !== undefined && entry.newSalary !== null
+            ? Number(entry.newSalary)
+            : 0,
+        reason: entry.reason ?? null,
         currency: entry.currency,
         payFrequency: entry.payFrequency,
       }));

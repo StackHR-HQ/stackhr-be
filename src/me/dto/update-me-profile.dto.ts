@@ -116,6 +116,11 @@ export class UpdateMeProfileDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(10)
+  pfaCode?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(20)
   pensionRsaNumber?: string;
 }

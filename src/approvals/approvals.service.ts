@@ -135,19 +135,13 @@ export class ApprovalsService {
       rawItems,
     );
 
-    const filteredItems = query.status
-      ? items.filter((item) => item.status === query.status)
-      : items;
-
     return {
-      items: filteredItems,
+      items,
       meta: {
-        total: query.status ? filteredItems.length : total,
+        total,
         page,
         limit,
-        totalPages: Math.ceil(
-          (query.status ? filteredItems.length : total) / limit,
-        ),
+        totalPages: Math.ceil(total / limit),
       },
     };
   }
@@ -380,7 +374,6 @@ export class ApprovalsService {
                 `Failed to auto-cancel orphan approval ${item.id}: ${err?.message}`,
               ),
             );
-          item.status = 'CANCELLED';
         }
         const readableType = item.subjectTable
           .replace(/_/g, ' ')

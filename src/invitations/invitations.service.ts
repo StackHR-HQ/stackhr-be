@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
@@ -11,10 +12,17 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { USER_TYPES } from '../auth/auth.constants';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
+import { EmailService } from '../notifications/email.service';
+import { invitationEmail } from '../notifications/email-templates';
 
 @Injectable()
 export class InvitationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(InvitationsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   private checkOrgContext(user: AuthenticatedUser): string {
     if (!user.organizationId) {
@@ -54,6 +62,35 @@ export class InvitationsService {
         inviterId: user.id,
       },
     });
+
+    const frontendBase =
+      (process.env.FRONTEND_URL ?? '')
+        .split(',')[0]
+        .trim()
+        .replace(/\/+$/, '') || 'https://app.stackhr.app';
+    const inviteLink = `${frontendBase}/accept-invitation?invitationId=${invitation.id}`;
+
+    void this.prisma.organization
+      .findUnique({
+        where: { id: orgId },
+        select: { name: true },
+      })
+      .then((org) => {
+        const orgName = org?.name ? ` to join ${org.name}` : '';
+        const emailPayload = invitationEmail(dto.email, inviteLink);
+        return this.emailService.send({
+          to: dto.email,
+          subject: `You have been invited${orgName} on StackHR`,
+          html: emailPayload.html,
+          text: emailPayload.text,
+          idempotencyKey: `admin-invitation:${invitation.id}`,
+        });
+      })
+      .catch((err: any) => {
+        this.logger.warn(
+          `Failed to dispatch invitation email to ${dto.email}: ${err?.message ?? err}`,
+        );
+      });
 
     return { invitation };
   }
@@ -199,7 +236,10 @@ export class InvitationsService {
           status: 'ACTIVE',
         },
       });
-    } else if (existingEmployee.status === 'PENDING_INVITATION') {
+    } else if (
+      existingEmployee.status === 'PENDING_INVITATION' ||
+      existingEmployee.status === 'ONBOARDING'
+    ) {
       await this.prisma.employee.update({
         where: { id: existingEmployee.id },
         data: { status: 'ACTIVE' },

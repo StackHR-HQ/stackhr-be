@@ -396,7 +396,7 @@ export class ComplianceService {
 
   async getAlerts(user: AuthenticatedUser) {
     const orgId = this.checkOrgContext(user);
-    const [missingTin, missingPensionRsa] = await Promise.all([
+    const [missingTin, missingPensionRsa, missingPfaCode] = await Promise.all([
       this.prisma.employee.findMany({
         where: {
           organizationId: orgId,
@@ -410,6 +410,14 @@ export class ComplianceService {
           organizationId: orgId,
           status: 'ACTIVE',
           OR: [{ pensionRsaNumber: null }, { pensionRsaNumber: '' }],
+        },
+        select: { id: true, fullName: true, email: true, department: true },
+      }),
+      this.prisma.employee.findMany({
+        where: {
+          organizationId: orgId,
+          status: 'ACTIVE',
+          OR: [{ pfaCode: null }, { pfaCode: '' }],
         },
         select: { id: true, fullName: true, email: true, department: true },
       }),
@@ -441,6 +449,18 @@ export class ComplianceService {
           missingPensionRsa.length +
           ' active employees are missing a Pension RSA Number',
         affectedEmployees: missingPensionRsa,
+      });
+    }
+
+    if (missingPfaCode.length > 0) {
+      alerts.push({
+        type: 'MISSING_PFA_CODE',
+        severity: 'MEDIUM',
+        count: missingPfaCode.length,
+        message:
+          missingPfaCode.length +
+          ' active employees are missing a Pension PFA Code',
+        affectedEmployees: missingPfaCode,
       });
     }
 

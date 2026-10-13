@@ -1836,6 +1836,58 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Task marked completed\",\n    \"employeeId\": \"emp-123\",\n    \"task\": {\n      \"id\": \"task-eng-1\",\n      \"completed\": true,\n      \"completedAt\": \"2026-09-09T10:45:00.000Z\"\n    }\n  }\n}"
             }
           ]
+        },
+        {
+          "name": "Complete Employee Onboarding",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/people/onboarding/employees/{{employeeId}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "people",
+                "onboarding",
+                "employees",
+                "{{employeeId}}",
+                "complete"
+              ]
+            },
+            "description": "Marks an employee onboarding checklist complete and transitions status to ACTIVE."
+          },
+          "response": [
+            {
+              "name": "200 OK - Onboarding Completed",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/onboarding/employees/{{employeeId}}/complete"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Onboarding completed and employee activated successfully\",\n  \"employeeId\": \"emp-1\",\n  \"status\": \"ACTIVE\"\n}"
+            }
+          ]
         }
       ]
     },
@@ -3009,6 +3061,55 @@
           ]
         },
         {
+          "name": "List All Employee Compensations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/compensation",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "compensation"
+              ]
+            },
+            "description": "Returns all employees active compensation breakdown in the organization."
+          },
+          "response": [
+            {
+              "name": "200 OK - All Compensations",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/payroll/compensation"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"compensations\": [\n      {\n        \"employeeId\": \"emp-1\",\n        \"fullName\": \"Ada Okafor\",\n        \"email\": \"ada@acme.com\",\n        \"jobTitle\": \"Software Engineer\",\n        \"department\": \"Engineering\",\n        \"status\": \"ACTIVE\",\n        \"annualSalaryMinor\": 1200000000,\n        \"currency\": \"NGN\",\n        \"paymentFrequency\": \"MONTHLY\",\n        \"basicSalary\": 600000,\n        \"housingAllowance\": 250000,\n        \"transportAllowance\": 100000,\n        \"otherAllowances\": 50000,\n        \"grossMonthlySalary\": 1000000,\n        \"effectiveFrom\": \"2026-01-01\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
           "name": "Get Compensation History",
           "request": {
             "method": "GET",
@@ -3375,6 +3476,66 @@
                 }
               ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"payDate\": \"2026-09-25\",\n      \"status\": \"RECONCILED\",\n      \"items\": [],\n      \"payslips\": []\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Generated Payslips",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/payslips?payrollRunId={{runId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "payslips"
+              ],
+              "query": [
+                {
+                  "key": "payrollRunId",
+                  "value": "{{runId}}"
+                },
+                {
+                  "key": "employeeId",
+                  "value": "{{employeeId}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lists all employee payslips generated for a specific payroll run or employee."
+          },
+          "response": [
+            {
+              "name": "200 OK - Payslips List",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/payroll/payslips?payrollRunId={{runId}}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"payslips\": [\n      {\n        \"id\": \"slip-1\",\n        \"organizationId\": \"org-123\",\n        \"payrollRunId\": \"run-1\",\n        \"employeeId\": \"emp-1\",\n        \"periodMonth\": 10,\n        \"periodYear\": 2026,\n        \"grossSalary\": 1000000,\n        \"netSalary\": 771900,\n        \"breakdownJson\": \"{\\\"basicSalary\\\":600000,\\\"grossSalary\\\":1000000,\\\"taxDeduction\\\":148100,\\\"pensionDeduction\\\":80000,\\\"netSalary\\\":771900}\",\n        \"generatedAt\": \"2026-10-12T12:00:00.000Z\",\n        \"employee\": {\n          \"id\": \"emp-1\",\n          \"fullName\": \"Ada Okafor\",\n          \"email\": \"ada@acme.com\",\n          \"department\": \"Engineering\",\n          \"jobTitle\": \"Software Engineer\"\n        }\n      }\n    ]\n  }\n}"
             }
           ]
         }
@@ -3828,6 +3989,61 @@
       "name": "Compliance & Tax Engine",
       "description": "Statutory compliance rule sets, PAYE progressive tax bands, pension basis, NHF opt-in, and rent relief configuration managed by StackHR Admin users.",
       "item": [
+        {
+          "name": "Get Active Tax Rule Set (Tenant)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/compliance/active-rule-set?country=NG",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "compliance",
+                "active-rule-set"
+              ],
+              "query": [
+                {
+                  "key": "country",
+                  "value": "NG"
+                }
+              ]
+            },
+            "description": "Tenant read-only endpoint returning the active tax rule set and statutory contribution rates."
+          },
+          "response": [
+            {
+              "name": "200 OK - Active Tax Rules",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/compliance/active-rule-set?country=NG"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"ng-nta-2026-v1\",\n    \"country\": \"NG\",\n    \"name\": \"Nigeria Tax Act 2026 (NTAA)\",\n    \"effectiveFrom\": \"2026-01-01T00:00:00.000Z\",\n    \"rentReliefPercentage\": 0.2,\n    \"rentReliefCap\": 500000,\n    \"pensionEmployeeRate\": 0.08,\n    \"pensionEmployerRate\": 0.1,\n    \"nhfRate\": 0.025,\n    \"taxFreeThreshold\": 800000\n  }\n}"
+            }
+          ]
+        },
         {
           "name": "List Tax Rule Sets",
           "request": {
@@ -4956,6 +5172,586 @@
                 }
               ],
               "body": "{\n  \"statusCode\": 401,\n  \"message\": \"Authentication is required\",\n  \"error\": \"Unauthorized\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pension & Statutory Remittance (PenCentral)",
+      "description": "Automated electronic pension remittance and PenCom statutory compliance integration via PenCentral Partner API.",
+      "item": [
+        {
+          "name": "Get Registered PFAs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/pfas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "pfas"
+              ]
+            },
+            "description": "Retrieve list of official Nigerian Pension Fund Administrators (PFAs) with their registered PenCom 3-digit codes."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"pfas\": [\n      {\n        \"code\": \"001\",\n        \"name\": \"Leadway Pensure PFA\"\n      },\n      {\n        \"code\": \"021\",\n        \"name\": \"ARM Pension Managers\"\n      },\n      {\n        \"code\": \"022\",\n        \"name\": \"Stanbic IBTC Pension Managers\"\n      },\n      {\n        \"code\": \"026\",\n        \"name\": \"Access Pensions Limited\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Employer PenCentral Config",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "config"
+              ]
+            },
+            "description": "Retrieve organization's PenCentral configuration including employer_code. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"org_123\",\n    \"name\": \"Acme Nigeria Ltd\",\n    \"penCentralEmployerCode\": \"EMP001\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Employer PenCentral Config",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"penCentralEmployerCode\": \"EMP001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/pension/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "config"
+              ]
+            },
+            "description": "Update organization's PenCentral employer code. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"PenCentral employer code updated successfully\",\n  \"data\": {\n    \"penCentralEmployerCode\": \"EMP001\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Remittance Schedule from Payroll",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/from-payroll/{{payrollRunId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "from-payroll",
+                "{{payrollRunId}}"
+              ]
+            },
+            "description": "Generate a DRAFT PenCentral remittance schedule from an approved or executed payroll run. Automatically aggregates statutory employee (8%) and employer (10%) pension contributions per employee. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (201 Created)",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Draft pension remittance schedule created successfully\",\n  \"data\": {\n    \"id\": \"sch_01928374\",\n    \"organizationId\": \"org_123\",\n    \"payrollRunId\": \"run_456\",\n    \"periodMonth\": \"September\",\n    \"periodYear\": 2026,\n    \"employerCode\": \"EMP001\",\n    \"totalEmployeePension\": 80000,\n    \"totalEmployerPension\": 100000,\n    \"totalAmount\": 180000,\n    \"employeeCount\": 10,\n    \"status\": \"DRAFT\"\n  }\n}"
+            },
+            {
+              "name": "Validation Error - Missing RSA/PFA (400 Bad Request)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Cannot create pension remittance schedule: Some employees have missing or invalid pension details\",\n  \"invalidEmployees\": [\n    {\n      \"employeeId\": \"emp_99\",\n      \"fullName\": \"John Doe\",\n      \"missing\": [\n        \"pensionRsaNumber\",\n        \"pfaCode\"\n      ]\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Remittance Schedules",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules?periodYear=2026",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules"
+              ],
+              "query": [
+                {
+                  "key": "periodYear",
+                  "value": "2026"
+                }
+              ]
+            },
+            "description": "List all pension remittance schedules for the active organization. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"schedules\": [\n      {\n        \"id\": \"sch_01928374\",\n        \"periodMonth\": \"September\",\n        \"periodYear\": 2026,\n        \"totalAmount\": 180000,\n        \"status\": \"PAID\",\n        \"virtualAccountNumber\": \"9990001234\",\n        \"receiptId\": \"rcp_rls2t3\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Remittance Schedule by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}"
+              ]
+            },
+            "description": "Retrieve details of a pension remittance schedule by ID. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"sch_01928374\",\n    \"periodMonth\": \"September\",\n    \"periodYear\": 2026,\n    \"status\": \"VALIDATED\",\n    \"totalAmount\": 180000,\n    \"penCentralValidationId\": \"val_alb2c3\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Validate Remittance Schedule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/validate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "validate"
+              ]
+            },
+            "description": "Format and dispatch remittance schedule to PenCentral Partner API for PenCom/PFA verification. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Schedule validation dispatched. PenCentral status: success\",\n  \"data\": {\n    \"schedule\": {\n      \"id\": \"sch_01928374\",\n      \"status\": \"VALIDATED\",\n      \"penCentralValidationId\": \"val_alb2c3\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Check Validation Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/validation-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "validation-status"
+              ]
+            },
+            "description": "Poll PenCentral validation status (pending, success, or failed) and retrieve any row-level validation errors."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"schedule\": {\n      \"id\": \"sch_01928374\",\n      \"status\": \"VALIDATED\"\n    },\n    \"penCentralStatus\": \"success\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Submit Remittance Schedule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/submit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "submit"
+              ]
+            },
+            "description": "Submit the validated remittance schedule to PenCentral, creating an immutable schedule_id ready for settlement. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Schedule successfully submitted to PenCentral\",\n  \"data\": {\n    \"schedule\": {\n      \"id\": \"sch_01928374\",\n      \"status\": \"SUBMITTED\",\n      \"penCentralScheduleId\": \"sch_x1y2z3\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Initiate Virtual Account Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/payment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "payment"
+              ]
+            },
+            "description": "Generate synthetic Monnify/Zenith dynamic virtual account details to fund the consolidated pension remittance. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Virtual account generated successfully for pension remittance payment\",\n  \"data\": {\n    \"schedule\": {\n      \"id\": \"sch_01928374\",\n      \"status\": \"PAYMENT_PENDING\",\n      \"virtualAccountNumber\": \"9990001234\",\n      \"virtualAccountBank\": \"Moniepoint Microfinance Bank\",\n      \"virtualAccountName\": \"PenCentral Collection\"\n    },\n    \"paymentDetails\": {\n      \"payment_id\": \"pay_plq2r3\",\n      \"account_number\": \"9990001234\",\n      \"bank_name\": \"Moniepoint Microfinance Bank\",\n      \"total_amount\": \"180000.00\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Sync Payment Status & Receipt",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/payment-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "payment-status"
+              ]
+            },
+            "description": "Check payment status and retrieve official PenCom/PenCentral issued receipt when succeeded. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Payment status synced: succeeded\",\n  \"data\": {\n    \"schedule\": {\n      \"id\": \"sch_01928374\",\n      \"status\": \"PAID\",\n      \"receiptId\": \"rcp_rls2t3\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Sync PFA Disbursements",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/disbursements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "disbursements"
+              ]
+            },
+            "description": "Track settlement breakdown per PFA, confirming credited amounts per employee pension fund custodian."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Disbursements status: completed\",\n  \"data\": {\n    \"disbursements\": {\n      \"schedule_id\": \"sch_x1y2z3\",\n      \"status\": \"completed\",\n      \"pfas\": [\n        {\n          \"pfa_code\": \"001\",\n          \"pfa_name\": \"Leadway PFA\",\n          \"amount\": \"180000.00\",\n          \"credited_amount\": \"180000.00\",\n          \"status\": \"completed\"\n        }\n      ]\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get PenCentral Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "dashboard"
+              ]
+            },
+            "description": "Retrieve organization's aggregate remittance statistics from PenCentral."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employer_code\": \"EMP001\",\n    \"schedule_count\": 12,\n    \"unsubmitted_count\": 2,\n    \"submitted_count\": 10,\n    \"cancelled_count\": 0,\n    \"total_remittance\": \"1250000.00\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get PenCentral Compliance Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/compliance-report",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "compliance-report"
+              ]
+            },
+            "description": "Retrieve PenCom statutory compliance metrics for submitted, paid, and disbursed remittances."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employer_code\": \"EMP001\",\n    \"submitted_count\": 10,\n    \"submitted_amount\": \"1250000.00\",\n    \"paid_count\": 8,\n    \"paid_amount\": \"1000000.00\",\n    \"disbursed_count\": 5,\n    \"disbursed_amount\": \"625000.00\"\n  }\n}"
             }
           ]
         }

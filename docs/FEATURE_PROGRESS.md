@@ -56,6 +56,7 @@ Status values: `Not Started` · `In Progress` · `Blocked` · `Awaiting Review` 
 - [x] `TaxRuleSet` / `TaxRule` models — versioned, effective-dated database records — Status: Done
 - [x] Statutory applicability evaluation engine (`ComplianceService`) — Status: Done
 - [x] StackHR Admin dynamic rule set management endpoints (`/stackhr-admin/compliance`) — Status: Done
+- [x] PenCentral Partner API integration for automated electronic pension remittance & PenCom compliance — Status: Awaiting Review
 - [x] Postman: Compliance & Tax Engine collection updated — Status: Done
 - User stories: US-018, US-019
 
@@ -107,3 +108,4 @@ Status values: `Not Started` · `In Progress` · `Blocked` · `Awaiting Review` 
 | 2026-09-09 | File created from backend audit report + architecture decisions. |
 | 2026-10-05 | Implemented PATCH /me/profile, PATCH /leave/requests/:id/cancel, PATCH /leave/types/:id, Reimbursements module (6 endpoints), GET /billing/status, and updated Postman collection with 87 requests and example responses. |
 | 2026-10-05 | Implemented Bug 2.3 `days` fallback on leave requests, `subjectSummary` null fallback in approvals, `GET /me/compensation-history`, `GET /me/notifications`, `GET /me/documents`, `GET /me/activity`, `GET /compliance/alerts`, added `employeeNumber` to employee details and `payDate` to payslip schema, added unit tests (319/319 passing), and updated Postman collection with all 5 new endpoints. |
+| 2026-10-12 | Implemented PenCentral Partner API integration for Nigerian statutory pension remittances (14 endpoints), PFA registry, schedule creation from payroll runs, PenCom validation & submission, Monnify/Zenith virtual account payment initiation, receipt syncing, and PFA disbursement tracking. Added unit tests (383/383 passing) and updated Postman collection. |

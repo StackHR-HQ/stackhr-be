@@ -22,6 +22,7 @@ import { MeModule } from './me/me.module';
 import { ComplianceModule } from './compliance/compliance.module';
 import { PeopleModule } from './people/people.module';
 import { WaitlistModule } from './waitlist/waitlist.module';
+import { PensionModule } from './pension/pension.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TenantInterceptor } from './database/tenant.interceptor';
 import { AuditInterceptor } from './audit/audit.interceptor';
@@ -60,6 +61,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     ComplianceModule,
     PeopleModule,
     WaitlistModule,
+    PensionModule,
   ],
   controllers: [AppController],
   providers: [

@@ -272,4 +272,41 @@ export class PeopleOnboardingService {
       return toOnboardingRow(employee, assignment.templateId, completions);
     });
   }
+
+  completeOnboarding(user: AuthenticatedUser, employeeId: string) {
+    const organizationId = requirePeopleOrganization(user);
+    return this.tenant.run(organizationId, async (client) => {
+      const employee = await client.employee.findFirst({
+        where: { id: employeeId, organizationId },
+      });
+      if (!employee) {
+        throw new NotFoundException('Employee was not found');
+      }
+
+      const updated = await client.employee.update({
+        where: { id: employeeId },
+        data: { status: 'ACTIVE' },
+      });
+
+      await client.auditEvent.create({
+        data: {
+          organizationId,
+          actorUserId: user.id,
+          action: 'employee.onboarding_completed',
+          targetType: 'employee',
+          targetId: employee.id,
+          employeeId,
+          description: `${employee.fullName} completed onboarding and transitioned to ACTIVE`,
+          changes: { status: { from: employee.status, to: 'ACTIVE' } },
+          createdAt: new Date(),
+        },
+      });
+
+      return {
+        message: 'Onboarding completed and employee activated successfully',
+        employeeId: updated.id,
+        status: updated.status,
+      };
+    });
+  }
 }

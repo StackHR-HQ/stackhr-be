@@ -25,6 +25,7 @@ const TENANT_SCOPED_MODELS = [
   'PayrollRun',
   'PayrollItem',
   'Payslip',
+  'PensionRemittanceSchedule',
 ];
 
 @Injectable()

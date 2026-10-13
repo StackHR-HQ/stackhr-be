@@ -98,6 +98,9 @@ export class EmployeesService {
         managerId: dto.managerId ?? null,
         employeeNumber,
         status: 'ACTIVE',
+        pensionProvider: dto.pensionProvider ?? null,
+        pfaCode: dto.pfaCode ?? null,
+        pensionRsaNumber: dto.pensionRsaNumber ?? null,
       },
     });
 
@@ -284,6 +287,15 @@ export class EmployeesService {
         ...(dto.status && { status: dto.status }),
         ...(dto.employeeNumber !== undefined && {
           employeeNumber: dto.employeeNumber,
+        }),
+        ...(dto.pensionProvider !== undefined && {
+          pensionProvider: dto.pensionProvider,
+        }),
+        ...(dto.pfaCode !== undefined && {
+          pfaCode: dto.pfaCode,
+        }),
+        ...(dto.pensionRsaNumber !== undefined && {
+          pensionRsaNumber: dto.pensionRsaNumber,
         }),
       },
     });

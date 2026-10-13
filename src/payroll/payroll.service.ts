@@ -125,6 +125,9 @@ export class PayrollService {
     return {
       ...run,
       payDate,
+      currency: 'NGN',
+      payrollEngineVersion: '2026.1',
+      taxRuleSetId: 'ng-nta-2026-v1',
     };
   }
 
@@ -472,6 +475,20 @@ export class PayrollService {
     const [runs, org] = await Promise.all([
       this.prisma.payrollRun.findMany({
         where: { organizationId: orgId },
+        include: {
+          items: {
+            select: {
+              id: true,
+              grossSalary: true,
+              taxDeduction: true,
+              pensionDeduction: true,
+              employerPensionDeduction: true,
+              nhfDeduction: true,
+              otherDeductions: true,
+              netSalary: true,
+            },
+          },
+        },
         orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
       }),
       this.prisma.organization.findUnique({
@@ -482,13 +499,38 @@ export class PayrollService {
 
     const payDay = org?.payDate ?? 25;
 
-    return { payrollRuns: runs.map((r) => this.formatPayrollRun(r, payDay)) };
+    return {
+      payrollRuns: runs.map((r) => {
+        const items = (r as any).items ?? [];
+        const employeeCount = items.length;
+        const totalNhf = items.reduce(
+          (sum: number, it: any) => sum + (it.nhfDeduction || 0),
+          0,
+        );
+        const totalEmployerPension = items.reduce(
+          (sum: number, it: any) => sum + (it.employerPensionDeduction || 0),
+          0,
+        );
+        const totalOtherDeductions = items.reduce(
+          (sum: number, it: any) => sum + (it.otherDeductions || 0),
+          0,
+        );
+
+        return {
+          ...this.formatPayrollRun(r, payDay),
+          employeeCount,
+          totalNhf,
+          totalEmployerPension,
+          totalOtherDeductions,
+        };
+      }),
+    };
   }
 
   async getRunById(user: AuthenticatedUser, runId: string) {
     const orgId = this.checkOrgContext(user);
 
-    const [run, org] = await Promise.all([
+    const [run, org, approval] = await Promise.all([
       this.prisma.payrollRun.findFirst({
         where: { id: runId, organizationId: orgId },
         include: {
@@ -500,6 +542,7 @@ export class PayrollService {
                   fullName: true,
                   email: true,
                   department: true,
+                  jobTitle: true,
                 },
               },
             },
@@ -511,6 +554,17 @@ export class PayrollService {
         where: { id: orgId },
         select: { payDate: true },
       }),
+      this.prisma.approvalRequest
+        ? this.prisma.approvalRequest.findFirst({
+            where: {
+              organizationId: orgId,
+              subjectTable: 'payroll_run',
+              subjectId: runId,
+            },
+            orderBy: { submittedAt: 'desc' },
+            select: { rejectionReason: true },
+          })
+        : Promise.resolve(null),
     ]);
 
     if (!run) {
@@ -518,7 +572,125 @@ export class PayrollService {
     }
 
     const payDay = org?.payDate ?? 25;
+    const formatted = this.formatPayrollRun(run, payDay);
 
-    return { payrollRun: this.formatPayrollRun(run, payDay) };
+    return {
+      payrollRun: {
+        ...formatted,
+        rejectionReason: approval?.rejectionReason ?? null,
+      },
+    };
+  }
+
+  async getAllCompensations(user: AuthenticatedUser) {
+    const orgId = this.checkOrgContext(user);
+
+    const [employees, records] = await Promise.all([
+      this.prisma.employee.findMany({
+        where: { organizationId: orgId },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          jobTitle: true,
+          department: true,
+          status: true,
+          annualSalaryMinor: true,
+          currency: true,
+          payFrequency: true,
+          startDate: true,
+        },
+        orderBy: [{ fullName: 'asc' }],
+      }),
+      this.prisma.compensationRecord.findMany({
+        where: {
+          organizationId: orgId,
+          OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }],
+        },
+        orderBy: { effectiveFrom: 'desc' },
+      }),
+    ]);
+
+    const compRecordByEmp = new Map<string, (typeof records)[number]>();
+    for (const rec of records) {
+      if (!compRecordByEmp.has(rec.employeeId)) {
+        compRecordByEmp.set(rec.employeeId, rec);
+      }
+    }
+
+    const compensations = employees.map((emp) => {
+      const rec = compRecordByEmp.get(emp.id);
+      const basicSalary = rec
+        ? rec.basicSalary
+        : Math.trunc(Number(emp.annualSalaryMinor) / 1200);
+      const housingAllowance = rec?.housingAllowance ?? 0;
+      const transportAllowance = rec?.transportAllowance ?? 0;
+      const otherAllowances = rec?.otherAllowances ?? 0;
+      const grossMonthlySalary =
+        basicSalary + housingAllowance + transportAllowance + otherAllowances;
+
+      return {
+        employeeId: emp.id,
+        fullName: emp.fullName,
+        email: emp.email,
+        jobTitle: emp.jobTitle,
+        department: emp.department,
+        status: emp.status,
+        annualSalaryMinor: Number(emp.annualSalaryMinor),
+        currency: emp.currency ?? 'NGN',
+        paymentFrequency:
+          rec?.paymentFrequency ?? emp.payFrequency ?? 'MONTHLY',
+        basicSalary,
+        housingAllowance,
+        transportAllowance,
+        otherAllowances,
+        grossMonthlySalary,
+        effectiveFrom: rec?.effectiveFrom ?? emp.startDate ?? null,
+      };
+    });
+
+    return { compensations };
+  }
+
+  async getPayslips(
+    user: AuthenticatedUser,
+    filter?: { payrollRunId?: string; employeeId?: string },
+  ) {
+    const orgId = this.checkOrgContext(user);
+
+    const where: Record<string, any> = { organizationId: orgId };
+    if (filter?.payrollRunId) where.payrollRunId = filter.payrollRunId;
+    if (filter?.employeeId) where.employeeId = filter.employeeId;
+
+    const payslips = await this.prisma.payslip.findMany({
+      where,
+      include: {
+        employee: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            department: true,
+            jobTitle: true,
+          },
+        },
+        payrollRun: {
+          select: {
+            id: true,
+            periodMonth: true,
+            periodYear: true,
+            title: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: [
+        { periodYear: 'desc' },
+        { periodMonth: 'desc' },
+        { generatedAt: 'desc' },
+      ],
+    });
+
+    return { payslips };
   }
 }

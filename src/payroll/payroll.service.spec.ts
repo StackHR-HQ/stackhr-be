@@ -343,4 +343,71 @@ describe('PayrollService', () => {
       expect(result.payrollRun.payDate).toBe('2026-10-25');
     });
   });
+
+  describe('getAllCompensations', () => {
+    it('should return compensation records for all organization employees', async () => {
+      prismaMock.employee.findMany.mockResolvedValue([
+        {
+          id: 'emp-1',
+          fullName: 'Alice Smith',
+          email: 'alice@acme.com',
+          jobTitle: 'Engineer',
+          department: 'Engineering',
+          status: 'ACTIVE',
+          annualSalaryMinor: 12000000n,
+          currency: 'NGN',
+          payFrequency: 'MONTHLY',
+          startDate: new Date('2026-01-01'),
+        },
+      ]);
+      prismaMock.compensationRecord.findMany.mockResolvedValue([
+        {
+          id: 'comp-1',
+          employeeId: 'emp-1',
+          basicSalary: 60000,
+          housingAllowance: 20000,
+          transportAllowance: 10000,
+          otherAllowances: 10000,
+          paymentFrequency: 'MONTHLY',
+          effectiveFrom: new Date('2026-01-01'),
+        },
+      ]);
+
+      const result = await service.getAllCompensations(mockAdminUser);
+
+      expect(result.compensations).toHaveLength(1);
+      expect(result.compensations[0].grossMonthlySalary).toBe(100000);
+      expect(result.compensations[0].basicSalary).toBe(60000);
+    });
+  });
+
+  describe('getPayslips', () => {
+    it('should return payslips filtered by organization', async () => {
+      prismaMock.payslip = { findMany: jest.fn() };
+      prismaMock.payslip.findMany.mockResolvedValue([
+        {
+          id: 'slip-1',
+          organizationId: 'org-123',
+          payrollRunId: 'run-1',
+          employeeId: 'emp-1',
+          grossSalary: 100000,
+          netSalary: 85000,
+        },
+      ]);
+
+      const result = await service.getPayslips(mockAdminUser, {
+        payrollRunId: 'run-1',
+      });
+
+      expect(result.payslips).toHaveLength(1);
+      expect(prismaMock.payslip.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: 'org-123',
+            payrollRunId: 'run-1',
+          }),
+        }),
+      );
+    });
+  });
 });

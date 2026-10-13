@@ -223,4 +223,18 @@ describe('PeopleOnboardingService', () => {
       ]);
     });
   });
+
+  describe('completeOnboarding', () => {
+    it('transitions employee status to ACTIVE and records an audit event', async () => {
+      fake.seed('employee', [employeeRow({ status: 'ONBOARDING' })]);
+
+      const result = await service.completeOnboarding(adminUser(), 'emp_ada');
+
+      expect(result).toEqual({
+        message: 'Onboarding completed and employee activated successfully',
+        employeeId: 'emp_ada',
+        status: 'ACTIVE',
+      });
+    });
+  });
 });
