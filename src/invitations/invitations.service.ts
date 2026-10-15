@@ -169,95 +169,89 @@ export class InvitationsService {
       type: argon2.argon2id,
     });
 
-    let existingUser = await this.prisma.user.findUnique({
-      where: { email: invitation.email },
-    });
+    const userResult = await this.prisma.$transaction(async (tx) => {
+      let existingUser = await tx.user.findUnique({
+        where: { email: invitation.email },
+      });
 
-    if (!existingUser) {
-      const userId = randomUUID();
-      existingUser = await this.prisma.user.create({
-        data: {
-          id: userId,
-          name: dto.fullName,
-          email: invitation.email,
-          emailVerified: true,
-          userType: USER_TYPES.BUSINESS,
-          role: invitation.role ?? 'EMPLOYEE',
-          accounts: {
-            create: {
-              id: randomUUID(),
-              accountId: invitation.email,
-              providerId: 'credential',
-              password: hashedPassword,
+      if (!existingUser) {
+        const userId = randomUUID();
+        existingUser = await tx.user.create({
+          data: {
+            id: userId,
+            name: dto.fullName,
+            email: invitation.email,
+            emailVerified: true,
+            userType: USER_TYPES.BUSINESS,
+            role: invitation.role ?? 'EMPLOYEE',
+            accounts: {
+              create: {
+                id: randomUUID(),
+                accountId: invitation.email,
+                providerId: 'credential',
+                password: hashedPassword,
+              },
             },
           },
-        },
-      });
-    }
+        });
+      }
 
-    const existingMember = await this.prisma.member.findFirst({
-      where: {
-        organizationId: invitation.organizationId,
-        userId: existingUser.id,
-      },
-    });
-
-    if (!existingMember) {
-      await this.prisma.member.create({
-        data: {
-          id: randomUUID(),
+      const existingMember = await tx.member.findFirst({
+        where: {
           organizationId: invitation.organizationId,
           userId: existingUser.id,
-          role: invitation.role ?? 'member',
-          createdAt: new Date(),
         },
       });
-    }
 
-    const existingEmployee = await this.prisma.employee.findFirst({
-      where: {
-        organizationId: invitation.organizationId,
-        email: invitation.email,
-      },
-    });
+      if (!existingMember) {
+        await tx.member.create({
+          data: {
+            id: randomUUID(),
+            organizationId: invitation.organizationId,
+            userId: existingUser.id,
+            role: invitation.role ?? 'member',
+            createdAt: new Date(),
+          },
+        });
+      }
 
-    if (!existingEmployee) {
-      await this.prisma.employee.create({
-        data: {
-          id: randomUUID(),
-          organizationId: invitation.organizationId,
-          fullName: dto.fullName,
-          email: invitation.email,
-          department: 'General',
-          jobTitle: invitation.role ?? 'Employee',
-          employmentType: 'FULL_TIME',
-          salaryAmount: 0,
-          startDate: new Date(),
-          status: 'ACTIVE',
-        },
+      const existingEmployee = invitation.employeeId
+        ? await tx.employee.findUnique({
+            where: { id: invitation.employeeId },
+          })
+        : await tx.employee.findFirst({
+            where: {
+              organizationId: invitation.organizationId,
+              email: invitation.email,
+            },
+          });
+
+      if (
+        existingEmployee &&
+        (existingEmployee.status === 'PENDING_INVITATION' ||
+          existingEmployee.status === 'ONBOARDING')
+      ) {
+        await tx.employee.update({
+          where: { id: existingEmployee.id },
+          data: { status: 'ACTIVE' },
+        });
+      }
+
+      await tx.invitation.update({
+        where: { id },
+        data: { status: 'accepted' },
       });
-    } else if (
-      existingEmployee.status === 'PENDING_INVITATION' ||
-      existingEmployee.status === 'ONBOARDING'
-    ) {
-      await this.prisma.employee.update({
-        where: { id: existingEmployee.id },
-        data: { status: 'ACTIVE' },
-      });
-    }
 
-    await this.prisma.invitation.update({
-      where: { id },
-      data: { status: 'accepted' },
+      return {
+        id: existingUser.id,
+        name: existingUser.name,
+        email: existingUser.email,
+      };
     });
 
     return {
       message: 'Invitation accepted successfully',
-      user: {
-        id: existingUser.id,
-        name: existingUser.name,
-        email: existingUser.email,
-      },
+      user: userResult,
     };
   }
 

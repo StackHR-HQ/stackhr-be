@@ -26,7 +26,7 @@ describe('PeopleOrganizationService', () => {
         service.deleteDepartment(adminUser(), 'dep_cs'),
       ).rejects.toMatchObject({ status: 409 });
       await expect(service.listDepartments(adminUser())).resolves.toEqual([
-        { id: 'dep_cs', name: 'Customer Success', headEmployeeId: '' },
+        { id: 'dep_cs', name: 'Customer Success', headEmployeeId: null },
       ]);
     });
   });
@@ -141,7 +141,7 @@ describe('PeopleOrganizationService', () => {
         }),
       ).rejects.toMatchObject({ status: 409 });
       await expect(service.listDepartments(adminUser())).resolves.toEqual([
-        { id: 'dep_cs', name: 'Customer Success', headEmployeeId: '' },
+        { id: 'dep_cs', name: 'Customer Success', headEmployeeId: null },
       ]);
     });
 
@@ -252,7 +252,7 @@ describe('PeopleOrganizationService', () => {
 
       await expect(service.listDepartments(adminUser())).resolves.toEqual([
         { id: 'dep_eng', name: 'Engineering', headEmployeeId: 'emp_ada' },
-        { id: 'dep_sales', name: 'Sales', headEmployeeId: '' },
+        { id: 'dep_sales', name: 'Sales', headEmployeeId: null },
       ]);
     });
   });

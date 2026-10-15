@@ -68,7 +68,7 @@ function toDepartment(
   return {
     id: department.id,
     name: department.name,
-    headEmployeeId: department.headEmployeeId ?? '',
+    headEmployeeId: department.headEmployeeId ?? null,
     memberIds,
   };
 }
@@ -87,7 +87,7 @@ export class PeopleOrganizationService {
       return departments.map((department) => ({
         id: department.id,
         name: department.name,
-        headEmployeeId: department.headEmployeeId ?? '',
+        headEmployeeId: department.headEmployeeId ?? null,
       }));
     });
   }

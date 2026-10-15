@@ -12,6 +12,21 @@ import { CreateSalaryAdvanceDto } from './dto/create-salary-advance.dto';
 import { AttachReceiptDto } from './dto/attach-receipt.dto';
 import { CreateReimbursementDto } from './dto/create-reimbursement.dto';
 
+function resolveExpenseDate(expense: any, explicitDate?: string): string {
+  if (explicitDate) return explicitDate;
+  if (expense?.expenseDate) return expense.expenseDate;
+  if (expense?.createdAt) {
+    try {
+      return new Date(
+        expense.createdAt as string | number | Date,
+      ).toISOString();
+    } catch {
+      return new Date().toISOString();
+    }
+  }
+  return new Date().toISOString();
+}
+
 @Injectable()
 export class SpendService {
   constructor(
@@ -68,7 +83,11 @@ export class SpendService {
 
     return {
       message: 'Expense submission recorded and routed for approval',
-      expense,
+      expense: {
+        ...expense,
+        expenseDate: resolveExpenseDate(expense, dto.expenseDate),
+        paymentMethod: dto.paymentMethod ?? 'BANK_TRANSFER',
+      },
       approvalRequest: approvalResult.approvalRequest,
     };
   }
@@ -149,7 +168,10 @@ export class SpendService {
 
     return {
       message: 'Salary advance request submitted and routed for approval',
-      salaryAdvance,
+      salaryAdvance: {
+        ...salaryAdvance,
+        currency: dto.currency ?? 'NGN',
+      },
       approvalRequest: approvalResult.approvalRequest,
     };
   }
@@ -170,7 +192,13 @@ export class SpendService {
       throw new NotFoundException(`Expense claim with ID "${id}" not found`);
     }
 
-    return { expense };
+    return {
+      expense: {
+        ...expense,
+        expenseDate: resolveExpenseDate(expense),
+        paymentMethod: (expense as any).paymentMethod ?? 'BANK_TRANSFER',
+      },
+    };
   }
 
   async cancelExpense(user: AuthenticatedUser, id: string) {
@@ -207,7 +235,13 @@ export class SpendService {
       data: { status: 'CANCELLED' },
     });
 
-    return { expense: updated };
+    return {
+      expense: {
+        ...updated,
+        expenseDate: resolveExpenseDate(updated),
+        paymentMethod: (updated as any).paymentMethod ?? 'BANK_TRANSFER',
+      },
+    };
   }
 
   async cancelSalaryAdvance(user: AuthenticatedUser, id: string) {
@@ -305,7 +339,13 @@ export class SpendService {
       },
     });
 
-    return { expenses };
+    const formattedExpenses = expenses.map((e) => ({
+      ...e,
+      expenseDate: resolveExpenseDate(e),
+      paymentMethod: (e as any).paymentMethod ?? 'BANK_TRANSFER',
+    }));
+
+    return { expenses: formattedExpenses };
   }
 
   async getSalaryAdvances(user: AuthenticatedUser) {
@@ -329,9 +369,14 @@ export class SpendService {
       },
     });
 
+    const formattedAdvances = advances.map((a) => ({
+      ...a,
+      currency: (a as any).currency ?? 'NGN',
+    }));
+
     return {
-      advances,
-      salaryAdvances: advances,
+      advances: formattedAdvances,
+      salaryAdvances: formattedAdvances,
     };
   }
 

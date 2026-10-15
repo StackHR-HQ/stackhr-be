@@ -29,10 +29,12 @@ describe('InvitationsService', () => {
       create: jest.Mock;
     };
     employee: {
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
 
   const mockAdminUser: AuthenticatedUser = {
@@ -68,10 +70,12 @@ describe('InvitationsService', () => {
         create: jest.fn(),
       },
       employee: {
+        findUnique: jest.fn(),
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
       },
+      $transaction: jest.fn().mockImplementation((cb: any) => cb(prismaMock)),
     };
 
     const module: TestingModule = await Test.createTestingModule({
