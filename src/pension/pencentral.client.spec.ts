@@ -274,4 +274,139 @@ describe('PenCentralClient', () => {
       expect(res.submitted_count).toBe(5);
     });
   });
+
+  describe('Employer Onboarding (Partner API)', () => {
+    it('validateEmployer sends employer_code and returns validation response', async () => {
+      const mockValidation = {
+        validation_id: 'ev_123',
+        employer_code: 'PR0000126311',
+        employer_name: 'UNDERDOG PRODUCTIONS LIMITED',
+        valid: true,
+        expires_at: '2026-10-16T04:03:02.485Z',
+      };
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => mockValidation,
+      } as any);
+
+      const res = await client.validateEmployer('PR0000126311');
+      expect(res).toEqual(mockValidation);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://test-api.pensioncentral.ng/partner-api/v1/employers/validations',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ employer_code: 'PR0000126311' }),
+        }),
+      );
+    });
+
+    it('validateEmployer handles 422 unprocessable entity when employer code is invalid', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: async () => ({
+          error: {
+            code: 'employer_code_invalid',
+            message:
+              "PENCOM did not validate employer code 'PR9999999999'. Employer not found.",
+          },
+        }),
+      } as any);
+
+      await expect(client.validateEmployer('PR9999999999')).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('attachEmployer sends validation_id and returns attached employer grant', async () => {
+      const mockGrant = {
+        id: 'grant_123',
+        employer_code: 'PR0000126311',
+        employer_name: 'UNDERDOG PRODUCTIONS LIMITED',
+        status: 'active',
+        attached_at: '2026-10-16T03:33:03.535Z',
+      };
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: async () => mockGrant,
+      } as any);
+
+      const res = await client.attachEmployer('ev_123');
+      expect(res).toEqual(mockGrant);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://test-api.pensioncentral.ng/partner-api/v1/employers',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ validation_id: 'ev_123' }),
+        }),
+      );
+    });
+
+    it('attachEmployer handles 404 when validation_id has expired or is invalid', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: async () => ({
+          error: {
+            code: 'not_found',
+            message:
+              "Employer validation 'ev_expired' was not found for this partner.",
+          },
+        }),
+      } as any);
+
+      await expect(client.attachEmployer('ev_expired')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('listAttachedEmployers returns array of employer grants', async () => {
+      const mockGrants = [
+        {
+          id: 'grant_123',
+          employer_code: 'PR0000126311',
+          employer_name: 'UNDERDOG PRODUCTIONS LIMITED',
+          status: 'active',
+          attached_at: '2026-10-16T03:33:03.535Z',
+        },
+      ];
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => mockGrants,
+      } as any);
+
+      const res = await client.listAttachedEmployers();
+      expect(res).toEqual(mockGrants);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://test-api.pensioncentral.ng/partner-api/v1/employers',
+        expect.objectContaining({
+          method: 'GET',
+        }),
+      );
+    });
+
+    it('revokeEmployer sends DELETE request and handles 204 No Content', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 204,
+        json: async () => null,
+      } as any);
+
+      await expect(
+        client.revokeEmployer('PR0000126311'),
+      ).resolves.toBeUndefined();
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://test-api.pensioncentral.ng/partner-api/v1/employers/PR0000126311',
+        expect.objectContaining({
+          method: 'DELETE',
+        }),
+      );
+    });
+  });
 });

@@ -133,3 +133,35 @@ export interface PenCentralComplianceReportResponse {
   disbursed_count: number;
   disbursed_amount: string;
 }
+
+export interface PenCentralEmployerValidationRequest {
+  employer_code: string;
+}
+
+export interface PenCentralEmployerValidationResponse {
+  validation_id: string;
+  employer_code: string;
+  employer_name: string;
+  valid: boolean;
+  expires_at: string;
+}
+
+export interface PenCentralEmployerAttachRequest {
+  validation_id: string;
+}
+
+export interface PenCentralEmployerAttachResponse {
+  id: string;
+  employer_code: string;
+  employer_name: string;
+  status: string;
+  attached_at: string;
+}
+
+export interface PenCentralEmployerGrant {
+  id: string;
+  employer_code: string;
+  employer_name: string;
+  status: string;
+  attached_at: string;
+}

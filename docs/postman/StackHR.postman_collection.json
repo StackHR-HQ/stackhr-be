@@ -5273,6 +5273,216 @@
       "description": "Automated electronic pension remittance and PenCom statutory compliance integration via PenCentral Partner API.",
       "item": [
         {
+          "name": "Validate Employer Code (PenCentral Onboarding)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employerCode\": \"PR0000126311\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/pension/employers/validate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "employers",
+                "validate"
+              ]
+            },
+            "description": "Read-only validation of a PenCom employer code before linking. Returns official employer name and a short-lived validation ID (valid 30 minutes). Accepts either employerCode or employer_code. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"validationId\": \"ev_ac33fd33551d4120935e764467322652\",\n    \"validation_id\": \"ev_ac33fd33551d4120935e764467322652\",\n    \"employerCode\": \"PR0000126311\",\n    \"employer_code\": \"PR0000126311\",\n    \"employerName\": \"UNDERDOG PRODUCTIONS LIMITED\",\n    \"employer_name\": \"UNDERDOG PRODUCTIONS LIMITED\",\n    \"valid\": true,\n    \"expiresAt\": \"2026-10-16T04:03:02.485Z\",\n    \"expires_at\": \"2026-10-16T04:03:02.485Z\"\n  }\n}"
+            },
+            {
+              "name": "Invalid Employer Code (422 Unprocessable Entity)",
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 422,\n  \"message\": \"PENCOM did not validate employer code 'PR9999999999'. Employer not found.\",\n  \"error\": \"Unprocessable Entity\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Attach Confirmed Employer (PenCentral Onboarding)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"validationId\": \"ev_ac33fd33551d4120935e764467322652\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/pension/employers/attach",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "employers",
+                "attach"
+              ]
+            },
+            "description": "Attach confirmed employer to partner portal using validation ID and configure current organization. Accepts either validationId or validation_id. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (201 Created)",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": \"Employer attached successfully\",\n    \"grantId\": \"grant_d4d8484fe34a4fcda0ee9fcc7a471c70\",\n    \"id\": \"grant_d4d8484fe34a4fcda0ee9fcc7a471c70\",\n    \"employerCode\": \"PR0000126311\",\n    \"employer_code\": \"PR0000126311\",\n    \"employerName\": \"UNDERDOG PRODUCTIONS LIMITED\",\n    \"employer_name\": \"UNDERDOG PRODUCTIONS LIMITED\",\n    \"status\": \"active\",\n    \"attachedAt\": \"2026-10-16T03:33:03.535Z\",\n    \"attached_at\": \"2026-10-16T03:33:03.535Z\"\n  }\n}"
+            },
+            {
+              "name": "Validation Expired / Not Found (404 Not Found)",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Employer validation 'ev_expired' was not found for this partner.\",\n  \"error\": \"Not Found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Employer Onboarding Status (PenCentral Onboarding)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/employers/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "employers",
+                "status"
+              ]
+            },
+            "description": "Check live attachment status of the active organization's employer code with PenCentral. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success - Attached (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"isAttached\": true,\n    \"employerCode\": \"PR0000126311\",\n    \"employer_code\": \"PR0000126311\",\n    \"employerName\": \"UNDERDOG PRODUCTIONS LIMITED\",\n    \"employer_name\": \"UNDERDOG PRODUCTIONS LIMITED\",\n    \"grant\": {\n      \"id\": \"grant_d4d8484fe34a4fcda0ee9fcc7a471c70\",\n      \"status\": \"active\",\n      \"attachedAt\": \"2026-10-16T03:33:03.535Z\",\n      \"attached_at\": \"2026-10-16T03:33:03.535Z\"\n    }\n  }\n}"
+            },
+            {
+              "name": "Success - Not Attached (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"isAttached\": false,\n    \"employerCode\": null,\n    \"employer_code\": null,\n    \"employerName\": null,\n    \"employer_name\": null,\n    \"grant\": null\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Revoke Employer Access (PenCentral Onboarding)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/employers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "employers"
+              ]
+            },
+            "description": "Revoke partner access to the employer on PenCentral and disconnect from active organization. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": \"Employer access revoked successfully\"\n  }\n}"
+            }
+          ]
+        },
+        {
           "name": "Get Registered PFAs",
           "request": {
             "method": "GET",

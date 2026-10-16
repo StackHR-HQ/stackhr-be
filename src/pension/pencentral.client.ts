@@ -14,6 +14,11 @@ import {
   PenCentralComplianceReportResponse,
   PenCentralDashboardResponse,
   PenCentralDisbursementsResponse,
+  PenCentralEmployerAttachRequest,
+  PenCentralEmployerAttachResponse,
+  PenCentralEmployerGrant,
+  PenCentralEmployerValidationRequest,
+  PenCentralEmployerValidationResponse,
   PenCentralInitiatePaymentResponse,
   PenCentralReceiptResponse,
   PenCentralSubmitScheduleResponse,
@@ -293,6 +298,65 @@ export class PenCentralClient {
   ): Promise<PenCentralComplianceReportResponse> {
     return this.request<PenCentralComplianceReportResponse>(
       `/partner-api/v1/reports/compliance?employer_code=${encodeURIComponent(employerCode)}`,
+    );
+  }
+
+  /**
+   * Phase 0 — Employer Onboarding
+   * Step 1: Validate Employer Code (Read-Only)
+   */
+  async validateEmployer(
+    employerCode: string,
+  ): Promise<PenCentralEmployerValidationResponse> {
+    const body: PenCentralEmployerValidationRequest = {
+      employer_code: employerCode,
+    };
+    return this.request<PenCentralEmployerValidationResponse>(
+      '/partner-api/v1/employers/validations',
+      {
+        method: 'POST',
+        body,
+      },
+    );
+  }
+
+  /**
+   * Phase 0 — Employer Onboarding
+   * Step 2: Attach the Confirmed Employer
+   */
+  async attachEmployer(
+    validationId: string,
+  ): Promise<PenCentralEmployerAttachResponse> {
+    const body: PenCentralEmployerAttachRequest = {
+      validation_id: validationId,
+    };
+    return this.request<PenCentralEmployerAttachResponse>(
+      '/partner-api/v1/employers',
+      {
+        method: 'POST',
+        body,
+      },
+    );
+  }
+
+  /**
+   * Phase 0 — Employer Onboarding
+   * Step 3: List Attached Employers
+   */
+  async listAttachedEmployers(): Promise<PenCentralEmployerGrant[]> {
+    return this.request<PenCentralEmployerGrant[]>('/partner-api/v1/employers');
+  }
+
+  /**
+   * Phase 0 — Employer Onboarding
+   * Step 4: Revoke Employer Access
+   */
+  async revokeEmployer(employerCode: string): Promise<void> {
+    await this.request<void>(
+      `/partner-api/v1/employers/${encodeURIComponent(employerCode)}`,
+      {
+        method: 'DELETE',
+      },
     );
   }
 }

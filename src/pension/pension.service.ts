@@ -18,8 +18,10 @@ import {
   PenCentralValidationRequest,
 } from './pencentral.types';
 import {
+  AttachEmployerDto,
   PensionScheduleQueryDto,
   UpdatePensionConfigDto,
+  ValidateEmployerCodeDto,
 } from './dto/pension.dto';
 
 const MONTH_NAMES = [
@@ -59,6 +61,178 @@ export class PensionService {
     return { pfas: NIGERIAN_PFAS };
   }
 
+  /**
+   * Phase 0 — Employer Onboarding
+   * Step 1: Validate Employer Code (Read-Only)
+   */
+  async validateEmployerCode(
+    user: AuthenticatedUser,
+    dto: ValidateEmployerCodeDto,
+  ) {
+    this.checkOrgContext(user);
+    const employerCode = dto.getCode();
+
+    const result = await this.penCentralClient.validateEmployer(employerCode);
+
+    return {
+      validationId: result.validation_id,
+      validation_id: result.validation_id,
+      employerCode: result.employer_code,
+      employer_code: result.employer_code,
+      employerName: result.employer_name,
+      employer_name: result.employer_name,
+      valid: result.valid,
+      expiresAt: result.expires_at,
+      expires_at: result.expires_at,
+    };
+  }
+
+  /**
+   * Phase 0 — Employer Onboarding
+   * Step 2: Attach the Confirmed Employer via validation_id
+   */
+  async attachEmployer(user: AuthenticatedUser, dto: AttachEmployerDto) {
+    const orgId = this.checkOrgContext(user);
+    const validationId = dto.getValidationId();
+
+    const result = await this.penCentralClient.attachEmployer(validationId);
+
+    await this.prisma.organization.update({
+      where: { id: orgId },
+      data: {
+        penCentralEmployerCode: result.employer_code,
+      },
+    });
+
+    return {
+      message: 'Employer attached successfully',
+      grantId: result.id,
+      id: result.id,
+      employerCode: result.employer_code,
+      employer_code: result.employer_code,
+      employerName: result.employer_name,
+      employer_name: result.employer_name,
+      status: result.status,
+      attachedAt: result.attached_at,
+      attached_at: result.attached_at,
+    };
+  }
+
+  /**
+   * Phase 0 — Employer Onboarding
+   * Step 3: Get Attachment Status of current Organization
+   */
+  async getEmployerStatus(user: AuthenticatedUser) {
+    const orgId = this.checkOrgContext(user);
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { id: true, name: true, penCentralEmployerCode: true },
+    });
+
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    if (!org.penCentralEmployerCode) {
+      return {
+        isAttached: false,
+        employerCode: null,
+        employer_code: null,
+        employerName: null,
+        employer_name: null,
+        grant: null,
+      };
+    }
+
+    try {
+      const attached = await this.penCentralClient.listAttachedEmployers();
+      const grant = attached?.find(
+        (g) =>
+          g.employer_code.toUpperCase() ===
+          org.penCentralEmployerCode?.toUpperCase(),
+      );
+
+      if (grant && grant.status === 'active') {
+        return {
+          isAttached: true,
+          employerCode: grant.employer_code,
+          employer_code: grant.employer_code,
+          employerName: grant.employer_name,
+          employer_name: grant.employer_name,
+          grant: {
+            id: grant.id,
+            status: grant.status,
+            attachedAt: grant.attached_at,
+            attached_at: grant.attached_at,
+          },
+        };
+      }
+
+      return {
+        isAttached: false,
+        employerCode: org.penCentralEmployerCode,
+        employer_code: org.penCentralEmployerCode,
+        employerName: null,
+        employer_name: null,
+        grant: null,
+        warning:
+          'Employer code is configured in StackHR but is not currently attached in PenCentral partner portal.',
+      };
+    } catch (err: any) {
+      this.logger.warn(
+        `Failed to query PenCentral attached employers for org ${orgId}: ${err.message}`,
+      );
+      return {
+        isAttached: true,
+        employerCode: org.penCentralEmployerCode,
+        employer_code: org.penCentralEmployerCode,
+        employerName: org.name,
+        employer_name: org.name,
+        grant: null,
+        degraded: true,
+        warning:
+          'Could not verify live attachment with PenCentral; local configuration retained.',
+      };
+    }
+  }
+
+  /**
+   * Phase 0 — Employer Onboarding
+   * Step 4: Revoke Employer Access
+   */
+  async revokeEmployer(user: AuthenticatedUser) {
+    const orgId = this.checkOrgContext(user);
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { id: true, penCentralEmployerCode: true },
+    });
+
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    if (org.penCentralEmployerCode) {
+      try {
+        await this.penCentralClient.revokeEmployer(org.penCentralEmployerCode);
+      } catch (err: any) {
+        this.logger.warn(
+          `PenCentral revoke call returned error for ${org.penCentralEmployerCode}: ${err.message}`,
+        );
+      }
+
+      await this.prisma.organization.update({
+        where: { id: orgId },
+        data: {
+          penCentralEmployerCode: null,
+        },
+      });
+    }
+
+    return {
+      message: 'Employer access revoked successfully',
+    };
+  }
+
   async updateEmployerConfig(
     user: AuthenticatedUser,
     dto: UpdatePensionConfigDto,
@@ -89,7 +263,31 @@ export class PensionService {
       throw new NotFoundException('Organization not found');
     }
 
-    return org;
+    let isAttached = false;
+    let employerName = org.name;
+
+    if (org.penCentralEmployerCode) {
+      try {
+        const attached = await this.penCentralClient.listAttachedEmployers();
+        const grant = attached?.find(
+          (g) =>
+            g.employer_code.toUpperCase() ===
+            org.penCentralEmployerCode?.toUpperCase(),
+        );
+        if (grant && grant.status === 'active') {
+          isAttached = true;
+          employerName = grant.employer_name;
+        }
+      } catch {
+        // Fallback gracefully without throwing
+      }
+    }
+
+    return {
+      ...org,
+      isAttached,
+      employerName,
+    };
   }
 
   /**
