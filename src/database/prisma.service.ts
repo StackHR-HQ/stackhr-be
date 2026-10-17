@@ -26,6 +26,9 @@ const TENANT_SCOPED_MODELS = [
   'PayrollItem',
   'Payslip',
   'PensionRemittanceSchedule',
+  'IdempotencyKey',
+  'OutboxEvent',
+  'DeadLetterEvent',
 ];
 
 @Injectable()

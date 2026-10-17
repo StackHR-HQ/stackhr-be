@@ -27,18 +27,30 @@ import {
   PenCentralValidationResponse,
   PenCentralWhoAmIResponse,
 } from './pencentral.types';
+import { CircuitBreaker } from '../common/resilience/circuit-breaker';
+import { executeWithRetry } from '../common/resilience/retry-policy';
 
 @Injectable()
 export class PenCentralClient {
   private readonly logger = new Logger(PenCentralClient.name);
   private readonly baseUrl: string;
   private readonly apiKey: string | undefined;
+  private readonly circuitBreaker: CircuitBreaker;
 
   constructor() {
     this.baseUrl =
       process.env.PENCENTRAL_BASE_URL?.replace(/\/+$/, '') ??
       'https://newhrpartnersapi.pensioncentral.ng';
     this.apiKey = process.env.PENCENTRAL_API_KEY;
+    this.circuitBreaker = new CircuitBreaker({
+      name: 'PenCentral',
+      failureThreshold: 5,
+      recoveryTimeoutMs: 30000,
+    });
+  }
+
+  getCircuitStats() {
+    return this.circuitBreaker.getStats();
   }
 
   private getAuthHeader(): string {
@@ -72,12 +84,46 @@ export class PenCentralClient {
 
     let response: Response;
     try {
-      response = await fetch(url, {
-        method,
-        headers,
-        body: options.body ? JSON.stringify(options.body) : undefined,
+      response = await this.circuitBreaker.execute(async () => {
+        return executeWithRetry(
+          async () => {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 15000);
+            try {
+              const res = await fetch(url, {
+                method,
+                headers,
+                body: options.body ? JSON.stringify(options.body) : undefined,
+                signal: controller.signal,
+              });
+
+              if (
+                !res.ok &&
+                [408, 429, 500, 502, 503, 504].includes(res.status)
+              ) {
+                throw new ServiceUnavailableException(
+                  `PenCentral API returned transient status ${res.status}`,
+                );
+              }
+              return res;
+            } catch (fetchErr: any) {
+              if (fetchErr.name === 'AbortError') {
+                throw new ServiceUnavailableException(
+                  `PenCentral API request timed out after 15000ms`,
+                );
+              }
+              throw fetchErr;
+            } finally {
+              clearTimeout(timer);
+            }
+          },
+          { name: 'PenCentral', maxRetries: 3, initialDelayMs: 200 },
+        );
       });
     } catch (err: any) {
+      if (err instanceof ServiceUnavailableException) {
+        throw err;
+      }
       this.logger.error(
         `Network error connecting to PenCentral: ${err.message}`,
       );

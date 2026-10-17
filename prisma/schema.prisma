@@ -852,3 +852,78 @@ model PensionRemittanceSchedule {
   @@map("pension_remittance_schedule")
 }
 
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+model IdempotencyKey {
+  id             String            @id
+  organizationId String
+  key            String
+  userId         String
+  endpoint       String
+  requestHash    String
+  status         IdempotencyStatus @default(IN_PROGRESS)
+  statusCode     Int?
+  responseBody   Json?
+  lockedUntil    DateTime
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([organizationId, key])
+  @@index([organizationId, status])
+  @@index([lockedUntil])
+  @@map("idempotency_key")
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+model OutboxEvent {
+  id             String       @id
+  organizationId String
+  eventType      String
+  aggregateType  String
+  aggregateId    String
+  payload        Json
+  status         OutboxStatus @default(PENDING)
+  retryCount     Int          @default(0)
+  maxRetries     Int          @default(5)
+  lastError      String?
+  nextRetryAt    DateTime     @default(now())
+  processedAt    DateTime?
+  lockedUntil    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, status])
+  @@index([status, nextRetryAt])
+  @@map("outbox_event")
+}
+
+model DeadLetterEvent {
+  id             String    @id
+  organizationId String
+  originalId     String
+  eventType      String
+  aggregateType  String
+  aggregateId    String
+  payload        Json
+  failureReason  String
+  stackTrace     String?
+  retryCount     Int
+  createdAt      DateTime  @default(now())
+
+  @@index([organizationId])
+  @@index([eventType])
+  @@map("dead_letter_event")
+}
+
+
+
