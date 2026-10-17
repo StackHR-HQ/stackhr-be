@@ -2,7 +2,7 @@
 
 > Multi-tenant People, Payroll, Nigerian Statutory Compliance, and Spend Management platform for African SMEs.
 
-[![CI Status](https://github.com/StackHR-HQ/stackhr-be/actions/workflows/ci.yml/badge.svg)](https://github.com/StackHR-HQ/stackhr-be/actions/workflows/ci.yml)
+[![CI Status](https://github.com/StackHR-HQ/stackhr-be/actions/workflows/main-ci.yml/badge.svg?branch=main)](https://github.com/StackHR-HQ/stackhr-be/actions/workflows/main-ci.yml)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org)
 [![NestJS](https://img.shields.io/badge/framework-NestJS%2011-ea2845.svg)](https://nestjs.com)
 [![Prisma](https://img.shields.io/badge/orm-Prisma%207-2d3748.svg)](https://www.prisma.io)
