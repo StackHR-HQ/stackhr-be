@@ -15,6 +15,10 @@ describe('PayrollListener', () => {
       },
       payslip: {
         createMany: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      auditEvent: {
+        create: jest.fn().mockResolvedValue({}),
       },
       $transaction: jest.fn((promises: any[]) => Promise.all(promises)),
     };
@@ -125,6 +129,64 @@ describe('PayrollListener', () => {
       where: { id: 'run-200' },
       data: { status: 'REJECTED' },
     });
+    expect(prisma.payslip.createMany).not.toHaveBeenCalled();
+    expect(prisma.auditEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'payroll_run.rejected',
+        }),
+      }),
+    );
+  });
+
+  it('should skip processing if payroll run is already APPROVED', async () => {
+    const event: ApprovalDecidedEvent = {
+      approvalRequestId: 'app-pay-3',
+      organizationId: 'org-1',
+      type: 'PAYROLL',
+      requesterId: 'user-1',
+      approverId: 'user-2',
+      subjectTable: 'payroll_run',
+      subjectId: 'run-300',
+      status: 'APPROVED',
+      rejectionReason: null,
+    };
+
+    prisma.payrollRun.findUnique.mockResolvedValue({
+      id: 'run-300',
+      status: 'APPROVED',
+      items: [],
+    });
+
+    await listener.handleApprovalDecided(event);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.payslip.createMany).not.toHaveBeenCalled();
+  });
+
+  it('should skip processing if payslips already exist for the payroll run', async () => {
+    const event: ApprovalDecidedEvent = {
+      approvalRequestId: 'app-pay-4',
+      organizationId: 'org-1',
+      type: 'PAYROLL',
+      requesterId: 'user-1',
+      approverId: 'user-2',
+      subjectTable: 'payroll_run',
+      subjectId: 'run-400',
+      status: 'APPROVED',
+      rejectionReason: null,
+    };
+
+    prisma.payrollRun.findUnique.mockResolvedValue({
+      id: 'run-400',
+      status: 'PENDING_APPROVAL',
+      items: [{ employeeId: 'emp-1' }],
+    });
+    prisma.payslip.count.mockResolvedValue(1);
+
+    await listener.handleApprovalDecided(event);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.payslip.createMany).not.toHaveBeenCalled();
   });
 });

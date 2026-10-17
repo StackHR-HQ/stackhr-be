@@ -323,6 +323,29 @@ export class PayrollService {
       include: { items: true },
     });
 
+    if (this.prisma.auditEvent) {
+      await this.prisma.auditEvent
+        .create({
+          data: {
+            organizationId: orgId,
+            actorUserId: user.id,
+            action: 'payroll_run.calculated',
+            targetType: 'payroll_run',
+            targetId: run.id,
+            description: `Calculated payroll run "${run.title}" for ${itemsData.length} employees`,
+            changes: {
+              status: 'CALCULATED',
+              totalGross,
+              totalTax,
+              totalPension,
+              totalNet,
+              employeeCount: itemsData.length,
+            },
+          },
+        })
+        .catch(() => undefined);
+    }
+
     return {
       message: `Payroll run calculated successfully for ${itemsData.length} employees`,
       payrollRun: updatedRun,
@@ -358,6 +381,26 @@ export class PayrollService {
       where: { id: runId },
       data: { status: 'PENDING_APPROVAL' },
     });
+
+    if (this.prisma.auditEvent) {
+      await this.prisma.auditEvent
+        .create({
+          data: {
+            organizationId: orgId,
+            actorUserId: user.id,
+            action: 'payroll_run.submitted',
+            targetType: 'payroll_run',
+            targetId: run.id,
+            description: `Submitted payroll run "${run.title}" for approval`,
+            changes: {
+              status: 'PENDING_APPROVAL',
+              approvalRequestId: approvalResult.approvalRequest.id,
+              amountSnapshot: run.totalNet,
+            },
+          },
+        })
+        .catch(() => undefined);
+    }
 
     return {
       message: 'Payroll run submitted for approval and locked from edits',
@@ -395,6 +438,28 @@ export class PayrollService {
       where: { id: runId },
       data: { status: nextStatus },
     });
+
+    if (this.prisma.auditEvent) {
+      await this.prisma.auditEvent
+        .create({
+          data: {
+            organizationId: orgId,
+            actorUserId: user.id,
+            action: 'payroll_run.funding_checked',
+            targetType: 'payroll_run',
+            targetId: run.id,
+            description: dto.confirmed
+              ? `Funding check passed for payroll run "${run.title}"`
+              : `Funding shortfall recorded for payroll run "${run.title}"`,
+            changes: {
+              status: nextStatus,
+              confirmed: dto.confirmed,
+              notes: dto.notes ?? null,
+            },
+          },
+        })
+        .catch(() => undefined);
+    }
 
     return {
       message: dto.confirmed
@@ -453,6 +518,27 @@ export class PayrollService {
       })),
     };
 
+    if (this.prisma.auditEvent) {
+      await this.prisma.auditEvent
+        .create({
+          data: {
+            organizationId: orgId,
+            actorUserId: user.id,
+            action: 'payroll_run.executed',
+            targetType: 'payroll_run',
+            targetId: run.id,
+            description: `Payment execution recorded for payroll run "${run.title}"`,
+            changes: {
+              status: 'EXECUTED',
+              executedAt: executedAt.toISOString(),
+              totalPayoutNet: run.totalNet,
+              employeeCount: run.items.length,
+            },
+          },
+        })
+        .catch(() => undefined);
+    }
+
     return {
       message: 'Payment execution recorded and bank transfer file exported',
       payrollRun: updatedRun,
@@ -485,6 +571,25 @@ export class PayrollService {
         reconciledAt,
       },
     });
+
+    if (this.prisma.auditEvent) {
+      await this.prisma.auditEvent
+        .create({
+          data: {
+            organizationId: orgId,
+            actorUserId: user.id,
+            action: 'payroll_run.reconciled',
+            targetType: 'payroll_run',
+            targetId: run.id,
+            description: `Payroll run "${run.title}" successfully reconciled`,
+            changes: {
+              status: 'RECONCILED',
+              reconciledAt: reconciledAt.toISOString(),
+            },
+          },
+        })
+        .catch(() => undefined);
+    }
 
     return {
       message: 'Payroll run successfully reconciled',

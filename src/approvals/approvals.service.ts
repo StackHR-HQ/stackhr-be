@@ -475,9 +475,10 @@ export class ApprovalsService {
         aggregateId: updated.id,
         payload: decidedEvent,
       });
+      await this.outboxService.processPending();
+    } else {
+      this.eventEmitter.emit(APPROVAL_EVENTS.DECIDED, decidedEvent);
     }
-
-    this.eventEmitter.emit(APPROVAL_EVENTS.DECIDED, decidedEvent);
 
     return { approvalRequest: updated };
   }
