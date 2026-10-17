@@ -16,6 +16,7 @@ import { PayrollService } from './payroll.service';
 import { SetCompensationDto } from './dto/set-compensation.dto';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { FundingCheckDto } from './dto/funding-check.dto';
+import { Idempotent } from '../common/idempotency/idempotency.decorator';
 
 const ADMIN_ROLES = [
   USER_ROLES.BUSINESS_OWNER,
@@ -90,6 +91,7 @@ export class PayrollController {
 
   @Post('runs/:id/execute')
   @RequireRoles(...ADMIN_ROLES)
+  @Idempotent({ required: true })
   executePayment(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') runId: string,

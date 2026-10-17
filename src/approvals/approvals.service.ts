@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
@@ -18,6 +19,7 @@ import {
   ApprovalDecidedEvent,
 } from './events/approval-decided.event';
 import type { ApprovalRequest } from '../../generated/prisma/client';
+import { OutboxService } from '../common/outbox/outbox.service';
 
 @Injectable()
 export class ApprovalsService {
@@ -26,6 +28,7 @@ export class ApprovalsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    @Optional() private readonly outboxService?: OutboxService,
   ) {}
 
   async submitRequest(user: AuthenticatedUser, dto: CreateApprovalRequestDto) {
@@ -452,20 +455,29 @@ export class ApprovalsService {
       },
     });
 
-    this.eventEmitter.emit(
-      APPROVAL_EVENTS.DECIDED,
-      new ApprovalDecidedEvent(
-        updated.id,
-        updated.organizationId,
-        updated.type,
-        updated.requesterId,
-        user.id,
-        dto.status,
-        updated.rejectionReason,
-        updated.subjectTable,
-        updated.subjectId,
-      ),
+    const decidedEvent = new ApprovalDecidedEvent(
+      updated.id,
+      updated.organizationId,
+      updated.type,
+      updated.requesterId,
+      user.id,
+      dto.status,
+      updated.rejectionReason,
+      updated.subjectTable,
+      updated.subjectId,
     );
+
+    if (this.outboxService) {
+      await this.outboxService.createEvent({
+        organizationId: updated.organizationId,
+        eventType: APPROVAL_EVENTS.DECIDED,
+        aggregateType: 'ApprovalRequest',
+        aggregateId: updated.id,
+        payload: decidedEvent,
+      });
+    }
+
+    this.eventEmitter.emit(APPROVAL_EVENTS.DECIDED, decidedEvent);
 
     return { approvalRequest: updated };
   }

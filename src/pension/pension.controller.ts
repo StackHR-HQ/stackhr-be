@@ -21,6 +21,7 @@ import {
   UpdatePensionConfigDto,
   ValidateEmployerCodeDto,
 } from './dto/pension.dto';
+import { Idempotent } from '../common/idempotency/idempotency.decorator';
 
 const PENSION_ADMIN_ROLES = [
   USER_ROLES.BUSINESS_OWNER,
@@ -127,6 +128,7 @@ export class PensionController {
 
   @Post('schedules/:id/submit')
   @RequireRoles(...PENSION_ADMIN_ROLES)
+  @Idempotent({ required: true })
   submitSchedule(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
@@ -136,6 +138,7 @@ export class PensionController {
 
   @Post('schedules/:id/payment')
   @RequireRoles(...PENSION_ADMIN_ROLES)
+  @Idempotent({ required: true })
   initiatePayment(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,

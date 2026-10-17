@@ -7,6 +7,179 @@
   },
   "item": [
     {
+      "name": "Observability & Health",
+      "description": "System telemetry, Prometheus metrics scrape endpoints, readiness/liveness health probes.",
+      "item": [
+        {
+          "name": "Get Prometheus Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "metrics"
+              ]
+            },
+            "description": "Scrapes Prometheus metrics text format including P50/P90/P95/P99 latency histograms, HTTP request counters, Idempotency engine events, Outbox DLQ depth, Circuit Breaker states, and Node.js process runtime stats."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "text",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain; version=0.0.4; charset=utf-8"
+                }
+              ],
+              "body": "# HELP stackhr_http_requests_total Total number of HTTP requests processed by StackHR backend\n# TYPE stackhr_http_requests_total counter\nstackhr_http_requests_total{method=\"GET\",route=\"/v1/api/employees\",status_code=\"200\"} 142\n\n# HELP stackhr_http_request_duration_seconds HTTP request latency in seconds across P50, P90, P95, and P99 percentiles\n# TYPE stackhr_http_request_duration_seconds histogram\nstackhr_http_request_duration_seconds_bucket{le=\"0.05\",method=\"GET\",route=\"/v1/api/employees\",status_code=\"200\"} 130\nstackhr_http_request_duration_seconds_bucket{le=\"+Inf\",method=\"GET\",route=\"/v1/api/employees\",status_code=\"200\"} 142\nstackhr_http_request_duration_seconds_sum{method=\"GET\",route=\"/v1/api/employees\",status_code=\"200\"} 3.421\nstackhr_http_request_duration_seconds_count{method=\"GET\",route=\"/v1/api/employees\",status_code=\"200\"} 142\n\n# HELP stackhr_outbox_dlq_depth Current number of dead-lettered events requiring operator attention\n# TYPE stackhr_outbox_dlq_depth gauge\nstackhr_outbox_dlq_depth 0\n\n# HELP stackhr_circuit_breaker_state Current state of external client circuit breakers (0 = CLOSED, 1 = HALF_OPEN, 2 = OPEN)\n# TYPE stackhr_circuit_breaker_state gauge\nstackhr_circuit_breaker_state{breaker_name=\"PenCentral\"} 0"
+            }
+          ]
+        },
+        {
+          "name": "Get System Health & Readiness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Liveness and readiness health check probe reporting database latency, process memory stats (heap, RSS), circuit breaker health, and DLQ depth."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"ok\",\n  \"timestamp\": \"2026-10-17T06:00:00.000Z\",\n  \"uptimeSeconds\": 1420,\n  \"database\": {\n    \"status\": \"up\",\n    \"responseTimeMs\": 4\n  },\n  \"memory\": {\n    \"heapUsedMb\": 65.4,\n    \"heapTotalMb\": 98.2,\n    \"rssMb\": 142.1\n  },\n  \"circuitBreakers\": [\n    {\n      \"name\": \"PenCentral\",\n      \"state\": \"CLOSED\",\n      \"consecutiveFailures\": 0,\n      \"lastFailureTime\": 0,\n      \"isAvailable\": true\n    }\n  ],\n  \"outboxDlq\": {\n    \"depth\": 0\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Dead Letter Events (DLQ)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/outbox/dlq?limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "outbox",
+                "dlq"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Maximum number of DLQ events to retrieve (default: 50, max: 100)"
+                },
+                {
+                  "key": "organizationId",
+                  "value": "org-uuid-placeholder",
+                  "disabled": true,
+                  "description": "Optional filter by organization ID"
+                }
+              ]
+            },
+            "description": "Platform Admin endpoint to inspect poisoned or max-retry-exceeded outbox domain events requiring operator intervention."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 1,\n    \"events\": [\n      {\n        \"id\": \"dlq_8f9a2b1c-9999-4d2a\",\n        \"organizationId\": \"org_abc123\",\n        \"originalId\": \"outbox_12345\",\n        \"eventType\": \"approval.decided\",\n        \"aggregateType\": \"ApprovalRequest\",\n        \"aggregateId\": \"appr_777\",\n        \"payload\": {\n          \"requestId\": \"appr_777\",\n          \"status\": \"APPROVED\",\n          \"requestType\": \"LEAVE\"\n        },\n        \"failureReason\": \"SendByte gateway connection timeout after 5 attempts\",\n        \"retryCount\": 5,\n        \"createdAt\": \"2026-10-17T05:30:00.000Z\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Replay Dead Letter Event",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/outbox/dlq/:id/replay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "outbox",
+                "dlq",
+                ":id",
+                "replay"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "dlq_8f9a2b1c-9999-4d2a",
+                  "description": "UUID of the dead letter event to replay"
+                }
+              ]
+            },
+            "description": "Platform Admin endpoint to replay a dead letter event by reinstating it as a fresh PENDING event in the Transactional Outbox and removing it from the DLQ."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Dead letter event successfully queued for replay\",\n    \"replayedEventId\": \"outbox_new_replayed_uuid\"\n  }\n}"
+            },
+            {
+              "name": "Not Found (404)",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Dead letter event with ID dlq_invalid not found\",\n  \"data\": null,\n  \"error\": {\n    \"error\": \"NotFoundException\",\n    \"statusCode\": 404\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Waitlist",
       "description": "Public waitlist registration and admin entry management endpoints.",
       "item": [
