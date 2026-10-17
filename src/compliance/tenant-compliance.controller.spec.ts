@@ -45,4 +45,14 @@ describe('TenantComplianceController', () => {
     expect(result).toEqual(mockRuleSet);
     expect(service.getEffectiveTaxRuleSet).toHaveBeenCalledWith('NG');
   });
+
+  it('should return alerts for authenticated user organization', async () => {
+    const mockAlerts = { alerts: [{ type: 'MISSING_TAX_ID', count: 1 }] };
+    (service as any).getAlerts = jest.fn().mockResolvedValue(mockAlerts);
+
+    const mockUser: any = { id: 'u-1', organizationId: 'org-1' };
+    const result = await controller.getAlerts(mockUser);
+    expect(result).toEqual(mockAlerts);
+    expect((service as any).getAlerts).toHaveBeenCalledWith(mockUser);
+  });
 });

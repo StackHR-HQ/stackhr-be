@@ -235,7 +235,16 @@ export class MeService {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return { expenses };
+    const formatted = expenses.map((e) => ({
+      ...e,
+      expenseDate:
+        (e as any).expenseDate ??
+        (e.createdAt
+          ? new Date(e.createdAt).toISOString()
+          : new Date().toISOString()),
+      paymentMethod: (e as any).paymentMethod ?? 'BANK_TRANSFER',
+    }));
+    return { expenses: formatted };
   }
 
   async getSalaryAdvances(user: AuthenticatedUser) {
@@ -247,9 +256,13 @@ export class MeService {
       },
       orderBy: { createdAt: 'desc' },
     });
+    const formatted = advances.map((a) => ({
+      ...a,
+      currency: (a as any).currency ?? 'NGN',
+    }));
     return {
-      salaryAdvances: advances,
-      advances,
+      salaryAdvances: formatted,
+      advances: formatted,
     };
   }
 

@@ -121,6 +121,15 @@ export class PayrollController {
     return this.payrollService.getRunById(user, runId);
   }
 
+  @Get('runs/:id/audit-events')
+  @RequireRoles(...ADMIN_ROLES)
+  getRunAuditEvents(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') runId: string,
+  ) {
+    return this.payrollService.getRunAuditEvents(user, runId);
+  }
+
   @Get('payslips')
   @RequireRoles(...ADMIN_ROLES)
   getPayslips(

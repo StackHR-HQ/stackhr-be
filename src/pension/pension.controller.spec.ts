@@ -3,6 +3,7 @@ import { PensionController } from './pension.controller';
 import { PensionService } from './pension.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { USER_ROLES, USER_TYPES } from '../auth/auth.constants';
+import { AttachEmployerDto, ValidateEmployerCodeDto } from './dto/pension.dto';
 
 describe('PensionController', () => {
   let controller: PensionController;
@@ -33,9 +34,37 @@ describe('PensionController', () => {
       syncDisbursements: jest.fn(),
       getDashboard: jest.fn(),
       getComplianceReport: jest.fn(),
+      validateEmployerCode: jest.fn(),
+      attachEmployer: jest.fn(),
+      getEmployerStatus: jest.fn(),
+      revokeEmployer: jest.fn(),
     } as any;
 
     controller = new PensionController(service);
+  });
+
+  it('delegates validateEmployer', async () => {
+    const dto = new ValidateEmployerCodeDto();
+    dto.employerCode = 'PR0000126311';
+    await controller.validateEmployer(mockUser, dto);
+    expect(service.validateEmployerCode).toHaveBeenCalledWith(mockUser, dto);
+  });
+
+  it('delegates attachEmployer', async () => {
+    const dto = new AttachEmployerDto();
+    dto.validationId = 'ev_123';
+    await controller.attachEmployer(mockUser, dto);
+    expect(service.attachEmployer).toHaveBeenCalledWith(mockUser, dto);
+  });
+
+  it('delegates getEmployerStatus', async () => {
+    await controller.getEmployerStatus(mockUser);
+    expect(service.getEmployerStatus).toHaveBeenCalledWith(mockUser);
+  });
+
+  it('delegates revokeEmployer', async () => {
+    await controller.revokeEmployer(mockUser);
+    expect(service.revokeEmployer).toHaveBeenCalledWith(mockUser);
   });
 
   it('delegates getRegisteredPfas', () => {

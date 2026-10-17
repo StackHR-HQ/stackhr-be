@@ -15,6 +15,7 @@ describe('PayrollService', () => {
   };
   let complianceServiceMock: {
     calculatePayrollDeductions: jest.Mock;
+    getAlerts?: jest.Mock;
   };
 
   const mockAdminUser: AuthenticatedUser = {
@@ -51,6 +52,13 @@ describe('PayrollService', () => {
         deleteMany: jest.fn(),
         createMany: jest.fn(),
       },
+      auditEvent: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue({}),
+      },
+      user: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
     approvalsServiceMock = {
@@ -68,6 +76,7 @@ describe('PayrollService', () => {
         annualBreakdown: {},
         ruleSetId: 'TRS-123',
       }),
+      getAlerts: jest.fn().mockResolvedValue({ alerts: [] }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -341,6 +350,35 @@ describe('PayrollService', () => {
       const result = await service.getRunById(mockAdminUser, 'run-1');
 
       expect(result.payrollRun.payDate).toBe('2026-10-25');
+      expect(result.payrollRun.createdBy).toBe('Admin User');
+      expect(result.payrollRun.auditTrail).toEqual([]);
+      expect(result.payrollRun.complianceWarnings).toEqual([]);
+    });
+  });
+
+  describe('getRunAuditEvents', () => {
+    it('should return chronological audit events for a payroll run', async () => {
+      prismaMock.payrollRun.findFirst.mockResolvedValue({
+        id: 'run-1',
+        title: 'Run 10/2026',
+      });
+      prismaMock.auditEvent.findMany.mockResolvedValue([
+        {
+          id: 'ev-1',
+          action: 'payroll_run.created',
+          description: 'Created run',
+          createdAt: new Date('2026-10-01'),
+          actorUserId: 'u-1',
+        },
+      ]);
+      prismaMock.user.findMany.mockResolvedValue([
+        { id: 'u-1', name: 'John Doe', email: 'john@acme.com' },
+      ]);
+
+      const result = await service.getRunAuditEvents(mockAdminUser, 'run-1');
+      expect(result.auditEvents).toHaveLength(1);
+      expect(result.auditEvents[0].actor.name).toBe('John Doe');
+      expect(result.auditEvents[0].action).toBe('payroll_run.created');
     });
   });
 

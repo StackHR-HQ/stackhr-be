@@ -127,7 +127,7 @@ export class PayrollService {
       payDate,
       currency: 'NGN',
       payrollEngineVersion: '2026.1',
-      taxRuleSetId: 'ng-nta-2026-v1',
+      taxRuleSetId: 'TRS-NTA-2026',
     };
   }
 
@@ -171,9 +171,32 @@ export class PayrollService {
 
     const payDay = org?.payDate ?? 25;
 
+    if (this.prisma.auditEvent) {
+      await this.prisma.auditEvent
+        .create({
+          data: {
+            organizationId: orgId,
+            actorUserId: user.id,
+            action: 'payroll_run.created',
+            targetType: 'payroll_run',
+            targetId: run.id,
+            description: `Created payroll run "${title}" in DRAFT state`,
+            changes: {
+              periodMonth: dto.periodMonth,
+              periodYear: dto.periodYear,
+              title,
+            },
+          },
+        })
+        .catch(() => undefined);
+    }
+
     return {
       message: 'Payroll run created in DRAFT state',
-      payrollRun: this.formatPayrollRun(run, payDay),
+      payrollRun: {
+        ...this.formatPayrollRun(run, payDay),
+        createdBy: user.name || user.email || 'Admin',
+      },
     };
   }
 
@@ -499,6 +522,34 @@ export class PayrollService {
 
     const payDay = org?.payDate ?? 25;
 
+    const runIds = runs.map((r) => r.id);
+    const creationEvents =
+      runIds.length > 0 && this.prisma.auditEvent
+        ? await this.prisma.auditEvent.findMany({
+            where: {
+              organizationId: orgId,
+              targetType: 'payroll_run',
+              targetId: { in: runIds },
+              action: 'payroll_run.created',
+            },
+          })
+        : [];
+    const actorUserIds = [...new Set(creationEvents.map((e) => e.actorUserId))];
+    const users =
+      actorUserIds.length > 0
+        ? await this.prisma.user.findMany({
+            where: { id: { in: actorUserIds } },
+            select: { id: true, name: true, email: true },
+          })
+        : [];
+    const userMap = new Map(users.map((u) => [u.id, u.name || u.email]));
+    const creatorByRunId = new Map(
+      creationEvents.map((e) => [
+        e.targetId,
+        userMap.get(e.actorUserId) || e.actorUserId,
+      ]),
+    );
+
     return {
       payrollRuns: runs.map((r) => {
         const items = (r as any).items ?? [];
@@ -522,6 +573,8 @@ export class PayrollService {
           totalNhf,
           totalEmployerPension,
           totalOtherDeductions,
+          createdBy:
+            creatorByRunId.get(r.id) ?? user.name ?? user.email ?? 'Admin',
         };
       }),
     };
@@ -530,7 +583,7 @@ export class PayrollService {
   async getRunById(user: AuthenticatedUser, runId: string) {
     const orgId = this.checkOrgContext(user);
 
-    const [run, org, approval] = await Promise.all([
+    const [run, org, approval, auditEvents] = await Promise.all([
       this.prisma.payrollRun.findFirst({
         where: { id: runId, organizationId: orgId },
         include: {
@@ -565,10 +618,67 @@ export class PayrollService {
             select: { rejectionReason: true },
           })
         : Promise.resolve(null),
+      this.prisma.auditEvent
+        ? this.prisma.auditEvent.findMany({
+            where: {
+              organizationId: orgId,
+              targetType: 'payroll_run',
+              targetId: runId,
+            },
+            orderBy: { createdAt: 'desc' },
+          })
+        : Promise.resolve([]),
     ]);
 
     if (!run) {
       throw new NotFoundException(`Payroll run ${runId} not found`);
+    }
+
+    const actorIds = [...new Set(auditEvents.map((e) => e.actorUserId))];
+    const actorUsers =
+      actorIds.length > 0
+        ? await this.prisma.user.findMany({
+            where: { id: { in: actorIds } },
+            select: { id: true, name: true, email: true },
+          })
+        : [];
+    const actorMap = new Map<string, any>(actorUsers.map((u) => [u.id, u]));
+
+    const auditTrail = auditEvents.map((e) => ({
+      id: e.id,
+      action: e.action,
+      description: e.description,
+      createdAt: e.createdAt,
+      actor: actorMap.get(e.actorUserId as string) ?? {
+        id: e.actorUserId,
+        name: 'User',
+        email: '',
+      },
+    }));
+
+    const creationEvent = auditEvents.find(
+      (e) => e.action === 'payroll_run.created',
+    );
+    const creatorUser = creationEvent
+      ? actorMap.get(creationEvent.actorUserId)
+      : null;
+    const createdBy =
+      creatorUser?.name ||
+      creatorUser?.email ||
+      user.name ||
+      user.email ||
+      'Admin';
+
+    let complianceWarnings: any[] = [];
+    if (run.status === 'DRAFT' || run.status === 'CALCULATED') {
+      try {
+        const alertData = await this.complianceService.getAlerts(user);
+        complianceWarnings = alertData.alerts.filter(
+          (a: any) => a.type !== 'UPCOMING_STATUTORY_DEADLINE',
+        );
+      } catch {
+        complianceWarnings = [];
+      }
     }
 
     const payDay = org?.payDate ?? 25;
@@ -577,9 +687,60 @@ export class PayrollService {
     return {
       payrollRun: {
         ...formatted,
+        createdBy,
         rejectionReason: approval?.rejectionReason ?? null,
+        complianceWarnings,
+        auditTrail,
       },
     };
+  }
+
+  async getRunAuditEvents(user: AuthenticatedUser, runId: string) {
+    const orgId = this.checkOrgContext(user);
+
+    const run = await this.prisma.payrollRun.findFirst({
+      where: { id: runId, organizationId: orgId },
+      select: { id: true, title: true },
+    });
+
+    if (!run) {
+      throw new NotFoundException(`Payroll run ${runId} not found`);
+    }
+
+    const auditEvents = this.prisma.auditEvent
+      ? await this.prisma.auditEvent.findMany({
+          where: {
+            organizationId: orgId,
+            targetType: 'payroll_run',
+            targetId: runId,
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      : [];
+
+    const actorIds = [...new Set(auditEvents.map((e) => e.actorUserId))];
+    const actorUsers =
+      actorIds.length > 0
+        ? await this.prisma.user.findMany({
+            where: { id: { in: actorIds } },
+            select: { id: true, name: true, email: true },
+          })
+        : [];
+    const actorMap = new Map<string, any>(actorUsers.map((u) => [u.id, u]));
+
+    const events = auditEvents.map((e) => ({
+      id: e.id,
+      action: e.action,
+      description: e.description,
+      createdAt: e.createdAt,
+      actor: actorMap.get(e.actorUserId) ?? {
+        id: e.actorUserId,
+        name: 'User',
+        email: '',
+      },
+    }));
+
+    return { auditEvents: events };
   }
 
   async getAllCompensations(user: AuthenticatedUser) {

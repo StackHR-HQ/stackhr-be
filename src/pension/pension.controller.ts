@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -15,8 +16,10 @@ import { USER_ROLES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PensionService } from './pension.service';
 import {
+  AttachEmployerDto,
   PensionScheduleQueryDto,
   UpdatePensionConfigDto,
+  ValidateEmployerCodeDto,
 } from './dto/pension.dto';
 
 const PENSION_ADMIN_ROLES = [
@@ -33,6 +36,36 @@ export class PensionController {
   @Get('pfas')
   getRegisteredPfas() {
     return this.pensionService.getRegisteredPfas();
+  }
+
+  @Post('employers/validate')
+  @RequireRoles(...PENSION_ADMIN_ROLES)
+  validateEmployer(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ValidateEmployerCodeDto,
+  ) {
+    return this.pensionService.validateEmployerCode(user, dto);
+  }
+
+  @Post('employers/attach')
+  @RequireRoles(...PENSION_ADMIN_ROLES)
+  attachEmployer(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AttachEmployerDto,
+  ) {
+    return this.pensionService.attachEmployer(user, dto);
+  }
+
+  @Get('employers/status')
+  @RequireRoles(...PENSION_ADMIN_ROLES)
+  getEmployerStatus(@CurrentUser() user: AuthenticatedUser) {
+    return this.pensionService.getEmployerStatus(user);
+  }
+
+  @Delete('employers')
+  @RequireRoles(...PENSION_ADMIN_ROLES)
+  revokeEmployer(@CurrentUser() user: AuthenticatedUser) {
+    return this.pensionService.revokeEmployer(user);
   }
 
   @Get('config')

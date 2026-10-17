@@ -65,12 +65,50 @@ export class ComplianceService {
       orderBy: { effectiveFrom: 'desc' },
     });
 
-    if (activeRuleSet) {
-      return activeRuleSet;
-    }
+    const ruleSet = activeRuleSet ?? (await this.seedNta2026RuleSet());
+    const applicability = {
+      pension: {
+        mandatoryThreshold: 15,
+        voluntaryBelowThreshold: true,
+        employeeRate: ruleSet.pensionEmployeeRate,
+        employerRate: ruleSet.pensionEmployerRate,
+        basis: ruleSet.pensionBasisFields,
+        legalBasis: 'Pension Reform Act 2014 Section 2',
+        note: 'Mandatory for employers with 15 or more employees. Voluntary for employers with fewer than 15 employees. Overridden if employee is pension exempt.',
+      },
+      nhf: {
+        rate: ruleSet.nhfRate,
+        basis: ruleSet.nhfBasisField,
+        voluntary: true,
+        legalBasis: 'National Housing Fund Act',
+        note: '2.5% of basic salary. Voluntary/opt-in for private sector employees via nhfOptIn.',
+      },
+      nsitf: {
+        rate: 0.01,
+        basis: 'GROSS',
+        mandatory: true,
+        legalBasis: 'Employees Compensation Act 2010',
+        note: '1% of total monthly payroll, 100% employer-funded. Mandatory for all employers with 1 or more employees.',
+      },
+      itf: {
+        rate: 0.01,
+        basis: 'GROSS',
+        mandatoryThreshold: 5,
+        turnoverThresholdMinor: 5000000000,
+        legalBasis: 'Industrial Training Fund Act',
+        note: '1% of annual payroll. Mandatory for employers with 5 or more employees or annual turnover of ₦50,000,000+.',
+      },
+      nhia: {
+        mandatory: true,
+        legalBasis: 'National Health Insurance Authority Act 2022',
+        note: 'Mandatory health insurance for all employees in Nigeria.',
+      },
+    };
 
-    // Fallback: seed NTA 2026 default rule set if none exists
-    return this.seedNta2026RuleSet();
+    return {
+      ...ruleSet,
+      applicability,
+    };
   }
 
   /**

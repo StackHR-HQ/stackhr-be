@@ -10,6 +10,7 @@ import { PenCentralClient } from './pencentral.client';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { USER_ROLES, USER_TYPES } from '../auth/auth.constants';
 import { NIGERIAN_PFAS, PENSION_SCHEDULE_STATUS } from './pension.constants';
+import { AttachEmployerDto, ValidateEmployerCodeDto } from './dto/pension.dto';
 
 describe('PensionService', () => {
   let service: PensionService;
@@ -53,9 +54,192 @@ describe('PensionService', () => {
       getDisbursements: jest.fn(),
       getDashboard: jest.fn(),
       getComplianceReport: jest.fn(),
+      validateEmployer: jest.fn(),
+      attachEmployer: jest.fn(),
+      listAttachedEmployers: jest.fn(),
+      revokeEmployer: jest.fn(),
     } as any;
 
     service = new PensionService(prisma, penCentralClient);
+  });
+
+  describe('Employer Onboarding Lifecycle', () => {
+    describe('validateEmployerCode', () => {
+      it('validates employer code and returns validation details', async () => {
+        const mockResult = {
+          validation_id: 'ev_123',
+          employer_code: 'PR0000126311',
+          employer_name: 'UNDERDOG PRODUCTIONS LIMITED',
+          valid: true,
+          expires_at: '2026-10-16T04:03:02.485Z',
+        };
+        (penCentralClient.validateEmployer as jest.Mock).mockResolvedValue(
+          mockResult,
+        );
+
+        const dto = new ValidateEmployerCodeDto();
+        dto.employerCode = 'PR0000126311';
+
+        const res = await service.validateEmployerCode(mockUser, dto);
+
+        expect(res.validationId).toBe('ev_123');
+        expect(res.employerCode).toBe('PR0000126311');
+        expect(res.employerName).toBe('UNDERDOG PRODUCTIONS LIMITED');
+        expect(res.valid).toBe(true);
+        expect(penCentralClient.validateEmployer).toHaveBeenCalledWith(
+          'PR0000126311',
+        );
+      });
+
+      it('throws BadRequestException if user lacks organization context', async () => {
+        const dto = new ValidateEmployerCodeDto();
+        dto.employerCode = 'PR0000126311';
+
+        await expect(
+          service.validateEmployerCode(
+            { ...mockUser, organizationId: null },
+            dto,
+          ),
+        ).rejects.toThrow(BadRequestException);
+      });
+    });
+
+    describe('attachEmployer', () => {
+      it('attaches employer via validation_id and updates org penCentralEmployerCode', async () => {
+        const mockGrant = {
+          id: 'grant_123',
+          employer_code: 'PR0000126311',
+          employer_name: 'UNDERDOG PRODUCTIONS LIMITED',
+          status: 'active',
+          attached_at: '2026-10-16T03:33:03.535Z',
+        };
+        (penCentralClient.attachEmployer as jest.Mock).mockResolvedValue(
+          mockGrant,
+        );
+        (prisma.organization.update as jest.Mock).mockResolvedValue({
+          id: 'org-123',
+          penCentralEmployerCode: 'PR0000126311',
+        });
+
+        const dto = new AttachEmployerDto();
+        dto.validationId = 'ev_123';
+
+        const res = await service.attachEmployer(mockUser, dto);
+
+        expect(res.message).toBe('Employer attached successfully');
+        expect(res.grantId).toBe('grant_123');
+        expect(res.employerCode).toBe('PR0000126311');
+        expect(prisma.organization.update).toHaveBeenCalledWith({
+          where: { id: 'org-123' },
+          data: { penCentralEmployerCode: 'PR0000126311' },
+        });
+      });
+    });
+
+    describe('getEmployerStatus', () => {
+      it('returns isAttached false when org has no penCentralEmployerCode', async () => {
+        (prisma.organization.findUnique as jest.Mock).mockResolvedValue({
+          id: 'org-123',
+          penCentralEmployerCode: null,
+        });
+
+        const res = await service.getEmployerStatus(mockUser);
+        expect(res.isAttached).toBe(false);
+        expect(res.employerCode).toBeNull();
+      });
+
+      it('returns isAttached true when grant is active in PenCentral', async () => {
+        (prisma.organization.findUnique as jest.Mock).mockResolvedValue({
+          id: 'org-123',
+          name: 'Acme',
+          penCentralEmployerCode: 'PR0000126311',
+        });
+        (penCentralClient.listAttachedEmployers as jest.Mock).mockResolvedValue(
+          [
+            {
+              id: 'grant_123',
+              employer_code: 'PR0000126311',
+              employer_name: 'UNDERDOG PRODUCTIONS LIMITED',
+              status: 'active',
+              attached_at: '2026-10-16T03:33:03.535Z',
+            },
+          ],
+        );
+
+        const res = await service.getEmployerStatus(mockUser);
+        expect(res.isAttached).toBe(true);
+        expect(res.employerCode).toBe('PR0000126311');
+        expect(res.employerName).toBe('UNDERDOG PRODUCTIONS LIMITED');
+        expect(res.grant?.status).toBe('active');
+      });
+
+      it('returns isAttached false with warning when code not found in PenCentral grants', async () => {
+        (prisma.organization.findUnique as jest.Mock).mockResolvedValue({
+          id: 'org-123',
+          name: 'Acme',
+          penCentralEmployerCode: 'PR0000126311',
+        });
+        (penCentralClient.listAttachedEmployers as jest.Mock).mockResolvedValue(
+          [],
+        );
+
+        const res = await service.getEmployerStatus(mockUser);
+        expect(res.isAttached).toBe(false);
+        expect(res.warning).toBeDefined();
+      });
+
+      it('returns degraded status when PenCentral API is temporarily unreachable', async () => {
+        (prisma.organization.findUnique as jest.Mock).mockResolvedValue({
+          id: 'org-123',
+          name: 'Acme',
+          penCentralEmployerCode: 'PR0000126311',
+        });
+        (penCentralClient.listAttachedEmployers as jest.Mock).mockRejectedValue(
+          new Error('Connection timeout'),
+        );
+
+        const res = await service.getEmployerStatus(mockUser);
+        expect(res.degraded).toBe(true);
+        expect(res.employerCode).toBe('PR0000126311');
+      });
+    });
+
+    describe('revokeEmployer', () => {
+      it('revokes access on PenCentral and clears org penCentralEmployerCode in DB', async () => {
+        (prisma.organization.findUnique as jest.Mock).mockResolvedValue({
+          id: 'org-123',
+          penCentralEmployerCode: 'PR0000126311',
+        });
+        (penCentralClient.revokeEmployer as jest.Mock).mockResolvedValue(
+          undefined,
+        );
+        (prisma.organization.update as jest.Mock).mockResolvedValue({
+          id: 'org-123',
+          penCentralEmployerCode: null,
+        });
+
+        const res = await service.revokeEmployer(mockUser);
+        expect(res.message).toBe('Employer access revoked successfully');
+        expect(penCentralClient.revokeEmployer).toHaveBeenCalledWith(
+          'PR0000126311',
+        );
+        expect(prisma.organization.update).toHaveBeenCalledWith({
+          where: { id: 'org-123' },
+          data: { penCentralEmployerCode: null },
+        });
+      });
+
+      it('is idempotent when org has no penCentralEmployerCode set', async () => {
+        (prisma.organization.findUnique as jest.Mock).mockResolvedValue({
+          id: 'org-123',
+          penCentralEmployerCode: null,
+        });
+
+        const res = await service.revokeEmployer(mockUser);
+        expect(res.message).toBe('Employer access revoked successfully');
+        expect(penCentralClient.revokeEmployer).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('getRegisteredPfas', () => {
