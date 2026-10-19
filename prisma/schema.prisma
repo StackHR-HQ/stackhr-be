@@ -758,6 +758,7 @@ model Payslip {
   breakdownJson  String
   generatedAt    DateTime     @default(now())
 
+  @@unique([payrollRunId, employeeId])
   @@index([organizationId, employeeId])
   @@index([payrollRunId])
   @@map("payslip")

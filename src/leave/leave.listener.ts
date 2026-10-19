@@ -35,6 +35,16 @@ export class LeaveListener {
       return;
     }
 
+    if (
+      leaveRequest.status === 'APPROVED' ||
+      leaveRequest.status === 'REJECTED'
+    ) {
+      this.logger.warn(
+        `Leave request ${leaveRequestId} already has terminal status "${leaveRequest.status}". Skipping duplicate processing.`,
+      );
+      return;
+    }
+
     const balance = await this.prisma.leaveBalance.findFirst({
       where: {
         organizationId: event.organizationId,

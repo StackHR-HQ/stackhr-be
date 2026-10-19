@@ -55,6 +55,13 @@ export class SpendListener {
       return;
     }
 
+    if (expense.status === 'APPROVED' || expense.status === 'REJECTED') {
+      this.logger.warn(
+        `Expense claim ${expenseId} already has terminal status "${expense.status}". Skipping duplicate processing.`,
+      );
+      return;
+    }
+
     if (event.status === 'APPROVED') {
       await this.prisma.$transaction([
         this.prisma.expense.update({
@@ -123,6 +130,13 @@ export class SpendListener {
 
     if (!advance) {
       this.logger.warn(`Salary advance ${advanceId} not found`);
+      return;
+    }
+
+    if (advance.status === 'APPROVED' || advance.status === 'REJECTED') {
+      this.logger.warn(
+        `Salary advance ${advanceId} already has terminal status "${advance.status}". Skipping duplicate processing.`,
+      );
       return;
     }
 

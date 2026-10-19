@@ -37,7 +37,25 @@ export class PayrollListener {
       return;
     }
 
+    if (run.status === 'APPROVED' || run.status === 'REJECTED') {
+      this.logger.warn(
+        `Payroll run ${runId} already has terminal status "${run.status}". Skipping duplicate approval processing.`,
+      );
+      return;
+    }
+
     if (event.status === 'APPROVED') {
+      const existingPayslipsCount = await this.prisma.payslip.count({
+        where: { payrollRunId: run.id },
+      });
+
+      if (existingPayslipsCount > 0) {
+        this.logger.warn(
+          `Payslips already exist for payroll run ${runId}. Skipping payslip creation.`,
+        );
+        return;
+      }
+
       const now = new Date();
       const payslipsData = run.items.map((item: any) => ({
         id: randomUUID(),
@@ -72,6 +90,26 @@ export class PayrollListener {
         }),
       ]);
 
+      if (this.prisma.auditEvent) {
+        await this.prisma.auditEvent
+          .create({
+            data: {
+              organizationId: run.organizationId,
+              actorUserId: event.approverId,
+              action: 'payroll_run.approved',
+              targetType: 'payroll_run',
+              targetId: run.id,
+              description: `Approved payroll run "${run.title}"`,
+              changes: {
+                status: 'APPROVED',
+                approvedAt: now.toISOString(),
+                payslipsCount: payslipsData.length,
+              },
+            },
+          })
+          .catch(() => undefined);
+      }
+
       this.logger.log(
         `Approved payroll run ${runId}. Generated ${payslipsData.length} payslips.`,
       );
@@ -80,6 +118,25 @@ export class PayrollListener {
         where: { id: runId },
         data: { status: 'REJECTED' },
       });
+
+      if (this.prisma.auditEvent) {
+        await this.prisma.auditEvent
+          .create({
+            data: {
+              organizationId: run.organizationId,
+              actorUserId: event.approverId,
+              action: 'payroll_run.rejected',
+              targetType: 'payroll_run',
+              targetId: run.id,
+              description: `Rejected payroll run "${run.title}": ${event.rejectionReason ?? 'No reason provided'}`,
+              changes: {
+                status: 'REJECTED',
+                rejectionReason: event.rejectionReason ?? null,
+              },
+            },
+          })
+          .catch(() => undefined);
+      }
 
       this.logger.log(`Payroll run ${runId} marked as rejected.`);
     }
