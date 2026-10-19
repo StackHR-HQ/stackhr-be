@@ -42,13 +42,16 @@ export class LeaveService {
       );
     }
 
+    const days = dto.daysPerYear ?? dto.defaultDays ?? 20;
+
     const leaveType = await this.prisma.leaveType.create({
       data: {
         id: randomUUID(),
         organizationId: orgId,
         name: dto.name,
         description: dto.description ?? null,
-        daysPerYear: dto.daysPerYear,
+        daysPerYear: days,
+        defaultDays: days,
         paid: dto.paid ?? true,
         requiresApproval: dto.requiresApproval ?? true,
       },
@@ -56,10 +59,11 @@ export class LeaveService {
 
     // Automatically allocate initial leave balance to all active employees in organization
     const activeEmployees = await this.prisma.employee.findMany({
-      where: { status: 'ACTIVE' },
+      where: { organizationId: orgId, status: 'ACTIVE' },
       select: { id: true },
     });
 
+    const currentYear = new Date().getUTCFullYear();
     for (const emp of activeEmployees) {
       await this.prisma.leaveBalance.create({
         data: {
@@ -67,10 +71,12 @@ export class LeaveService {
           organizationId: orgId,
           employeeId: emp.id,
           leaveTypeId: leaveType.id,
-          allocatedDays: dto.daysPerYear,
+          year: currentYear,
+          allocatedDays: days,
+          totalDays: days,
           usedDays: 0,
           pendingDays: 0,
-          remainingDays: dto.daysPerYear,
+          remainingDays: days,
         },
       });
     }
@@ -165,16 +171,19 @@ export class LeaveService {
 
     if (!balance) {
       // Auto-initialize balance if missing
+      const days = leaveType.daysPerYear ?? leaveType.defaultDays ?? 20;
       balance = await this.prisma.leaveBalance.create({
         data: {
           id: randomUUID(),
           organizationId: orgId,
           employeeId: employee.id,
           leaveTypeId: leaveType.id,
-          allocatedDays: leaveType.daysPerYear,
+          year: new Date().getUTCFullYear(),
+          allocatedDays: days,
+          totalDays: days,
           usedDays: 0,
           pendingDays: 0,
-          remainingDays: leaveType.daysPerYear,
+          remainingDays: days,
         },
       });
     }
@@ -357,12 +366,14 @@ export class LeaveService {
       }
     }
 
+    const days = dto.daysPerYear ?? dto.defaultDays;
+
     const updated = await this.prisma.leaveType.update({
       where: { id },
       data: {
         ...(dto.name && { name: dto.name }),
         ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.daysPerYear !== undefined && { daysPerYear: dto.daysPerYear }),
+        ...(days !== undefined && { daysPerYear: days, defaultDays: days }),
         ...(dto.paid !== undefined && { paid: dto.paid }),
         ...(dto.requiresApproval !== undefined && {
           requiresApproval: dto.requiresApproval,
@@ -371,6 +382,44 @@ export class LeaveService {
     });
 
     return { leaveType: updated };
+  }
+
+  async deleteLeaveType(user: AuthenticatedUser, id: string) {
+    const orgId = this.checkOrgContext(user);
+
+    const leaveType = await this.prisma.leaveType.findFirst({
+      where: { id, organizationId: orgId },
+      include: {
+        _count: {
+          select: {
+            leaveRequests: true,
+          },
+        },
+      },
+    });
+
+    if (!leaveType) {
+      throw new NotFoundException(`Leave type with ID "${id}" not found`);
+    }
+
+    if (leaveType._count.leaveRequests > 0) {
+      throw new BadRequestException(
+        `Cannot delete leave type "${leaveType.name}" because it has ${leaveType._count.leaveRequests} associated leave request(s).`,
+      );
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.leaveBalance.deleteMany({
+        where: { leaveTypeId: id, organizationId: orgId },
+      }),
+      this.prisma.leaveType.delete({
+        where: { id },
+      }),
+    ]);
+
+    return {
+      message: `Leave type "${leaveType.name}" was successfully deleted`,
+    };
   }
 
   async cancelLeaveRequest(user: AuthenticatedUser, id: string) {

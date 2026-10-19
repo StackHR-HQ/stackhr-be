@@ -2388,6 +2388,71 @@
           ]
         },
         {
+          "name": "Delete Leave Type",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leave/types/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leave",
+                "types",
+                ":id"
+              ]
+            },
+            "description": "Delete a leave type and its unused balances (Admin/HR only). Rejected if leave requests exist for this type."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Leave type deleted successfully\"\n}"
+            },
+            {
+              "name": "Error (409 Conflict - Leave requests exist)",
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 409,\n  \"message\": \"Cannot delete leave type that has existing leave requests\",\n  \"error\": \"Conflict\"\n}"
+            },
+            {
+              "name": "Error (404 Not Found)",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Leave type with ID \\\"lt-1\\\" not found\",\n  \"error\": \"Not Found\"\n}"
+            }
+          ]
+        },
+        {
           "name": "Cancel Leave Request",
           "request": {
             "method": "PATCH",

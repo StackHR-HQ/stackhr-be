@@ -158,7 +158,7 @@ export class MeService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [balances, approvedRequests] = await Promise.all([
+    const [balances, approvedRequests, allLeaveTypes] = await Promise.all([
       this.prisma.leaveBalance.findMany({
         where: {
           employeeId: employee.id,
@@ -180,7 +180,44 @@ export class MeService {
           totalDays: true,
         },
       }),
+      this.prisma.leaveType
+        ? this.prisma.leaveType.findMany({
+            where: { organizationId: employee.organizationId },
+          })
+        : Promise.resolve([]),
     ]);
+
+    const existingTypeIds = new Set(balances.map((b) => b.leaveTypeId));
+    const missingTypes = allLeaveTypes.filter(
+      (t) => !existingTypeIds.has(t.id),
+    );
+
+    if (missingTypes.length > 0) {
+      const currentYear = new Date().getUTCFullYear();
+      for (const mt of missingTypes) {
+        const days = mt.daysPerYear ?? mt.defaultDays ?? 20;
+        const newBal = await this.prisma.leaveBalance
+          .create({
+            data: {
+              id: randomUUID(),
+              organizationId: employee.organizationId,
+              employeeId: employee.id,
+              leaveTypeId: mt.id,
+              year: currentYear,
+              allocatedDays: days,
+              totalDays: days,
+              usedDays: 0,
+              pendingDays: 0,
+              remainingDays: days,
+            },
+            include: { leaveType: true },
+          })
+          .catch(() => null);
+        if (newBal) {
+          balances.push(newBal);
+        }
+      }
+    }
 
     const upcomingByType = new Map<string, number>();
     for (const req of approvedRequests) {
@@ -195,8 +232,19 @@ export class MeService {
     const enrichedBalances = balances.map((balance) => {
       const upcomingDays = upcomingByType.get(balance.leaveTypeId) ?? 0;
       const actualUsedDays = Math.max(0, balance.usedDays - upcomingDays);
+      const totalDays =
+        balance.totalDays && balance.totalDays > 0
+          ? balance.totalDays
+          : balance.allocatedDays && balance.allocatedDays > 0
+            ? balance.allocatedDays
+            : (balance.leaveType?.daysPerYear ??
+              balance.leaveType?.defaultDays ??
+              20);
+
       return {
         ...balance,
+        totalDays,
+        allocatedDays: totalDays,
         usedDays: actualUsedDays,
         upcomingDays,
         approvedFutureDays: upcomingDays,

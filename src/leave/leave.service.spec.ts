@@ -18,12 +18,14 @@ describe('LeaveService', () => {
       findFirst: jest.Mock;
       findMany: jest.Mock;
       update: jest.Mock;
+      delete: jest.Mock;
     };
     leaveBalance: {
       create: jest.Mock;
       findFirst: jest.Mock;
       findMany: jest.Mock;
       update: jest.Mock;
+      deleteMany: jest.Mock;
     };
     leaveRequest: {
       create: jest.Mock;
@@ -39,6 +41,7 @@ describe('LeaveService', () => {
       findFirst: jest.Mock;
       findMany: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
   let approvalsServiceMock: {
     submitRequest: jest.Mock;
@@ -60,12 +63,14 @@ describe('LeaveService', () => {
         findFirst: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
+        delete: jest.fn(),
       },
       leaveBalance: {
         create: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
+        deleteMany: jest.fn(),
       },
       leaveRequest: {
         create: jest.fn(),
@@ -81,6 +86,7 @@ describe('LeaveService', () => {
         findFirst: jest.fn(),
         findMany: jest.fn(),
       },
+      $transaction: jest.fn((promises: any[]) => Promise.all(promises)),
     };
 
     approvalsServiceMock = {
@@ -344,6 +350,49 @@ describe('LeaveService', () => {
       await expect(
         service.cancelLeaveRequest(mockAdminUser, 'lr-1'),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('deleteLeaveType', () => {
+    it('should successfully delete leave type and associated balances when no requests exist', async () => {
+      prismaMock.leaveType.findFirst.mockResolvedValue({
+        id: 'lt-1',
+        name: 'Sick Leave',
+        organizationId: 'org-123',
+        _count: { leaveRequests: 0 },
+      });
+      prismaMock.leaveBalance.deleteMany.mockResolvedValue({ count: 5 });
+      prismaMock.leaveType.delete.mockResolvedValue({ id: 'lt-1' });
+
+      const result = await service.deleteLeaveType(mockAdminUser, 'lt-1');
+      expect(result.message).toContain('was successfully deleted');
+      expect(prismaMock.leaveBalance.deleteMany).toHaveBeenCalledWith({
+        where: { leaveTypeId: 'lt-1', organizationId: 'org-123' },
+      });
+      expect(prismaMock.leaveType.delete).toHaveBeenCalledWith({
+        where: { id: 'lt-1' },
+      });
+    });
+
+    it('should throw BadRequestException if leave requests are associated with the leave type', async () => {
+      prismaMock.leaveType.findFirst.mockResolvedValue({
+        id: 'lt-1',
+        name: 'Sick Leave',
+        organizationId: 'org-123',
+        _count: { leaveRequests: 2 },
+      });
+
+      await expect(
+        service.deleteLeaveType(mockAdminUser, 'lt-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException if leave type not found', async () => {
+      prismaMock.leaveType.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.deleteLeaveType(mockAdminUser, 'lt-nonexistent'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });
