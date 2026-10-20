@@ -69,7 +69,7 @@ export class PeopleLeaveService {
       return types.map((type) => ({
         id: type.id,
         name: type.name,
-        defaultDays: type.defaultDays,
+        defaultDays: type.defaultDays ?? type.daysPerYear,
         paid: type.paid,
         tone: type.tone,
         description: type.description,
@@ -261,9 +261,15 @@ export class PeopleLeaveService {
         avatarInitials: avatarInitials(employee.fullName),
         balances: types.map((type) => {
           const balance = byEmployeeAndType.get(`${employee.id}:${type.id}`);
+          const totalDays =
+            balance?.totalDays && balance.totalDays > 0
+              ? balance.totalDays
+              : balance?.allocatedDays && balance.allocatedDays > 0
+                ? balance.allocatedDays
+                : (type.daysPerYear ?? type.defaultDays);
           return {
             type: type.name,
-            totalDays: balance?.totalDays ?? type.defaultDays,
+            totalDays,
             usedDays: balance?.usedDays ?? 0,
           };
         }),

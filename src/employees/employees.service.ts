@@ -133,6 +133,35 @@ export class EmployeesService {
       });
     }
 
+    // Automatically allocate leave balances for existing leave types in organization
+    const existingLeaveTypes = this.prisma.leaveType
+      ? await this.prisma.leaveType.findMany({
+          where: { organizationId: orgId },
+        })
+      : [];
+    if (existingLeaveTypes.length > 0 && this.prisma.leaveBalance) {
+      const currentYear = new Date().getUTCFullYear();
+      for (const lt of existingLeaveTypes) {
+        const days = lt.daysPerYear ?? lt.defaultDays ?? 20;
+        await this.prisma.leaveBalance
+          .create({
+            data: {
+              id: randomUUID(),
+              organizationId: orgId,
+              employeeId: employee.id,
+              leaveTypeId: lt.id,
+              year: currentYear,
+              allocatedDays: days,
+              totalDays: days,
+              usedDays: 0,
+              pendingDays: 0,
+              remainingDays: days,
+            },
+          })
+          .catch(() => undefined);
+      }
+    }
+
     return { employee };
   }
 

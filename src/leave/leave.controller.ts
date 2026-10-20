@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -47,6 +48,15 @@ export class LeaveController {
     @Body() dto: UpdateLeaveTypeDto,
   ) {
     return this.leaveService.updateLeaveType(user, id, dto);
+  }
+
+  @Delete('types/:id')
+  @RequireRoles(...ADMIN_ROLES)
+  deleteLeaveType(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.leaveService.deleteLeaveType(user, id);
   }
 
   @Get('types')

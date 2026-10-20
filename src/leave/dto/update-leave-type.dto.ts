@@ -14,6 +14,11 @@ export class UpdateLeaveTypeDto {
   @IsOptional()
   daysPerYear?: number;
 
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  defaultDays?: number;
+
   @IsBoolean()
   @IsOptional()
   paid?: boolean;

@@ -18,7 +18,13 @@ export class CreateLeaveTypeDto {
 
   @IsInt()
   @Min(1)
-  daysPerYear: number;
+  @IsOptional()
+  daysPerYear?: number;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  defaultDays?: number;
 
   @IsBoolean()
   @IsOptional()
