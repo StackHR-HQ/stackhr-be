@@ -1,4 +1,8 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 
 export interface SendEmailInput {
   to: string;
@@ -12,6 +16,12 @@ export interface SendEmailResult {
   id: string;
 }
 
+export interface SubscribeToListInput {
+  email: string;
+  name?: string;
+  attributes?: Record<string, unknown>;
+}
+
 interface SendByteResponse {
   id?: unknown;
   error?: unknown;
@@ -19,6 +29,7 @@ interface SendByteResponse {
 
 @Injectable()
 export class EmailService {
+  private readonly logger = new Logger(EmailService.name);
   private readonly endpoint = 'https://api.sendbyte.africa/v1/emails';
   private readonly from =
     process.env.SENDBYTE_FROM_EMAIL ?? 'StackHR <noreply@stackhr.app>';
@@ -65,6 +76,66 @@ export class EmailService {
     }
 
     return { id: body.id };
+  }
+
+  /**
+   * Adds a contact to a SendByte marketing list via the list import endpoint.
+   * Requires SENDBYTE_BRAND_ID and SENDBYTE_WAITLIST_LIST_ID env vars.
+   * This method does NOT throw on failure — it logs a warning instead,
+   * making it safe to call fire-and-forget from the waitlist flow.
+   */
+  async subscribeToList(input: SubscribeToListInput): Promise<void> {
+    const apiKey = process.env.SENDBYTE_API_KEY ?? process.env.SENDBYTE_KEY;
+    const brandId = process.env.SENDBYTE_BRAND_ID;
+    const listId = process.env.SENDBYTE_WAITLIST_LIST_ID;
+
+    if (!apiKey || !brandId || !listId) {
+      this.logger.warn(
+        'SendByte list subscription skipped: SENDBYTE_API_KEY, SENDBYTE_BRAND_ID, or SENDBYTE_WAITLIST_LIST_ID is not configured',
+      );
+      return;
+    }
+
+    const url = `https://api.sendbyte.africa/v1/brands/${brandId}/lists/${listId}/import`;
+
+    const subscriber: Record<string, unknown> = {
+      email: input.email,
+    };
+    if (input.name) {
+      subscriber.name = input.name;
+    }
+    if (input.attributes && Object.keys(input.attributes).length > 0) {
+      subscriber.attributes = input.attributes;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subscribers: [subscriber],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => 'no body');
+        this.logger.warn(
+          `SendByte list subscribe failed (${response.status}): ${errorBody}`,
+        );
+        return;
+      }
+
+      this.logger.log(
+        `Successfully subscribed ${input.email} to SendByte list ${listId}`,
+      );
+    } catch (error: any) {
+      this.logger.warn(
+        `SendByte list subscribe error for ${input.email}: ${error?.message ?? error}`,
+      );
+    }
   }
 
   private getProviderError(body: SendByteResponse | null): string | null {

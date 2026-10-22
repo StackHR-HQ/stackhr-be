@@ -11,14 +11,18 @@ response:
     type: json
     content: |-
       {
-        "reimbursements": [
-          {
-            "id": "reimb-123",
-            "expenseId": "exp-123",
-            "amount": 25000,
-            "currency": "NGN",
-            "status": "PENDING"
-          }
-        ]
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "reimbursements": [
+            {
+              "id": "reimb-123",
+              "expenseId": "exp-123",
+              "amount": 25000,
+              "currency": "NGN",
+              "status": "PENDING"
+            }
+          ]
+        }
       }
 order: 1000

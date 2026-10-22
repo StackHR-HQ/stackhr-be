@@ -11,6 +11,10 @@ response:
     type: json
     content: |-
       {
-        "leaveRequests": []
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "leaveRequests": []
+        }
       }
 order: 1000

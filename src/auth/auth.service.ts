@@ -26,7 +26,13 @@ import {
   type UserType,
 } from './auth.constants';
 import type { AuthenticatedUser } from './auth.types';
-import { verificationEmail } from '../notifications/email-templates';
+import {
+  passwordResetEmail,
+  verificationEmail,
+} from '../notifications/email-templates';
+import type { ForgotPasswordDto } from './dto/forgot-password.dto';
+import type { ResetPasswordDto } from './dto/reset-password.dto';
+import type { ChangePasswordDto } from './dto/change-password.dto';
 
 interface SignupBusinessInput {
   email: string;
@@ -60,8 +66,15 @@ interface UserRecord {
   }>;
 }
 
+interface SessionCacheEntry {
+  user: AuthenticatedUser;
+  expiresAt: number; // Date.now() ms
+}
+
 @Injectable()
 export class AuthService implements OnModuleInit {
+  private readonly sessionCache = new Map<string, SessionCacheEntry>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
@@ -371,16 +384,233 @@ export class AuthService implements OnModuleInit {
     return this.login(input, USER_TYPES.STACKHR_ADMIN, options);
   }
 
-  async logout(token: string): Promise<void> {
+  async forgotPassword(emailInput: ForgotPasswordDto) {
+    const email = this.normalizeEmail(emailInput.email);
+    const genericResponse = {
+      success: true,
+      message:
+        'If an account exists with this email, a password reset link has been sent.',
+    };
+
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return genericResponse;
+    }
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = this.hashToken(rawToken);
+    const identifier = `password-reset:${email}`;
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    await this.prisma.verification.deleteMany({
+      where: { identifier },
+    });
+
+    await this.prisma.verification.create({
+      data: {
+        id: randomUUID(),
+        identifier,
+        value: tokenHash,
+        expiresAt,
+      },
+    });
+
+    const resetUrl = `${process.env.STACKHR_APP_URL || 'https://app.stackhr.app'}/reset-password?token=${rawToken}`;
+
+    const apiKey = process.env.SENDBYTE_API_KEY ?? process.env.SENDBYTE_KEY;
+    if (apiKey) {
+      await this.emailService.send({
+        to: email,
+        ...passwordResetEmail(resetUrl),
+        idempotencyKey: `password-reset:${email}:${expiresAt.getTime()}`,
+      });
+    }
+
+    return genericResponse;
+  }
+
+  async verifyResetToken(rawToken: string) {
+    if (!rawToken || typeof rawToken !== 'string') {
+      throw new BadRequestException('A valid reset token is required');
+    }
+
+    const tokenHash = this.hashToken(rawToken);
+    const verification = await this.prisma.verification.findFirst({
+      where: {
+        value: tokenHash,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (
+      !verification ||
+      !verification.identifier.startsWith('password-reset:')
+    ) {
+      throw new BadRequestException('Invalid or expired password reset link');
+    }
+
+    const email = verification.identifier.slice('password-reset:'.length);
+    return { valid: true, email };
+  }
+
+  async resetPassword(input: ResetPasswordDto, options?: SessionOptions) {
+    const password = this.validatePassword(input.password);
+    if (password !== input.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    if (!input.token || typeof input.token !== 'string') {
+      throw new BadRequestException('A valid reset token is required');
+    }
+
+    const tokenHash = this.hashToken(input.token);
+    const verification = await this.prisma.verification.findFirst({
+      where: {
+        value: tokenHash,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (
+      !verification ||
+      !verification.identifier.startsWith('password-reset:')
+    ) {
+      throw new BadRequestException('Invalid or expired password reset link');
+    }
+
+    const email = verification.identifier.slice('password-reset:'.length);
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: {
+        memberships: {
+          select: {
+            organizationId: true,
+            role: true,
+            organization: { select: { name: true, slug: true } },
+          },
+        },
+      },
+    });
+    if (!user) {
+      throw new BadRequestException('User account no longer exists');
+    }
+
+    const passwordHash = await this.hashPassword(password);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
     await this.prisma.session.updateMany({
-      where: { token: this.hashToken(token), revokedAt: null },
+      where: { userId: user.id, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    this.evictUserSessions(user.id);
+
+    await this.prisma.verification.delete({ where: { id: verification.id } });
+
+    const authenticatedUser = this.toAuthenticatedUser(
+      user,
+      user.memberships[0]?.organizationId,
+    );
+    const token = await this.createSession(
+      user.id,
+      options,
+      authenticatedUser.organizationId,
+    );
+
+    return {
+      user: authenticatedUser,
+      token,
+      message: 'Password has been reset successfully.',
+    };
+  }
+
+  async changePassword(
+    currentUser: AuthenticatedUser,
+    input: ChangePasswordDto,
+    options?: SessionOptions,
+  ) {
+    const newPassword = this.validatePassword(input.newPassword);
+    if (newPassword !== input.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: currentUser.id },
+      include: {
+        memberships: {
+          select: {
+            organizationId: true,
+            role: true,
+            organization: { select: { name: true, slug: true } },
+          },
+        },
+      },
+    });
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Invalid user or password not set');
+    }
+
+    const isCurrentValid = await this.verifyPassword(
+      input.currentPassword,
+      user.passwordHash,
+    );
+    if (!isCurrentValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const newPasswordHash = await this.hashPassword(newPassword);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: newPasswordHash },
+    });
+
+    await this.prisma.session.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    this.evictUserSessions(user.id);
+
+    const authenticatedUser = this.toAuthenticatedUser(
+      user,
+      currentUser.organizationId,
+    );
+    const token = await this.createSession(
+      user.id,
+      options,
+      authenticatedUser.organizationId,
+    );
+
+    return {
+      user: authenticatedUser,
+      token,
+      message: 'Password changed successfully.',
+    };
+  }
+
+  async logout(token: string): Promise<void> {
+    const tokenHash = this.hashToken(token);
+    await this.prisma.session.updateMany({
+      where: { token: tokenHash, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    this.evictSession(tokenHash);
   }
 
   async validateSession(token: string): Promise<AuthenticatedUser | null> {
+    const tokenHash = this.hashToken(token);
+
+    // --- Cache read ---
+    const cached = this.getCachedSession(tokenHash);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    // --- Cache miss: query Postgres ---
     const session = await this.prisma.session.findUnique({
-      where: { token: this.hashToken(token) },
+      where: { token: tokenHash },
       include: {
         user: {
           include: {
@@ -412,7 +642,16 @@ export class AuthService implements OnModuleInit {
       )
     )
       return null;
-    return this.toAuthenticatedUser(session.user, session.activeOrganizationId);
+
+    const user = this.toAuthenticatedUser(
+      session.user,
+      session.activeOrganizationId,
+    );
+
+    // --- Cache write: TTL = remaining session lifetime ---
+    this.setCachedSession(tokenHash, user, session.expiresAt);
+
+    return user;
   }
 
   getTokenFromRequest(request: Request): string | null {
@@ -433,27 +672,46 @@ export class AuthService implements OnModuleInit {
     return cookie?.trim().slice(SESSION_COOKIE_NAME.length + 1) || null;
   }
 
-  setSessionCookie(response: Response, token: string): void {
-    const attributes = [
-      `${SESSION_COOKIE_NAME}=${token}`,
+  private cookieOptions(): {
+    sameSite: 'None' | 'Lax' | 'Strict';
+    secure: boolean;
+  } {
+    const isProd = process.env.NODE_ENV === 'production';
+    const raw = (process.env.COOKIE_SAMESITE ?? (isProd ? 'None' : 'Lax'))
+      .trim()
+      .toLowerCase();
+
+    const sameSite =
+      raw === 'none' ? 'None' : raw === 'strict' ? 'Strict' : 'Lax';
+
+    const secure =
+      process.env.COOKIE_SECURE === 'true' || sameSite === 'None' || isProd;
+
+    return { sameSite, secure };
+  }
+
+  private buildCookie(value: string, maxAgeSeconds: number): string {
+    const { sameSite, secure } = this.cookieOptions();
+    const parts = [
+      `${SESSION_COOKIE_NAME}=${value}`,
       'HttpOnly',
       'Path=/v1/api',
-      `Max-Age=${Math.floor(SESSION_DURATION_MS / 1000)}`,
-      'SameSite=Lax',
+      `Max-Age=${maxAgeSeconds}`,
+      `SameSite=${sameSite}`,
     ];
+    if (secure) parts.push('Secure');
+    return parts.join('; ');
+  }
 
-    if (process.env.NODE_ENV === 'production') {
-      attributes.push('Secure');
-    }
-
-    response.setHeader('Set-Cookie', attributes.join('; '));
+  setSessionCookie(response: Response, token: string): void {
+    response.append(
+      'Set-Cookie',
+      this.buildCookie(token, Math.floor(SESSION_DURATION_MS / 1000)),
+    );
   }
 
   clearSessionCookie(response: Response): void {
-    response.setHeader(
-      'Set-Cookie',
-      `${SESSION_COOKIE_NAME}=; HttpOnly; Path=/v1/api; Max-Age=0; SameSite=Lax`,
-    );
+    response.append('Set-Cookie', this.buildCookie('', 0));
   }
 
   async ensureConfiguredAdmin(): Promise<void> {
@@ -567,8 +825,8 @@ export class AuthService implements OnModuleInit {
 
   private async createSession(
     userId: string,
-    options: SessionOptions,
-    organizationId: string | null,
+    options: SessionOptions = {},
+    organizationId: string | null = null,
   ): Promise<string> {
     const token = randomBytes(32).toString('base64url');
 
@@ -579,8 +837,8 @@ export class AuthService implements OnModuleInit {
         userId,
         activeOrganizationId: organizationId,
         expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
-        ipAddress: options.ipAddress,
-        userAgent: options.userAgent,
+        ipAddress: options?.ipAddress,
+        userAgent: options?.userAgent,
       },
     });
 
@@ -736,6 +994,48 @@ export class AuthService implements OnModuleInit {
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Session cache helpers — to be replaced later with Redis calls when
+  // moving to a shared cache (e.g. ioredis + @nestjs/cache-manager).
+  // ---------------------------------------------------------------------------
+
+  /** Returns the cached AuthenticatedUser, or undefined on miss/expiry. */
+  private getCachedSession(tokenHash: string): AuthenticatedUser | undefined {
+    const entry = this.sessionCache.get(tokenHash);
+    if (!entry) return undefined;
+    if (Date.now() >= entry.expiresAt) {
+      this.sessionCache.delete(tokenHash);
+      return undefined;
+    }
+    return entry.user;
+  }
+
+  /** Writes a cache entry whose TTL matches the session's DB expiry. */
+  private setCachedSession(
+    tokenHash: string,
+    user: AuthenticatedUser,
+    sessionExpiresAt: Date,
+  ): void {
+    this.sessionCache.set(tokenHash, {
+      user,
+      expiresAt: sessionExpiresAt.getTime(),
+    });
+  }
+
+  /** Removes a single entry — call on logout or organisation switch. */
+  private evictSession(tokenHash: string): void {
+    this.sessionCache.delete(tokenHash);
+  }
+
+  /** Removes all cached session entries for a specific user ID. */
+  private evictUserSessions(userId: string): void {
+    for (const [tokenHash, entry] of this.sessionCache.entries()) {
+      if (entry.user.id === userId) {
+        this.sessionCache.delete(tokenHash);
+      }
+    }
   }
 
   private deriveKey(

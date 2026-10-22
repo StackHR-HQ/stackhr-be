@@ -2,12 +2,17 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { InvitationsService } from './invitations.service';
 import { PrismaService } from '../database/prisma.service';
+import { EmailService } from '../notifications/email.service';
 import { USER_ROLES, USER_TYPES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 describe('InvitationsService', () => {
   let service: InvitationsService;
+  let emailServiceMock: { send: jest.Mock };
   let prismaMock: {
+    organization: {
+      findUnique: jest.Mock;
+    };
     invitation: {
       create: jest.Mock;
       findMany: jest.Mock;
@@ -24,10 +29,12 @@ describe('InvitationsService', () => {
       create: jest.Mock;
     };
     employee: {
+      findUnique: jest.Mock;
       findFirst: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
 
   const mockAdminUser: AuthenticatedUser = {
@@ -40,7 +47,13 @@ describe('InvitationsService', () => {
   };
 
   beforeEach(async () => {
+    emailServiceMock = {
+      send: jest.fn().mockResolvedValue(undefined),
+    };
     prismaMock = {
+      organization: {
+        findUnique: jest.fn().mockResolvedValue({ name: 'Acme Corp' }),
+      },
       invitation: {
         create: jest.fn(),
         findMany: jest.fn(),
@@ -57,10 +70,12 @@ describe('InvitationsService', () => {
         create: jest.fn(),
       },
       employee: {
+        findUnique: jest.fn(),
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
       },
+      $transaction: jest.fn().mockImplementation((cb: any) => cb(prismaMock)),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -69,6 +84,10 @@ describe('InvitationsService', () => {
         {
           provide: PrismaService,
           useValue: prismaMock,
+        },
+        {
+          provide: EmailService,
+          useValue: emailServiceMock,
         },
       ],
     }).compile();

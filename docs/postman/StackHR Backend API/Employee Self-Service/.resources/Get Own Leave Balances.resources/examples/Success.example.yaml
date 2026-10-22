@@ -11,12 +11,16 @@ response:
     type: json
     content: |-
       {
-        "leaveBalances": [
-          {
-            "allocatedDays": 20,
-            "usedDays": 5,
-            "remainingDays": 15
-          }
-        ]
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "leaveBalances": [
+            {
+              "allocatedDays": 20,
+              "usedDays": 5,
+              "remainingDays": 15
+            }
+          ]
+        }
       }
 order: 1000

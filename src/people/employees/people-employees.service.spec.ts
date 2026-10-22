@@ -142,6 +142,9 @@ describe('PeopleEmployeesService', () => {
           id: expect.any(String) as unknown,
           effectiveDate: '2026-10-01',
           annualSalaryMinor: 1_200_000_000,
+          previousSalary: 0,
+          newSalary: 0,
+          reason: null,
           currency: 'NGN',
           payFrequency: 'MONTHLY',
         },
@@ -280,6 +283,27 @@ describe('PeopleEmployeesService', () => {
       ]);
     });
 
+    it('updates departmentId, employmentType, startDate, and status', async () => {
+      fake.seed('employee', [employeeRow()]);
+      fake.seed('department', [
+        { id: 'dept_prod', name: 'Product', organizationId: 'org_a' },
+      ]);
+
+      await service.updateEmployee(adminUser(), 'emp_ada', {
+        employment: {
+          departmentId: 'dept_prod',
+          employmentType: 'CONTRACT',
+          startDate: '2026-03-01',
+          status: 'ACTIVE',
+        },
+      });
+
+      const updated = await service.getEmployee(adminUser(), 'emp_ada');
+      expect(updated.departmentId).toBe('dept_prod');
+      expect(updated.employmentType).toBe('Contract');
+      expect(updated.employmentStatus).toBe('active');
+    });
+
     it('records a salary change in compensation history from its effective date', async () => {
       fake.seed('employee', [employeeRow()]);
 
@@ -299,6 +323,9 @@ describe('PeopleEmployeesService', () => {
           id: expect.any(String) as unknown,
           effectiveDate: '2026-11-01',
           annualSalaryMinor: 600_000_000,
+          previousSalary: 0,
+          newSalary: 0,
+          reason: null,
           currency: 'NGN',
           payFrequency: 'MONTHLY',
         },

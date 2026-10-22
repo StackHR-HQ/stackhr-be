@@ -11,12 +11,16 @@ response:
     type: json
     content: |-
       {
-        "organizationTree": [
-          {
-            "id": "emp-123",
-            "fullName": "Jane CEO",
-            "directReports": []
-          }
-        ]
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "organizationTree": [
+            {
+              "id": "emp-123",
+              "fullName": "Jane CEO",
+              "directReports": []
+            }
+          ]
+        }
       }
 order: 1000

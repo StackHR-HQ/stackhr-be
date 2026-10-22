@@ -11,11 +11,15 @@ response:
     type: json
     content: |-
       {
-        "payrollRun": {
-          "id": "run-123",
-          "status": "RECONCILED",
-          "items": [],
-          "payslips": []
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "payrollRun": {
+            "id": "run-123",
+            "status": "RECONCILED",
+            "items": [],
+            "payslips": []
+          }
         }
       }
 order: 1000

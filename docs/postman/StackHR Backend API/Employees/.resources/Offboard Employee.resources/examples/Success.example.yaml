@@ -11,14 +11,18 @@ response:
     type: json
     content: |-
       {
-        "message": "Employee offboarded successfully",
-        "employee": {
-          "id": "emp-123",
-          "status": "OFFBOARDED"
-        },
-        "offboardDetails": {
-          "offboardDate": "2026-12-31",
-          "reason": "Resigned for personal reasons"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "message": "Employee offboarded successfully",
+          "employee": {
+            "id": "emp-123",
+            "status": "OFFBOARDED"
+          },
+          "offboardDetails": {
+            "offboardDate": "2026-12-31",
+            "reason": "Resigned for personal reasons"
+          }
         }
       }
 order: 1000

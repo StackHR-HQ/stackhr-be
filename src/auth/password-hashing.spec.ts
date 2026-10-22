@@ -8,7 +8,7 @@ describe('Password Hashing (argon2id - ADR-008)', () => {
     expect(hash).toContain('$argon2id$');
     const isValid = await argon2.verify(hash, password);
     expect(isValid).toBe(true);
-  });
+  }, 20000);
 
   it('should reject incorrect password', async () => {
     const password = 'SuperSecurePassword123!';

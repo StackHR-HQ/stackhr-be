@@ -11,10 +11,14 @@ response:
     type: json
     content: |-
       {
-        "message": "Invitation revoked successfully",
-        "invitation": {
-          "id": "inv-123",
-          "status": "revoked"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "message": "Invitation revoked successfully",
+          "invitation": {
+            "id": "inv-123",
+            "status": "revoked"
+          }
         }
       }
 order: 1000

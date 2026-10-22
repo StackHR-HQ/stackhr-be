@@ -13,7 +13,16 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { PAY_FREQUENCIES } from './create-employee.dto';
+import { EMPLOYMENT_TYPES, PAY_FREQUENCIES } from './create-employee.dto';
+
+export const EMPLOYEE_STATUSES = [
+  'ACTIVE',
+  'PENDING_INVITATION',
+  'ONBOARDING',
+  'OFFBOARDING',
+  'TERMINATED',
+  'SUSPENDED',
+] as const;
 
 const trimString = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -36,9 +45,34 @@ export class UpdateEmployeeEmploymentDto {
   @IsOptional()
   @IsUUID()
   managerId?: string | null;
+
+  /** Department ID in the organization. `null` removes department. */
+  @IsOptional()
+  @IsString()
+  departmentId?: string | null;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
+  @IsIn(EMPLOYMENT_TYPES)
+  employmentType?: string;
+
+  /** YYYY-MM-DD */
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'startDate must be YYYY-MM-DD' })
+  @IsISO8601({ strict: true })
+  startDate?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
+  @IsIn(EMPLOYEE_STATUSES)
+  status?: string;
 }
 
-/** A compensation change is always a complete, dated entry in the history. */
+/** A compensation change creates a dated entry in the history. */
 export class UpdateEmployeeCompensationDto {
   /** Annual salary in integer minor units of `currency`. */
   @IsInt()
@@ -46,18 +80,21 @@ export class UpdateEmployeeCompensationDto {
   @Max(Number.MAX_SAFE_INTEGER)
   annualSalaryMinor: number;
 
+  @IsOptional()
   @Matches(/^[A-Z]{3}$/, { message: 'currency must be an ISO 4217 code' })
-  currency: string;
+  currency?: string;
 
+  @IsOptional()
   @IsIn(PAY_FREQUENCIES)
-  payFrequency: string;
+  payFrequency?: string;
 
   /** YYYY-MM-DD */
+  @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/, {
     message: 'effectiveDate must be YYYY-MM-DD',
   })
   @IsISO8601({ strict: true })
-  effectiveDate: string;
+  effectiveDate?: string;
 }
 
 const PHONE_PATTERN = /^\+[1-9]\d{6,14}$/;

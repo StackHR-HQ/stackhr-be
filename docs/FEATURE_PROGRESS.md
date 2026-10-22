@@ -20,7 +20,10 @@ Status values: `Not Started` · `In Progress` · `Blocked` · `Awaiting Review` 
 - [x] Migrate password hashing to argon2id (ADR-008) — Status: Done
 - [x] `KeyProvider` + AES-256-GCM field encryption utility (ADR-010) — Status: Done
 - [x] `AuditLog` Prisma model + global `AuditInterceptor` — Status: Done
-- [x] Postman: Auth collection updated for switch-organization endpoint — Status: Done
+- [x] In-memory session cache (`Map<string, SessionCacheEntry>`) in `AuthService` — Status: Done
+- [x] Secured Password Reset flow (`POST /auth/forgot-password`, `GET /auth/reset-password/verify`, `POST /auth/reset-password`) — Status: Done
+- [x] Secured Password Change flow (`POST /auth/change-password`) — Status: Done
+- [x] Postman: Auth collection updated for password reset & session cache — Status: Done
 
 ### Phase 1 — Generic Approvals Engine (ADR-003)
 *Every subsequent domain module's approval flow depends on this.*
@@ -53,6 +56,7 @@ Status values: `Not Started` · `In Progress` · `Blocked` · `Awaiting Review` 
 - [x] `TaxRuleSet` / `TaxRule` models — versioned, effective-dated database records — Status: Done
 - [x] Statutory applicability evaluation engine (`ComplianceService`) — Status: Done
 - [x] StackHR Admin dynamic rule set management endpoints (`/stackhr-admin/compliance`) — Status: Done
+- [x] PenCentral Partner API integration for automated electronic pension remittance & PenCom compliance — Status: Awaiting Review
 - [x] Postman: Compliance & Tax Engine collection updated — Status: Done
 - User stories: US-018, US-019
 
@@ -80,6 +84,15 @@ Status values: `Not Started` · `In Progress` · `Blocked` · `Awaiting Review` 
 - [x] Full security/validation/audit pass across all P0 modules against `GEMINI.md` §4 checklist — Status: Done
 - User stories: US-006 (self-service parts), Epic 15
 
+### Phase 7 — System Reliability & Production Observability (ADR-013)
+*Transforming happy-path execution into resilient, observable, fault-tolerant production architecture.*
+
+- [x] Step 1: Structured Logging & Distributed Tracing (AsyncLocalStorage, Correlation IDs, OpenTelemetry instrumentation) — Status: Done
+- [x] Step 2: Idempotency Engine & Concurrency Guard (`Idempotency-Key`, atomic reservation, double-spend protection) — Status: Done
+- [x] Step 3: Resilient External Communication (Retries, Exponential Backoff + Jitter, Circuit Breakers for PenCentral & Banking Rails) — Status: Done
+- [x] Step 4: Transactional Outbox Pattern & Dead Letter Queue (DLQ for durable domain events & statutory notifications) — Status: Done
+- [x] Step 5: Production Metrics & Observability Dashboarding (P50/P95/P99 latency, Prometheus metrics, graceful shutdown & connection draining) — Status: Done
+
 ---
 
 ## P1 — High Priority After Launch *(parked — do not start early)*
@@ -102,3 +115,18 @@ Status values: `Not Started` · `In Progress` · `Blocked` · `Awaiting Review` 
 | Date | Change |
 |---|---|
 | 2026-09-09 | File created from backend audit report + architecture decisions. |
+| 2026-10-05 | Implemented PATCH /me/profile, PATCH /leave/requests/:id/cancel, PATCH /leave/types/:id, Reimbursements module (6 endpoints), GET /billing/status, and updated Postman collection with 87 requests and example responses. |
+| 2026-10-05 | Implemented Bug 2.3 `days` fallback on leave requests, `subjectSummary` null fallback in approvals, `GET /me/compensation-history`, `GET /me/notifications`, `GET /me/documents`, `GET /me/activity`, `GET /compliance/alerts`, added `employeeNumber` to employee details and `payDate` to payslip schema, added unit tests (319/319 passing), and updated Postman collection with all 5 new endpoints. |
+| 2026-10-12 | Implemented PenCentral Partner API integration for Nigerian statutory pension remittances (14 endpoints), PFA registry, schedule creation from payroll runs, PenCom validation & submission, Monnify/Zenith virtual account payment initiation, receipt syncing, and PFA disbursement tracking. Added unit tests (383/383 passing) and updated Postman collection. |
+| 2026-10-17 | Added ADR-013 & Phase 7 roadmap for System Reliability & Production Observability covering Structured Logging/OTel, Idempotency, Circuit Breakers, Transactional Outbox/DLQ, and Production Metrics. |
+| 2026-10-17 | Implemented Step 1 of Phase 7: AsyncLocalStorage request context propagation, Pino structured JSON logger with automated PII redaction and pretty dev transport, OpenTelemetry W3C traceparent integration, header injection (`x-correlation-id`, `x-trace-id`), error response trace tagging, and comprehensive unit tests (430/430 passing). |
+| 2026-10-17 | Implemented Step 2 of Phase 7: Idempotency engine with `IdempotencyKey` PostgreSQL schema pushed safely via `prisma db push`, atomic lease reservation (`IN_PROGRESS`), replay short-circuiting (`COMPLETED`, `Idempotent-Replayed: true`), payload mismatch detection (SHA-256 hash checking $\rightarrow$ 422), crash lease expiry recovery, `@Idempotent()` decorator on payroll execution and pension remittance, and unit tests (444/444 passing). |
+| 2026-10-17 | Implemented Step 3 of Phase 7: Resilient external communication with `CircuitBreaker` (CLOSED $\rightarrow$ OPEN $\rightarrow$ HALF_OPEN), `RetryPolicy` with exponential backoff and full jitter, request timeout abort controls (15s), wiring into `PenCentralClient` & `ResilienceModule`, strict `@Idempotent({ required: true })` enforcement on financial operations, and unit tests (454/454 passing). |
+| 2026-10-17 | Implemented Step 4 of Phase 7: Transactional Outbox pattern (`outbox_event` and `dead_letter_event` tables), atomic event persistence inside domain transactions (`ApprovalsService`), asynchronous polling processor (`OutboxProcessor`) with graceful shutdown, exponential retry backoff, DLQ routing on 5 failed attempts, DLQ replay mechanics, and unit tests (463/463 passing). |
+| 2026-10-17 | Implemented Step 5 of Phase 7: Production Metrics, Health Checks & Observability Dashboarding using prom-client with P50/P90/P95/P99 latency histograms, HTTP counters with cardinality control, Idempotency/Outbox/Circuit Breaker gauges, deep /health check probe, @BypassTransform decorator, Postman collection update, and comprehensive unit tests (480/480 passing). |
+
+
+
+
+
+

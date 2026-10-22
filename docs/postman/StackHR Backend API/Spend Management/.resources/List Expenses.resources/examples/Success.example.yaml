@@ -11,13 +11,17 @@ response:
     type: json
     content: |-
       {
-        "expenses": [
-          {
-            "id": "exp-123",
-            "category": "Travel",
-            "amount": 25000,
-            "status": "PENDING"
-          }
-        ]
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "expenses": [
+            {
+              "id": "exp-123",
+              "category": "Travel",
+              "amount": 25000,
+              "status": "PENDING"
+            }
+          ]
+        }
       }
 order: 1000

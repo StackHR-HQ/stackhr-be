@@ -11,12 +11,16 @@ response:
     type: json
     content: |-
       {
-        "leaveType": {
-          "id": "lt-123",
-          "name": "Annual Paid Leave",
-          "daysPerYear": 20,
-          "paid": true,
-          "requiresApproval": true
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "leaveType": {
+            "id": "lt-123",
+            "name": "Annual Paid Leave",
+            "daysPerYear": 20,
+            "paid": true,
+            "requiresApproval": true
+          }
         }
       }
 order: 1000

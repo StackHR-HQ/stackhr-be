@@ -75,6 +75,14 @@ export class EmployeesService {
       }
     }
 
+    let employeeNumber = dto.employeeNumber;
+    if (!employeeNumber) {
+      const count = await this.prisma.employee.count({
+        where: { organizationId: orgId },
+      });
+      employeeNumber = `EMP-${String(count + 1).padStart(4, '0')}`;
+    }
+
     const employee = await this.prisma.employee.create({
       data: {
         id: randomUUID(),
@@ -85,11 +93,74 @@ export class EmployeesService {
         jobTitle: dto.jobTitle,
         employmentType: dto.employmentType,
         salaryAmount: dto.salaryAmount,
+        annualSalaryMinor: BigInt((dto.salaryAmount ?? 0) * 1200),
         startDate: new Date(dto.startDate),
         managerId: dto.managerId ?? null,
+        employeeNumber,
         status: 'ACTIVE',
+        pensionProvider: dto.pensionProvider ?? null,
+        pfaCode: dto.pfaCode ?? null,
+        pensionRsaNumber: dto.pensionRsaNumber ?? null,
       },
     });
+
+    if (dto.salaryAmount && dto.salaryAmount > 0) {
+      await this.prisma.compensationRecord.create({
+        data: {
+          id: randomUUID(),
+          organizationId: orgId,
+          employeeId: employee.id,
+          effectiveFrom: employee.startDate,
+          basicSalary: dto.salaryAmount,
+          housingAllowance: 0,
+          transportAllowance: 0,
+          otherAllowances: 0,
+          currency: 'NGN',
+          paymentFrequency: 'MONTHLY',
+        },
+      });
+
+      await this.prisma.compensationHistory.create({
+        data: {
+          organizationId: orgId,
+          employeeId: employee.id,
+          annualSalaryMinor: BigInt(dto.salaryAmount * 1200),
+          currency: 'NGN',
+          payFrequency: 'MONTHLY',
+          effectiveDate: employee.startDate,
+          changedByUserId: user.id,
+        },
+      });
+    }
+
+    // Automatically allocate leave balances for existing leave types in organization
+    const existingLeaveTypes = this.prisma.leaveType
+      ? await this.prisma.leaveType.findMany({
+          where: { organizationId: orgId },
+        })
+      : [];
+    if (existingLeaveTypes.length > 0 && this.prisma.leaveBalance) {
+      const currentYear = new Date().getUTCFullYear();
+      for (const lt of existingLeaveTypes) {
+        const days = lt.daysPerYear ?? lt.defaultDays ?? 20;
+        await this.prisma.leaveBalance
+          .create({
+            data: {
+              id: randomUUID(),
+              organizationId: orgId,
+              employeeId: employee.id,
+              leaveTypeId: lt.id,
+              year: currentYear,
+              allocatedDays: days,
+              totalDays: days,
+              usedDays: 0,
+              pendingDays: 0,
+              remainingDays: days,
+            },
+          })
+          .catch(() => undefined);
+      }
+    }
 
     return { employee };
   }
@@ -141,7 +212,11 @@ export class EmployeesService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      data: employees,
+      data: employees.map((emp) => {
+        const copy = { ...emp };
+        delete (copy as any).invitationToken;
+        return copy;
+      }),
       meta: {
         total,
         page,
@@ -180,7 +255,9 @@ export class EmployeesService {
       throw new NotFoundException(`Employee with ID "${id}" not found`);
     }
 
-    return { employee };
+    const safeEmployee = { ...employee };
+    delete (safeEmployee as any).invitationToken;
+    return { employee: safeEmployee };
   }
 
   async updateEmployee(
@@ -237,6 +314,18 @@ export class EmployeesService {
         ...(dto.startDate && { startDate: new Date(dto.startDate) }),
         ...(dto.managerId !== undefined && { managerId: dto.managerId }),
         ...(dto.status && { status: dto.status }),
+        ...(dto.employeeNumber !== undefined && {
+          employeeNumber: dto.employeeNumber,
+        }),
+        ...(dto.pensionProvider !== undefined && {
+          pensionProvider: dto.pensionProvider,
+        }),
+        ...(dto.pfaCode !== undefined && {
+          pfaCode: dto.pfaCode,
+        }),
+        ...(dto.pensionRsaNumber !== undefined && {
+          pensionRsaNumber: dto.pensionRsaNumber,
+        }),
       },
     });
 

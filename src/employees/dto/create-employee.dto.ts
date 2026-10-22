@@ -47,4 +47,20 @@ export class CreateEmployeeDto {
 
   @IsOptional()
   nhfOptIn?: boolean;
+
+  @IsString()
+  @IsOptional()
+  employeeNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  pensionProvider?: string;
+
+  @IsString()
+  @IsOptional()
+  pfaCode?: string;
+
+  @IsString()
+  @IsOptional()
+  pensionRsaNumber?: string;
 }

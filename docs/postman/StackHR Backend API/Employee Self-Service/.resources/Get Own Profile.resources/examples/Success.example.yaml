@@ -11,12 +11,16 @@ response:
     type: json
     content: |-
       {
-        "profile": {
-          "id": "emp-123",
-          "fullName": "Jane Doe",
-          "email": "jane@acme.com",
-          "department": "Engineering",
-          "jobTitle": "Software Engineer"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "profile": {
+            "id": "emp-123",
+            "fullName": "Jane Doe",
+            "email": "jane@acme.com",
+            "department": "Engineering",
+            "jobTitle": "Software Engineer"
+          }
         }
       }
 order: 1000

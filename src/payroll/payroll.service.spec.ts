@@ -15,6 +15,7 @@ describe('PayrollService', () => {
   };
   let complianceServiceMock: {
     calculatePayrollDeductions: jest.Mock;
+    getAlerts?: jest.Mock;
   };
 
   const mockAdminUser: AuthenticatedUser = {
@@ -51,6 +52,13 @@ describe('PayrollService', () => {
         deleteMany: jest.fn(),
         createMany: jest.fn(),
       },
+      auditEvent: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue({}),
+      },
+      user: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
     approvalsServiceMock = {
@@ -68,6 +76,7 @@ describe('PayrollService', () => {
         annualBreakdown: {},
         ruleSetId: 'TRS-123',
       }),
+      getAlerts: jest.fn().mockResolvedValue({ alerts: [] }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -300,6 +309,143 @@ describe('PayrollService', () => {
       const result = await service.reconcileRun(mockAdminUser, 'run-1');
 
       expect(result.payrollRun.status).toBe('RECONCILED');
+    });
+  });
+
+  describe('getRuns', () => {
+    it('should return runs with payDate formatted as YYYY-MM-DD', async () => {
+      prismaMock.payrollRun.findMany.mockResolvedValue([
+        {
+          id: 'run-1',
+          periodMonth: 10,
+          periodYear: 2026,
+          status: 'DRAFT',
+        },
+      ]);
+      prismaMock.organization.findUnique.mockResolvedValue({
+        payDate: 25,
+      });
+
+      const result = await service.getRuns(mockAdminUser);
+
+      expect(result.payrollRuns).toHaveLength(1);
+      expect(result.payrollRuns[0].payDate).toBe('2026-10-25');
+    });
+  });
+
+  describe('getRunById', () => {
+    it('should return run with payDate formatted as YYYY-MM-DD', async () => {
+      prismaMock.payrollRun.findFirst.mockResolvedValue({
+        id: 'run-1',
+        periodMonth: 10,
+        periodYear: 2026,
+        status: 'DRAFT',
+        items: [],
+        payslips: [],
+      });
+      prismaMock.organization.findUnique.mockResolvedValue({
+        payDate: 25,
+      });
+
+      const result = await service.getRunById(mockAdminUser, 'run-1');
+
+      expect(result.payrollRun.payDate).toBe('2026-10-25');
+      expect(result.payrollRun.createdBy).toBe('Admin User');
+      expect(result.payrollRun.auditTrail).toEqual([]);
+      expect(result.payrollRun.complianceWarnings).toEqual([]);
+    });
+  });
+
+  describe('getRunAuditEvents', () => {
+    it('should return chronological audit events for a payroll run', async () => {
+      prismaMock.payrollRun.findFirst.mockResolvedValue({
+        id: 'run-1',
+        title: 'Run 10/2026',
+      });
+      prismaMock.auditEvent.findMany.mockResolvedValue([
+        {
+          id: 'ev-1',
+          action: 'payroll_run.created',
+          description: 'Created run',
+          createdAt: new Date('2026-10-01'),
+          actorUserId: 'u-1',
+        },
+      ]);
+      prismaMock.user.findMany.mockResolvedValue([
+        { id: 'u-1', name: 'John Doe', email: 'john@acme.com' },
+      ]);
+
+      const result = await service.getRunAuditEvents(mockAdminUser, 'run-1');
+      expect(result.auditEvents).toHaveLength(1);
+      expect(result.auditEvents[0].actor.name).toBe('John Doe');
+      expect(result.auditEvents[0].action).toBe('payroll_run.created');
+    });
+  });
+
+  describe('getAllCompensations', () => {
+    it('should return compensation records for all organization employees', async () => {
+      prismaMock.employee.findMany.mockResolvedValue([
+        {
+          id: 'emp-1',
+          fullName: 'Alice Smith',
+          email: 'alice@acme.com',
+          jobTitle: 'Engineer',
+          department: 'Engineering',
+          status: 'ACTIVE',
+          annualSalaryMinor: 12000000n,
+          currency: 'NGN',
+          payFrequency: 'MONTHLY',
+          startDate: new Date('2026-01-01'),
+        },
+      ]);
+      prismaMock.compensationRecord.findMany.mockResolvedValue([
+        {
+          id: 'comp-1',
+          employeeId: 'emp-1',
+          basicSalary: 60000,
+          housingAllowance: 20000,
+          transportAllowance: 10000,
+          otherAllowances: 10000,
+          paymentFrequency: 'MONTHLY',
+          effectiveFrom: new Date('2026-01-01'),
+        },
+      ]);
+
+      const result = await service.getAllCompensations(mockAdminUser);
+
+      expect(result.compensations).toHaveLength(1);
+      expect(result.compensations[0].grossMonthlySalary).toBe(100000);
+      expect(result.compensations[0].basicSalary).toBe(60000);
+    });
+  });
+
+  describe('getPayslips', () => {
+    it('should return payslips filtered by organization', async () => {
+      prismaMock.payslip = { findMany: jest.fn() };
+      prismaMock.payslip.findMany.mockResolvedValue([
+        {
+          id: 'slip-1',
+          organizationId: 'org-123',
+          payrollRunId: 'run-1',
+          employeeId: 'emp-1',
+          grossSalary: 100000,
+          netSalary: 85000,
+        },
+      ]);
+
+      const result = await service.getPayslips(mockAdminUser, {
+        payrollRunId: 'run-1',
+      });
+
+      expect(result.payslips).toHaveLength(1);
+      expect(prismaMock.payslip.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: 'org-123',
+            payrollRunId: 'run-1',
+          }),
+        }),
+      );
     });
   });
 });

@@ -11,13 +11,17 @@ response:
     type: json
     content: |-
       {
-        "message": "Payroll run created in DRAFT state",
-        "payrollRun": {
-          "id": "run-123",
-          "periodMonth": 9,
-          "periodYear": 2026,
-          "title": "September 2026 Regular Payroll",
-          "status": "DRAFT"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "message": "Payroll run created in DRAFT state",
+          "payrollRun": {
+            "id": "run-123",
+            "periodMonth": 9,
+            "periodYear": 2026,
+            "title": "September 2026 Regular Payroll",
+            "status": "DRAFT"
+          }
         }
       }
 order: 1000

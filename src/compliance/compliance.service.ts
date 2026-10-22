@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import { CreateTaxRuleSetDto } from './dto/create-tax-rule-set.dto';
 import { UpdateTaxRuleSetDto } from './dto/update-tax-rule-set.dto';
 
@@ -64,12 +65,50 @@ export class ComplianceService {
       orderBy: { effectiveFrom: 'desc' },
     });
 
-    if (activeRuleSet) {
-      return activeRuleSet;
-    }
+    const ruleSet = activeRuleSet ?? (await this.seedNta2026RuleSet());
+    const applicability = {
+      pension: {
+        mandatoryThreshold: 15,
+        voluntaryBelowThreshold: true,
+        employeeRate: ruleSet.pensionEmployeeRate,
+        employerRate: ruleSet.pensionEmployerRate,
+        basis: ruleSet.pensionBasisFields,
+        legalBasis: 'Pension Reform Act 2014 Section 2',
+        note: 'Mandatory for employers with 15 or more employees. Voluntary for employers with fewer than 15 employees. Overridden if employee is pension exempt.',
+      },
+      nhf: {
+        rate: ruleSet.nhfRate,
+        basis: ruleSet.nhfBasisField,
+        voluntary: true,
+        legalBasis: 'National Housing Fund Act',
+        note: '2.5% of basic salary. Voluntary/opt-in for private sector employees via nhfOptIn.',
+      },
+      nsitf: {
+        rate: 0.01,
+        basis: 'GROSS',
+        mandatory: true,
+        legalBasis: 'Employees Compensation Act 2010',
+        note: '1% of total monthly payroll, 100% employer-funded. Mandatory for all employers with 1 or more employees.',
+      },
+      itf: {
+        rate: 0.01,
+        basis: 'GROSS',
+        mandatoryThreshold: 5,
+        turnoverThresholdMinor: 5000000000,
+        legalBasis: 'Industrial Training Fund Act',
+        note: '1% of annual payroll. Mandatory for employers with 5 or more employees or annual turnover of ₦50,000,000+.',
+      },
+      nhia: {
+        mandatory: true,
+        legalBasis: 'National Health Insurance Authority Act 2022',
+        note: 'Mandatory health insurance for all employees in Nigeria.',
+      },
+    };
 
-    // Fallback: seed NTA 2026 default rule set if none exists
-    return this.seedNta2026RuleSet();
+    return {
+      ...ruleSet,
+      applicability,
+    };
   }
 
   /**
@@ -266,6 +305,8 @@ export class ComplianceService {
             lowerLimit: rule.lowerLimit,
             upperLimit: rule.upperLimit,
             taxRate: rule.taxRate,
+            createdAt: new Date(),
+            updatedAt: new Date(),
           })),
         });
       }
@@ -381,5 +422,95 @@ export class ComplianceService {
         },
       },
     });
+  }
+  private checkOrgContext(user: AuthenticatedUser): string {
+    if (!user.organizationId) {
+      throw new BadRequestException(
+        'An active organization context is required',
+      );
+    }
+    return user.organizationId;
+  }
+
+  async getAlerts(user: AuthenticatedUser) {
+    const orgId = this.checkOrgContext(user);
+    const [missingTin, missingPensionRsa, missingPfaCode] = await Promise.all([
+      this.prisma.employee.findMany({
+        where: {
+          organizationId: orgId,
+          status: 'ACTIVE',
+          OR: [{ tin: null }, { tin: '' }],
+        },
+        select: { id: true, fullName: true, email: true, department: true },
+      }),
+      this.prisma.employee.findMany({
+        where: {
+          organizationId: orgId,
+          status: 'ACTIVE',
+          OR: [{ pensionRsaNumber: null }, { pensionRsaNumber: '' }],
+        },
+        select: { id: true, fullName: true, email: true, department: true },
+      }),
+      this.prisma.employee.findMany({
+        where: {
+          organizationId: orgId,
+          status: 'ACTIVE',
+          OR: [{ pfaCode: null }, { pfaCode: '' }],
+        },
+        select: { id: true, fullName: true, email: true, department: true },
+      }),
+    ]);
+
+    const now = new Date();
+    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const alerts: any[] = [];
+
+    if (missingTin.length > 0) {
+      alerts.push({
+        type: 'MISSING_TAX_ID',
+        severity: 'MEDIUM',
+        count: missingTin.length,
+        message:
+          missingTin.length +
+          ' active employees are missing a Tax Identification Number (TIN)',
+        affectedEmployees: missingTin,
+      });
+    }
+
+    if (missingPensionRsa.length > 0) {
+      alerts.push({
+        type: 'MISSING_PENSION_RSA',
+        severity: 'MEDIUM',
+        count: missingPensionRsa.length,
+        message:
+          missingPensionRsa.length +
+          ' active employees are missing a Pension RSA Number',
+        affectedEmployees: missingPensionRsa,
+      });
+    }
+
+    if (missingPfaCode.length > 0) {
+      alerts.push({
+        type: 'MISSING_PFA_CODE',
+        severity: 'MEDIUM',
+        count: missingPfaCode.length,
+        message:
+          missingPfaCode.length +
+          ' active employees are missing a Pension PFA Code',
+        affectedEmployees: missingPfaCode,
+      });
+    }
+
+    alerts.push({
+      type: 'UPCOMING_STATUTORY_DEADLINE',
+      severity: 'INFO',
+      dueDate: lastDayOfMonth.toISOString().split('T')[0],
+      message:
+        'Statutory remittance deadline for current month is ' +
+        lastDayOfMonth.toISOString().split('T')[0],
+    });
+
+    return { alerts };
   }
 }

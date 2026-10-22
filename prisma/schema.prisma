@@ -93,10 +93,12 @@ model Organization {
   companySize                   String?
   currency                      String                         @default("NGN")
   payrollFrequency              String                         @default("MONTHLY")
+  payDate                       Int                            @default(25)
   taxId                         String?
   pensionEmployeeRateOverride   Float?
   pensionEmployerRateOverride   Float?
   pensionBasisOverride          String?
+  penCentralEmployerCode        String?
   createdAt                     DateTime                       @default(now())
   updatedAt                     DateTime                       @updatedAt
   metadata                      String?
@@ -129,6 +131,7 @@ model Organization {
   payrollRuns                   PayrollRun[]
   payrollItems                  PayrollItem[]
   payslips                      Payslip[]
+  pensionRemittanceSchedules    PensionRemittanceSchedule[]
 
   @@index([ownerId])
   @@map("organization")
@@ -244,6 +247,7 @@ model PositionLevel {
 
 model Employee {
   id                           String                         @id @default(dbgenerated("(uuidv7())::text"))
+  employeeNumber               String?
   organizationId               String
   organization                 Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userId                       String?                        @unique
@@ -272,6 +276,7 @@ model Employee {
   tin                          String?
   pensionProvider              String?
   pensionRsaNumber             String?
+  pfaCode                      String?
   avatarUrl                    String?
   employmentType               String                         @default("FULL_TIME")
   jobTitle                     String
@@ -316,6 +321,7 @@ model Employee {
   @@unique([organizationId, email])
   @@index([organizationId, status])
   @@index([managerId])
+  @@index([organizationId, employeeNumber])
   @@map("employee")
 }
 
@@ -702,6 +708,7 @@ model PayrollRun {
   updatedAt      DateTime      @updatedAt
   items          PayrollItem[]
   payslips       Payslip[]
+  pensionRemittanceSchedule PensionRemittanceSchedule?
 
   @@unique([organizationId, periodYear, periodMonth])
   @@index([organizationId, status])
@@ -751,6 +758,7 @@ model Payslip {
   breakdownJson  String
   generatedAt    DateTime     @default(now())
 
+  @@unique([payrollRunId, employeeId])
   @@index([organizationId, employeeId])
   @@index([payrollRunId])
   @@map("payslip")
@@ -807,4 +815,116 @@ model WaitlistEntry {
   @@index([businessEmail])
   @@map("waitlist_entry")
 }
+
+model PensionRemittanceSchedule {
+  id                     String       @id @default(dbgenerated("(uuidv7())::text"))
+  organizationId         String
+  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payrollRunId           String       @unique
+  payrollRun             PayrollRun   @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  penCentralValidationId String?
+  penCentralScheduleId   String?
+  periodMonth            String       // Full English month name, e.g. "September"
+  periodYear             Int          // e.g. 2026
+  employerCode           String
+  totalEmployeePension   Int          @default(0)
+  totalEmployerPension   Int          @default(0)
+  totalAmount            Int          @default(0)
+  employeeCount          Int          @default(0)
+  status                 String       @default("DRAFT") // DRAFT, VALIDATING, VALIDATION_FAILED, VALIDATED, SUBMITTED, PAYMENT_PENDING, PAID, DISBURSED, CANCELLED
+  validationErrorsJson   String?
+  paymentId              String?
+  paymentProvider        String?
+  virtualAccountNumber   String?
+  virtualAccountBank     String?
+  virtualAccountName     String?
+  paymentExpiresAt       DateTime?
+  paidAt                 DateTime?
+  receiptId              String?
+  receiptJson            String?
+  disbursementStatus     String?
+  disbursementJson       String?
+  submittedAt            DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  @@index([organizationId, status])
+  @@index([payrollRunId])
+  @@map("pension_remittance_schedule")
+}
+
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+model IdempotencyKey {
+  id             String            @id
+  organizationId String
+  key            String
+  userId         String
+  endpoint       String
+  requestHash    String
+  status         IdempotencyStatus @default(IN_PROGRESS)
+  statusCode     Int?
+  responseBody   Json?
+  lockedUntil    DateTime
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([organizationId, key])
+  @@index([organizationId, status])
+  @@index([lockedUntil])
+  @@map("idempotency_key")
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+model OutboxEvent {
+  id             String       @id
+  organizationId String
+  eventType      String
+  aggregateType  String
+  aggregateId    String
+  payload        Json
+  status         OutboxStatus @default(PENDING)
+  retryCount     Int          @default(0)
+  maxRetries     Int          @default(5)
+  lastError      String?
+  nextRetryAt    DateTime     @default(now())
+  processedAt    DateTime?
+  lockedUntil    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, status])
+  @@index([status, nextRetryAt])
+  @@map("outbox_event")
+}
+
+model DeadLetterEvent {
+  id             String    @id
+  organizationId String
+  originalId     String
+  eventType      String
+  aggregateType  String
+  aggregateId    String
+  payload        Json
+  failureReason  String
+  stackTrace     String?
+  retryCount     Int
+  createdAt      DateTime  @default(now())
+
+  @@index([organizationId])
+  @@index([eventType])
+  @@map("dead_letter_event")
+}
+
+
 

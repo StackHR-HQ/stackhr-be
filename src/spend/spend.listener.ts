@@ -55,6 +55,13 @@ export class SpendListener {
       return;
     }
 
+    if (expense.status === 'APPROVED' || expense.status === 'REJECTED') {
+      this.logger.warn(
+        `Expense claim ${expenseId} already has terminal status "${expense.status}". Skipping duplicate processing.`,
+      );
+      return;
+    }
+
     if (event.status === 'APPROVED') {
       await this.prisma.$transaction([
         this.prisma.expense.update({
@@ -72,16 +79,42 @@ export class SpendListener {
             status: 'PENDING',
           },
         }),
+        this.prisma.auditEvent.create({
+          data: {
+            organizationId: event.organizationId,
+            actorUserId: event.approverId,
+            action: 'EXPENSE_APPROVED',
+            targetType: 'expense',
+            targetId: expenseId,
+            employeeId: expense.employeeId,
+            description: `Expense claim for ${expense.currency} ${expense.amount} was approved`,
+            createdAt: new Date(),
+          },
+        }),
       ]);
 
       this.logger.log(
         `Expense claim ${expenseId} approved. Generated pending reimbursement.`,
       );
     } else if (event.status === 'REJECTED') {
-      await this.prisma.expense.update({
-        where: { id: expenseId },
-        data: { status: 'REJECTED' },
-      });
+      await this.prisma.$transaction([
+        this.prisma.expense.update({
+          where: { id: expenseId },
+          data: { status: 'REJECTED' },
+        }),
+        this.prisma.auditEvent.create({
+          data: {
+            organizationId: event.organizationId,
+            actorUserId: event.approverId,
+            action: 'EXPENSE_REJECTED',
+            targetType: 'expense',
+            targetId: expenseId,
+            employeeId: expense.employeeId,
+            description: `Expense claim for ${expense.currency} ${expense.amount} was rejected`,
+            createdAt: new Date(),
+          },
+        }),
+      ]);
 
       this.logger.log(`Expense claim ${expenseId} marked as rejected.`);
     }
@@ -100,18 +133,53 @@ export class SpendListener {
       return;
     }
 
+    if (advance.status === 'APPROVED' || advance.status === 'REJECTED') {
+      this.logger.warn(
+        `Salary advance ${advanceId} already has terminal status "${advance.status}". Skipping duplicate processing.`,
+      );
+      return;
+    }
+
     if (event.status === 'APPROVED') {
-      await this.prisma.salaryAdvance.update({
-        where: { id: advanceId },
-        data: { status: 'APPROVED' },
-      });
+      await this.prisma.$transaction([
+        this.prisma.salaryAdvance.update({
+          where: { id: advanceId },
+          data: { status: 'APPROVED' },
+        }),
+        this.prisma.auditEvent.create({
+          data: {
+            organizationId: event.organizationId,
+            actorUserId: event.approverId,
+            action: 'SALARY_ADVANCE_APPROVED',
+            targetType: 'salary_advance',
+            targetId: advanceId,
+            employeeId: advance.employeeId,
+            description: `Salary advance of ${advance.amount} was approved`,
+            createdAt: new Date(),
+          },
+        }),
+      ]);
 
       this.logger.log(`Salary advance ${advanceId} approved.`);
     } else if (event.status === 'REJECTED') {
-      await this.prisma.salaryAdvance.update({
-        where: { id: advanceId },
-        data: { status: 'REJECTED' },
-      });
+      await this.prisma.$transaction([
+        this.prisma.salaryAdvance.update({
+          where: { id: advanceId },
+          data: { status: 'REJECTED' },
+        }),
+        this.prisma.auditEvent.create({
+          data: {
+            organizationId: event.organizationId,
+            actorUserId: event.approverId,
+            action: 'SALARY_ADVANCE_REJECTED',
+            targetType: 'salary_advance',
+            targetId: advanceId,
+            employeeId: advance.employeeId,
+            description: `Salary advance of ${advance.amount} was rejected`,
+            createdAt: new Date(),
+          },
+        }),
+      ]);
 
       this.logger.log(`Salary advance ${advanceId} marked as rejected.`);
     }

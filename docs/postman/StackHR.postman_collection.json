@@ -7,6 +7,179 @@
   },
   "item": [
     {
+      "name": "Observability & Health",
+      "description": "System telemetry, Prometheus metrics scrape endpoints, readiness/liveness health probes.",
+      "item": [
+        {
+          "name": "Get Prometheus Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "metrics"
+              ]
+            },
+            "description": "Scrapes Prometheus metrics text format including P50/P90/P95/P99 latency histograms, HTTP request counters, Idempotency engine events, Outbox DLQ depth, Circuit Breaker states, and Node.js process runtime stats."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "text",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain; version=0.0.4; charset=utf-8"
+                }
+              ],
+              "body": "# HELP stackhr_http_requests_total Total number of HTTP requests processed by StackHR backend\n# TYPE stackhr_http_requests_total counter\nstackhr_http_requests_total{method=\"GET\",route=\"/v1/api/employees\",status_code=\"200\"} 142\n\n# HELP stackhr_http_request_duration_seconds HTTP request latency in seconds across P50, P90, P95, and P99 percentiles\n# TYPE stackhr_http_request_duration_seconds histogram\nstackhr_http_request_duration_seconds_bucket{le=\"0.05\",method=\"GET\",route=\"/v1/api/employees\",status_code=\"200\"} 130\nstackhr_http_request_duration_seconds_bucket{le=\"+Inf\",method=\"GET\",route=\"/v1/api/employees\",status_code=\"200\"} 142\nstackhr_http_request_duration_seconds_sum{method=\"GET\",route=\"/v1/api/employees\",status_code=\"200\"} 3.421\nstackhr_http_request_duration_seconds_count{method=\"GET\",route=\"/v1/api/employees\",status_code=\"200\"} 142\n\n# HELP stackhr_outbox_dlq_depth Current number of dead-lettered events requiring operator attention\n# TYPE stackhr_outbox_dlq_depth gauge\nstackhr_outbox_dlq_depth 0\n\n# HELP stackhr_circuit_breaker_state Current state of external client circuit breakers (0 = CLOSED, 1 = HALF_OPEN, 2 = OPEN)\n# TYPE stackhr_circuit_breaker_state gauge\nstackhr_circuit_breaker_state{breaker_name=\"PenCentral\"} 0"
+            }
+          ]
+        },
+        {
+          "name": "Get System Health & Readiness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Liveness and readiness health check probe reporting database latency, process memory stats (heap, RSS), circuit breaker health, and DLQ depth."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"ok\",\n  \"timestamp\": \"2026-10-17T06:00:00.000Z\",\n  \"uptimeSeconds\": 1420,\n  \"database\": {\n    \"status\": \"up\",\n    \"responseTimeMs\": 4\n  },\n  \"memory\": {\n    \"heapUsedMb\": 65.4,\n    \"heapTotalMb\": 98.2,\n    \"rssMb\": 142.1\n  },\n  \"circuitBreakers\": [\n    {\n      \"name\": \"PenCentral\",\n      \"state\": \"CLOSED\",\n      \"consecutiveFailures\": 0,\n      \"lastFailureTime\": 0,\n      \"isAvailable\": true\n    }\n  ],\n  \"outboxDlq\": {\n    \"depth\": 0\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Dead Letter Events (DLQ)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/outbox/dlq?limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "outbox",
+                "dlq"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Maximum number of DLQ events to retrieve (default: 50, max: 100)"
+                },
+                {
+                  "key": "organizationId",
+                  "value": "org-uuid-placeholder",
+                  "disabled": true,
+                  "description": "Optional filter by organization ID"
+                }
+              ]
+            },
+            "description": "Platform Admin endpoint to inspect poisoned or max-retry-exceeded outbox domain events requiring operator intervention."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 1,\n    \"events\": [\n      {\n        \"id\": \"dlq_8f9a2b1c-9999-4d2a\",\n        \"organizationId\": \"org_abc123\",\n        \"originalId\": \"outbox_12345\",\n        \"eventType\": \"approval.decided\",\n        \"aggregateType\": \"ApprovalRequest\",\n        \"aggregateId\": \"appr_777\",\n        \"payload\": {\n          \"requestId\": \"appr_777\",\n          \"status\": \"APPROVED\",\n          \"requestType\": \"LEAVE\"\n        },\n        \"failureReason\": \"SendByte gateway connection timeout after 5 attempts\",\n        \"retryCount\": 5,\n        \"createdAt\": \"2026-10-17T05:30:00.000Z\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Replay Dead Letter Event",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/outbox/dlq/:id/replay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "outbox",
+                "dlq",
+                ":id",
+                "replay"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "dlq_8f9a2b1c-9999-4d2a",
+                  "description": "UUID of the dead letter event to replay"
+                }
+              ]
+            },
+            "description": "Platform Admin endpoint to replay a dead letter event by reinstating it as a fresh PENDING event in the Transactional Outbox and removing it from the DLQ."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Dead letter event successfully queued for replay\",\n    \"replayedEventId\": \"outbox_new_replayed_uuid\"\n  }\n}"
+            },
+            {
+              "name": "Not Found (404)",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Dead letter event with ID dlq_invalid not found\",\n  \"data\": null,\n  \"error\": {\n    \"error\": \"NotFoundException\",\n    \"statusCode\": 404\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Waitlist",
       "description": "Public waitlist registration and admin entry management endpoints.",
       "item": [
@@ -414,6 +587,266 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Forgot Password (Public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@company.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "Request a password reset link sent via transactional email. Returns a generic success response to prevent email enumeration."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"If an account exists with this email, a password reset link has been sent.\",\n  \"data\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify Password Reset Token (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password/verify?token=sample-reset-token-123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password",
+                "verify"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "sample-reset-token-123",
+                  "description": "Password reset token sent in email link"
+                }
+              ]
+            },
+            "description": "Public endpoint to verify password reset token validity before presenting password form."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"valid\": true,\n    \"email\": \"owner@company.com\"\n  }\n}"
+            },
+            {
+              "name": "Invalid or Expired Token (400)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Invalid or expired password reset link\",\n  \"data\": null,\n  \"error\": {\n    \"error\": \"Bad Request\",\n    \"statusCode\": 400\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Reset Password (Public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"sample-reset-token-123\",\n  \"password\": \"NewSecurePass123!\",\n  \"confirmPassword\": \"NewSecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "Reset user password using single-use verification token. Revokes all active sessions for security."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Password has been reset successfully.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"usr-123\",\n      \"name\": \"Acme Corp\",\n      \"email\": \"owner@company.com\",\n      \"userType\": \"BUSINESS\",\n      \"role\": \"BUSINESS_OWNER\",\n      \"organizationId\": \"org-123\"\n    },\n    \"token\": \"new-session-token-xyz\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Change Password (Protected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"OldSecurePass123!\",\n  \"newPassword\": \"NewSecurePass123!\",\n  \"confirmPassword\": \"NewSecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "change-password"
+              ]
+            },
+            "description": "Change caller password. Verifies current password using Argon2id, revokes old sessions, and re-issues a new session token & HTTP cookie."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Password changed successfully.\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"usr-123\",\n      \"name\": \"Acme Corp\",\n      \"email\": \"owner@company.com\",\n      \"userType\": \"BUSINESS\",\n      \"role\": \"BUSINESS_OWNER\",\n      \"organizationId\": \"org-123\"\n    },\n    \"token\": \"new-session-token-xyz\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Retrieve currently authenticated user session details and organization context."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"user\": {\n    \"id\": \"usr-123\",\n    \"name\": \"Jane Doe\",\n    \"email\": \"jane@company.com\",\n    \"role\": \"BUSINESS_ADMIN\",\n    \"userType\": \"BUSINESS\",\n    \"organizationId\": \"org-123\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Invalidates the active session token on server-side DB/cache and clears authentication cookies."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true\n}"
+            }
+          ]
         }
       ]
     },
@@ -554,6 +987,90 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Get Onboarding Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboarding/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding",
+                "status"
+              ]
+            },
+            "description": "Fetch organization onboarding checklist progress and completion state."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"IN_PROGRESS\",\n  \"companyInfoCompleted\": true,\n  \"employeesAdded\": 3,\n  \"payrollConfigured\": false,\n  \"isComplete\": false\n}"
+            }
+          ]
+        },
+        {
+          "name": "Complete Onboarding",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyInfo\": {\n    \"companyName\": \"Acme Corp\",\n    \"industry\": \"Technology\",\n    \"companySize\": \"11-50\",\n    \"currency\": \"NGN\"\n  },\n  \"employees\": [\n    {\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane@acme.com\",\n      \"jobTitle\": \"Engineer\",\n      \"salary\": 500000,\n      \"startDate\": \"2026-01-15\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboarding/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "onboarding",
+                "complete"
+              ]
+            },
+            "description": "Finalize and complete initial business onboarding setup."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Onboarding completed successfully\",\n  \"organization\": {\n    \"id\": \"org-123\",\n    \"name\": \"Acme Corp\",\n    \"onboardingStatus\": \"COMPLETED\"\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -653,7 +1170,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"appr-123\",\n        \"type\": \"LEAVE\",\n        \"status\": \"PENDING\",\n        \"requesterId\": \"usr-123\"\n      }\n    ],\n    \"meta\": {\n      \"total\": 1,\n      \"page\": 1,\n      \"limit\": 20,\n      \"totalPages\": 1\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"appr-123\",\n        \"organizationId\": \"org-123\",\n        \"type\": \"LEAVE\",\n        \"subjectTable\": \"leave_request\",\n        \"subjectId\": \"leave-100\",\n        \"requesterId\": \"usr-123\",\n        \"requester\": {\n          \"id\": \"usr-123\",\n          \"fullName\": \"Chukwuemeka Okafor\"\n        },\n        \"approverId\": null,\n        \"approver\": null,\n        \"status\": \"PENDING\",\n        \"amountSnapshot\": 3,\n        \"unit\": \"DAYS\",\n        \"currency\": null,\n        \"subjectSummary\": {\n          \"leaveType\": \"Annual Leave\",\n          \"startDate\": \"2026-10-01T00:00:00.000Z\",\n          \"endDate\": \"2026-10-03T00:00:00.000Z\",\n          \"totalDays\": 3,\n          \"reason\": \"Family vacation\"\n        },\n        \"metadata\": null,\n        \"stage\": 1,\n        \"submittedAt\": \"2026-09-25T15:13:43.979Z\",\n        \"decidedAt\": null,\n        \"rejectionReason\": null\n      }\n    ],\n    \"meta\": {\n      \"total\": 1,\n      \"page\": 1,\n      \"limit\": 20,\n      \"totalPages\": 1\n    }\n  }\n}"
             }
           ]
         },
@@ -815,7 +1332,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"data\": [\n      {\n        \"id\": \"emp-123\",\n        \"fullName\": \"Jane Doe\",\n        \"email\": \"jane.doe@company.com\",\n        \"department\": \"Engineering\",\n        \"jobTitle\": \"Senior Software Engineer\",\n        \"status\": \"ACTIVE\"\n      }\n    ],\n    \"meta\": {\n      \"total\": 1,\n      \"page\": 1,\n      \"limit\": 10,\n      \"totalPages\": 1\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"data\": [\n      {\n        \"id\": \"emp-123\",\n        \"fullName\": \"Jane Doe\",\n        \"email\": \"jane.doe@company.com\",\n        \"department\": \"Engineering\",\n        \"jobTitle\": \"Senior Software Engineer\",\n        \"status\": \"ACTIVE\",\n        \"startDate\": \"2024-01-15T00:00:00.000Z\",\n        \"organizationId\": \"org-abc\"\n      }\n    ],\n    \"meta\": {\n      \"total\": 1,\n      \"page\": 1,\n      \"limit\": 10,\n      \"totalPages\": 1\n    }\n  }\n}"
             }
           ]
         },
@@ -853,7 +1370,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employee\": {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane.doe@company.com\",\n      \"department\": \"Engineering\",\n      \"jobTitle\": \"Senior Software Engineer\",\n      \"status\": \"ACTIVE\",\n      \"manager\": null,\n      \"directReports\": []\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employee\": {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane.doe@company.com\",\n      \"department\": \"Engineering\",\n      \"jobTitle\": \"Senior Software Engineer\",\n      \"status\": \"ACTIVE\",\n      \"startDate\": \"2024-01-15T00:00:00.000Z\",\n      \"organizationId\": \"org-abc\",\n      \"manager\": null,\n      \"directReports\": []\n    }\n  }\n}"
             }
           ]
         },
@@ -1159,7 +1676,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"invitations\": [\n      {\n        \"id\": \"inv-123\",\n        \"email\": \"newmember@company.com\",\n        \"status\": \"pending\"\n      }\n    ]\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"invitations\": [\n      {\n        \"id\": \"inv-123\",\n        \"email\": \"newmember@company.com\",\n        \"status\": \"pending\",\n        \"role\": \"EMPLOYEE\",\n        \"createdAt\": \"2026-09-28T10:00:00.000Z\",\n        \"expiresAt\": \"2026-10-05T10:00:00.000Z\"\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -1492,6 +2009,58 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Task marked completed\",\n    \"employeeId\": \"emp-123\",\n    \"task\": {\n      \"id\": \"task-eng-1\",\n      \"completed\": true,\n      \"completedAt\": \"2026-09-09T10:45:00.000Z\"\n    }\n  }\n}"
             }
           ]
+        },
+        {
+          "name": "Complete Employee Onboarding",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/people/onboarding/employees/{{employeeId}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "people",
+                "onboarding",
+                "employees",
+                "{{employeeId}}",
+                "complete"
+              ]
+            },
+            "description": "Marks an employee onboarding checklist complete and transitions status to ACTIVE."
+          },
+          "response": [
+            {
+              "name": "200 OK - Onboarding Completed",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/onboarding/employees/{{employeeId}}/complete"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Onboarding completed and employee activated successfully\",\n  \"employeeId\": \"emp-1\",\n  \"status\": \"ACTIVE\"\n}"
+            }
+          ]
         }
       ]
     },
@@ -1617,7 +2186,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employeeId\": \"emp-123\",\n    \"balances\": [\n      {\n        \"allocatedDays\": 20,\n        \"usedDays\": 2,\n        \"pendingDays\": 5,\n        \"remainingDays\": 13,\n        \"leaveType\": {\n          \"id\": \"lt-123\",\n          \"name\": \"Annual Paid Leave\"\n        }\n      }\n    ]\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employeeId\": \"emp-123\",\n    \"balances\": [\n      {\n        \"allocatedDays\": 20,\n        \"usedDays\": 2,\n        \"approvedFutureDays\": 5,\n        \"pendingDays\": 3,\n        \"remainingDays\": 15,\n        \"leaveType\": {\n          \"id\": \"lt-123\",\n          \"name\": \"Annual Paid Leave\"\n        }\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -1715,7 +2284,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"data\": [\n      {\n        \"id\": \"lr-456\",\n        \"startDate\": \"2026-10-01T00:00:00.000Z\",\n        \"endDate\": \"2026-10-05T00:00:00.000Z\",\n        \"totalDays\": 5,\n        \"status\": \"APPROVED\",\n        \"leaveType\": {\n          \"id\": \"lt-123\",\n          \"name\": \"Annual Paid Leave\"\n        }\n      }\n    ],\n    \"meta\": {\n      \"total\": 1,\n      \"page\": 1,\n      \"limit\": 10,\n      \"totalPages\": 1\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"data\": [\n      {\n        \"id\": \"lr-456\",\n        \"startDate\": \"2026-10-01T00:00:00.000Z\",\n        \"endDate\": \"2026-10-05T00:00:00.000Z\",\n        \"totalDays\": 5,\n        \"status\": \"APPROVED\",\n        \"decidedAt\": \"2026-09-30T14:22:00.000Z\",\n        \"decidedByUserId\": \"usr-mgr-789\",\n        \"leaveType\": {\n          \"id\": \"lt-123\",\n          \"name\": \"Annual Paid Leave\"\n        }\n      }\n    ],\n    \"meta\": {\n      \"total\": 1,\n      \"page\": 1,\n      \"limit\": 10,\n      \"totalPages\": 1\n    }\n  }\n}"
             }
           ]
         },
@@ -1754,7 +2323,189 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveRequest\": {\n      \"id\": \"lr-456\",\n      \"startDate\": \"2026-10-01T00:00:00.000Z\",\n      \"endDate\": \"2026-10-05T00:00:00.000Z\",\n      \"totalDays\": 5,\n      \"status\": \"APPROVED\",\n      \"employee\": {\n        \"id\": \"emp-123\",\n        \"fullName\": \"Jane Doe\"\n      }\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveRequest\": {\n      \"id\": \"lr-456\",\n      \"startDate\": \"2026-10-01T00:00:00.000Z\",\n      \"endDate\": \"2026-10-05T00:00:00.000Z\",\n      \"totalDays\": 5,\n      \"status\": \"APPROVED\",\n      \"decidedAt\": \"2026-09-30T14:22:00.000Z\",\n      \"decidedByUserId\": \"usr-mgr-789\",\n      \"employee\": {\n        \"id\": \"emp-123\",\n        \"fullName\": \"Jane Doe\"\n      },\n      \"leaveType\": {\n        \"id\": \"lt-123\",\n        \"name\": \"Annual Paid Leave\"\n      }\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Leave Type",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leave/types/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leave",
+                "types",
+                ":id"
+              ]
+            },
+            "description": "Update an existing leave type (Admin/HR only).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Annual Paid Leave\",\n  \"daysPerYear\": 25,\n  \"paid\": true\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"leaveType\": {\n    \"id\": \"lt-1\",\n    \"name\": \"Annual Paid Leave\",\n    \"daysPerYear\": 25,\n    \"paid\": true\n  }\n}"
+            },
+            {
+              "name": "Error (400 Bad Request / 404 Not Found)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Leave type with ID \\\"lt-1\\\" not found\",\n  \"error\": \"Not Found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Leave Type",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leave/types/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leave",
+                "types",
+                ":id"
+              ]
+            },
+            "description": "Delete a leave type and its unused balances (Admin/HR only). Rejected if leave requests exist for this type."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Leave type deleted successfully\"\n}"
+            },
+            {
+              "name": "Error (409 Conflict - Leave requests exist)",
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 409,\n  \"message\": \"Cannot delete leave type that has existing leave requests\",\n  \"error\": \"Conflict\"\n}"
+            },
+            {
+              "name": "Error (404 Not Found)",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Leave type with ID \\\"lt-1\\\" not found\",\n  \"error\": \"Not Found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Cancel Leave Request",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leave/requests/:id/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leave",
+                "requests",
+                ":id",
+                "cancel"
+              ]
+            },
+            "description": "Cancel a pending or approved leave request and restore leave balance."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"leaveRequest\": {\n    \"id\": \"lr-1\",\n    \"status\": \"CANCELLED\",\n    \"totalDays\": 5\n  }\n}"
+            },
+            {
+              "name": "Error (400 Bad Request / 404 Not Found)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Leave request is already cancelled\",\n  \"error\": \"Bad Request\"\n}"
             }
           ]
         }
@@ -2017,6 +2768,484 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"reimbursements\": [\n      {\n        \"id\": \"reimb-123\",\n        \"expenseId\": \"exp-123\",\n        \"amount\": 25000,\n        \"currency\": \"NGN\",\n        \"status\": \"PENDING\"\n      }\n    ]\n  }\n}"
             }
           ]
+        },
+        {
+          "name": "Submit Reimbursement Claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reimbursements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reimbursements"
+              ]
+            },
+            "description": "Submit a new expense reimbursement claim routed for approval.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 15000,\n  \"currency\": \"NGN\",\n  \"description\": \"Taxi fare for client meeting\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Reimbursement claim submitted and routed for approval\",\n  \"reimbursement\": {\n    \"id\": \"rmb-1\",\n    \"amount\": 15000,\n    \"currency\": \"NGN\",\n    \"status\": \"PENDING\"\n  },\n  \"approvalRequest\": {\n    \"id\": \"appr-1\",\n    \"status\": \"PENDING\"\n  }\n}"
+            },
+            {
+              "name": "Error (400 Bad Request / 404 Not Found)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": [\n    \"amount must be a positive number\"\n  ],\n  \"error\": \"Bad Request\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Reimbursement Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reimbursements/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reimbursements",
+                ":id"
+              ]
+            },
+            "description": "Fetch details of a single reimbursement claim."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"reimbursement\": {\n    \"id\": \"rmb-1\",\n    \"amount\": 15000,\n    \"status\": \"PENDING\",\n    \"employee\": {\n      \"fullName\": \"Jane Doe\"\n    }\n  }\n}"
+            },
+            {
+              "name": "Error (400 Bad Request / 404 Not Found)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Reimbursement claim with ID \\\"rmb-1\\\" not found\",\n  \"error\": \"Not Found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Cancel Reimbursement Claim",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reimbursements/:id/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reimbursements",
+                ":id",
+                "cancel"
+              ]
+            },
+            "description": "Cancel a pending reimbursement claim."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"reimbursement\": {\n    \"id\": \"rmb-1\",\n    \"status\": \"CANCELLED\"\n  }\n}"
+            },
+            {
+              "name": "Error (400 Bad Request / 404 Not Found)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Cannot cancel a paid reimbursement claim\",\n  \"error\": \"Bad Request\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Reimbursements Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reimbursements/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reimbursements",
+                "summary"
+              ]
+            },
+            "description": "Get summary metrics for reimbursements (pending, approved, paid totals)."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"summary\": {\n    \"pending\": {\n      \"count\": 3,\n      \"amountMinor\": 45000\n    },\n    \"approved\": {\n      \"count\": 5,\n      \"amountMinor\": 120000\n    },\n    \"paid\": {\n      \"count\": 12,\n      \"amountMinor\": 350000\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Mark Reimbursement as Paid (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reimbursements/:id/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reimbursements",
+                ":id",
+                "pay"
+              ]
+            },
+            "description": "Admin/Finance action to mark an approved reimbursement as paid."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"reimbursement\": {\n    \"id\": \"rmb-1\",\n    \"status\": \"PAID\",\n    \"paidAt\": \"2026-10-05T12:00:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "Error (400 Bad Request / 404 Not Found)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Reimbursement claim is already paid\",\n  \"error\": \"Bad Request\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Expense Claim Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spend/expenses/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "expenses",
+                ":id"
+              ]
+            },
+            "description": "Fetch detailed information for a specific expense claim, including linked reimbursement and employee details."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"expense\": {\n      \"id\": \"exp-123\",\n      \"employeeId\": \"emp-1\",\n      \"category\": \"Travel\",\n      \"amount\": 25000,\n      \"currency\": \"NGN\",\n      \"description\": \"Client visit taxi fare\",\n      \"receiptUrl\": \"https://storage.stackhr.app/receipts/exp-123.pdf\",\n      \"status\": \"PENDING\",\n      \"employee\": {\n        \"id\": \"emp-1\",\n        \"fullName\": \"Jane Doe\",\n        \"email\": \"jane@acme.com\",\n        \"jobTitle\": \"Software Engineer\"\n      },\n      \"reimbursement\": null\n    }\n  }\n}"
+            },
+            {
+              "name": "Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Expense with ID \\\"exp-123\\\" not found\",\n  \"error\": \"Not Found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Cancel Expense Claim",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spend/expenses/:id/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "expenses",
+                ":id",
+                "cancel"
+              ]
+            },
+            "description": "Cancel a pending expense claim. Also cancels any linked approval request."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"expense\": {\n      \"id\": \"exp-123\",\n      \"status\": \"CANCELLED\"\n    }\n  }\n}"
+            },
+            {
+              "name": "Bad Request - Cannot Cancel",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Cannot cancel an expense claim with status APPROVED\",\n  \"error\": \"Bad Request\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Cancel Salary Advance",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spend/advances/:id/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "advances",
+                ":id",
+                "cancel"
+              ]
+            },
+            "description": "Cancel a pending salary advance request. Also cancels any linked approval request."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"salaryAdvance\": {\n      \"id\": \"adv-123\",\n      \"status\": \"CANCELLED\"\n    }\n  }\n}"
+            },
+            {
+              "name": "Bad Request - Cannot Cancel",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Cannot cancel a salary advance with status APPROVED\",\n  \"error\": \"Bad Request\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Disburse Salary Advance (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/spend/advances/:id/disburse",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "spend",
+                "advances",
+                ":id",
+                "disburse"
+              ]
+            },
+            "description": "Mark an approved salary advance as disbursed (Admin only). Sets status to DISBURSED and records disbursedAt timestamp."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Salary advance marked as disbursed successfully\",\n    \"salaryAdvance\": {\n      \"id\": \"adv-123\",\n      \"status\": \"DISBURSED\",\n      \"disbursedAt\": \"2026-10-07T12:00:00.000Z\"\n    }\n  }\n}"
+            },
+            {
+              "name": "Bad Request - Not Approved",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Cannot disburse salary advance with status PENDING. It must be APPROVED first.\",\n  \"error\": \"Bad Request\"\n}"
+            }
+          ]
         }
       ]
     },
@@ -2066,6 +3295,55 @@
                 }
               ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Compensation record set successfully\",\n    \"compensationRecord\": {\n      \"id\": \"comp-123\",\n      \"employeeId\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"basicSalary\": 30000000,\n      \"housingAllowance\": 10000000,\n      \"transportAllowance\": 5000000,\n      \"otherAllowances\": 2000000,\n      \"effectiveFrom\": \"2026-09-09T13:00:00.000Z\",\n      \"effectiveTo\": null\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List All Employee Compensations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/compensation",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "compensation"
+              ]
+            },
+            "description": "Returns all employees active compensation breakdown in the organization."
+          },
+          "response": [
+            {
+              "name": "200 OK - All Compensations",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/payroll/compensation"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"compensations\": [\n      {\n        \"employeeId\": \"emp-1\",\n        \"fullName\": \"Ada Okafor\",\n        \"email\": \"ada@acme.com\",\n        \"jobTitle\": \"Software Engineer\",\n        \"department\": \"Engineering\",\n        \"status\": \"ACTIVE\",\n        \"annualSalaryMinor\": 1200000000,\n        \"currency\": \"NGN\",\n        \"paymentFrequency\": \"MONTHLY\",\n        \"basicSalary\": 600000,\n        \"housingAllowance\": 250000,\n        \"transportAllowance\": 100000,\n        \"otherAllowances\": 50000,\n        \"grossMonthlySalary\": 1000000,\n        \"effectiveFrom\": \"2026-01-01\"\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -2150,7 +3428,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Payroll run created in DRAFT state\",\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"title\": \"September 2026 Regular Payroll\",\n      \"status\": \"DRAFT\"\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Payroll run created in DRAFT state\",\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"payDate\": \"2026-09-25\",\n      \"title\": \"September 2026 Regular Payroll\",\n      \"status\": \"DRAFT\"\n    }\n  }\n}"
             }
           ]
         },
@@ -2396,7 +3674,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payrollRuns\": [\n      {\n        \"id\": \"run-123\",\n        \"periodMonth\": 9,\n        \"periodYear\": 2026,\n        \"status\": \"RECONCILED\"\n      }\n    ]\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payrollRuns\": [\n      {\n        \"id\": \"run-123\",\n        \"periodMonth\": 9,\n        \"periodYear\": 2026,\n        \"payDate\": \"2026-09-25\",\n        \"status\": \"RECONCILED\"\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -2435,7 +3713,107 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"status\": \"RECONCILED\",\n      \"items\": [],\n      \"payslips\": []\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"payDate\": \"2026-09-25\",\n      \"currency\": \"NGN\",\n      \"payrollEngineVersion\": \"2026.1\",\n      \"taxRuleSetId\": \"TRS-NTA-2026\",\n      \"createdBy\": \"Admin User\",\n      \"status\": \"DRAFT\",\n      \"complianceWarnings\": [],\n      \"auditTrail\": [],\n      \"items\": [],\n      \"payslips\": []\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Payroll Run Audit Events",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/runs/run-123/audit-events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "runs",
+                "run-123",
+                "audit-events"
+              ]
+            },
+            "description": "Get chronological audit events and activity log for a specific payroll run."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"auditEvents\": [\n      {\n        \"id\": \"ev-1\",\n        \"action\": \"payroll_run.created\",\n        \"description\": \"Created payroll run \\\"October 2026\\\" in DRAFT state\",\n        \"createdAt\": \"2026-10-01T10:00:00.000Z\",\n        \"actor\": {\n          \"id\": \"user-1\",\n          \"name\": \"John Doe\",\n          \"email\": \"john@acme.com\"\n        }\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Generated Payslips",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payroll/payslips?payrollRunId={{runId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payroll",
+                "payslips"
+              ],
+              "query": [
+                {
+                  "key": "payrollRunId",
+                  "value": "{{runId}}"
+                },
+                {
+                  "key": "employeeId",
+                  "value": "{{employeeId}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lists all employee payslips generated for a specific payroll run or employee."
+          },
+          "response": [
+            {
+              "name": "200 OK - Payslips List",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/payroll/payslips?payrollRunId={{runId}}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"payslips\": [\n      {\n        \"id\": \"slip-1\",\n        \"organizationId\": \"org-123\",\n        \"payrollRunId\": \"run-1\",\n        \"employeeId\": \"emp-1\",\n        \"periodMonth\": 10,\n        \"periodYear\": 2026,\n        \"grossSalary\": 1000000,\n        \"netSalary\": 771900,\n        \"breakdownJson\": \"{\\\"basicSalary\\\":600000,\\\"grossSalary\\\":1000000,\\\"taxDeduction\\\":148100,\\\"pensionDeduction\\\":80000,\\\"netSalary\\\":771900}\",\n        \"generatedAt\": \"2026-10-12T12:00:00.000Z\",\n        \"employee\": {\n          \"id\": \"emp-1\",\n          \"fullName\": \"Ada Okafor\",\n          \"email\": \"ada@acme.com\",\n          \"department\": \"Engineering\",\n          \"jobTitle\": \"Software Engineer\"\n        }\n      }\n    ]\n  }\n}"
             }
           ]
         }
@@ -2478,7 +3856,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"profile\": {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane@acme.com\",\n      \"department\": \"Engineering\",\n      \"jobTitle\": \"Software Engineer\"\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"profile\": {\n      \"id\": \"emp-123\",\n      \"fullName\": \"Jane Doe\",\n      \"email\": \"jane@acme.com\",\n      \"department\": \"Engineering\",\n      \"jobTitle\": \"Software Engineer\",\n      \"employmentStatus\": \"ACTIVE\",\n      \"workLocation\": \"Lagos, Nigeria\",\n      \"startDate\": \"2024-01-15T00:00:00.000Z\",\n      \"nextPayDate\": \"2026-10-25\",\n      \"bankName\": \"First Bank of Nigeria\",\n      \"accountNumber\": \"0123456789\",\n      \"bankAccountLast4\": \"6789\",\n      \"manager\": {\n        \"id\": \"mgr-456\",\n        \"fullName\": \"John Manager\",\n        \"email\": \"john@acme.com\",\n        \"jobTitle\": \"Engineering Manager\"\n      },\n      \"compensation\": {\n        \"basicSalary\": 400000,\n        \"housingAllowance\": 50000,\n        \"transportAllowance\": 30000,\n        \"otherAllowances\": 20000,\n        \"effectiveFrom\": \"2024-01-15\"\n      }\n    }\n  }\n}"
             }
           ]
         },
@@ -2554,7 +3932,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveBalances\": [\n      {\n        \"allocatedDays\": 20,\n        \"usedDays\": 5,\n        \"remainingDays\": 15\n      }\n    ]\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveBalances\": [\n      {\n        \"allocatedDays\": 20,\n        \"usedDays\": 2,\n        \"upcomingDays\": 5,\n        \"approvedFutureDays\": 5,\n        \"pendingDays\": 3,\n        \"remainingDays\": 15,\n        \"leaveType\": {\n          \"id\": \"lt-123\",\n          \"name\": \"Annual Paid Leave\"\n        }\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -2592,7 +3970,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveRequests\": []\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveRequests\": [\n      {\n        \"id\": \"lr-456\",\n        \"startDate\": \"2026-10-01T00:00:00.000Z\",\n        \"endDate\": \"2026-10-05T00:00:00.000Z\",\n        \"totalDays\": 5,\n        \"status\": \"APPROVED\",\n        \"decidedAt\": \"2026-09-30T14:22:00.000Z\",\n        \"decidedByUserId\": \"usr-mgr-789\",\n        \"reason\": \"Family vacation\",\n        \"leaveType\": {\n          \"id\": \"lt-123\",\n          \"name\": \"Annual Paid Leave\"\n        }\n      }\n    ]\n  }\n}"
             }
           ]
         },
@@ -2671,6 +4049,217 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"salaryAdvances\": []\n  }\n}"
             }
           ]
+        },
+        {
+          "name": "Update Own Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "profile"
+              ]
+            },
+            "description": "Update logged-in employee profile fields (personal, bank, contact details). Excludes admin fields.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"phone\": \"+2348012345678\",\n  \"address\": \"123 Victoria Island, Lagos\",\n  \"bankName\": \"First Bank of Nigeria\",\n  \"accountNumber\": \"0123456789\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"profile\": {\n    \"id\": \"emp-100\",\n    \"firstName\": \"Jane\",\n    \"lastName\": \"Doe\",\n    \"phone\": \"+2348012345678\",\n    \"address\": \"123 Victoria Island, Lagos\",\n    \"bankName\": \"First Bank of Nigeria\",\n    \"accountNumber\": \"0123456789\",\n    \"bankAccountLast4\": \"6789\",\n    \"employmentStatus\": \"ACTIVE\",\n    \"nextPayDate\": \"2026-10-25\"\n  }\n}"
+            },
+            {
+              "name": "Error (400 Bad Request / 404 Not Found)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": [\n    \"phone must be a string\"\n  ],\n  \"error\": \"Bad Request\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Own Compensation History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/compensation-history",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "compensation-history"
+              ]
+            },
+            "description": "Retrieve own compensation record and revision history."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"records\": [\n    {\n      \"id\": \"cr-1\",\n      \"baseSalary\": 500000,\n      \"effectiveDate\": \"2026-01-01T00:00:00.000Z\"\n    }\n  ],\n  \"history\": [\n    {\n      \"id\": \"ch-1\",\n      \"previousSalary\": 400000,\n      \"newSalary\": 500000,\n      \"effectiveDate\": \"2026-01-01T00:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Own Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "notifications"
+              ]
+            },
+            "description": "Retrieve recent system notifications for logged-in employee."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"notifications\": [\n    {\n      \"id\": \"evt-1\",\n      \"action\": \"LEAVE_APPROVED\",\n      \"createdAt\": \"2026-10-01T10:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Own Documents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "documents"
+              ]
+            },
+            "description": "Retrieve own uploaded or company-assigned documents."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"documents\": [\n    {\n      \"id\": \"doc-1\",\n      \"title\": \"Employment Contract\",\n      \"fileUrl\": \"https://storage.stackhr.app/docs/contract.pdf\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Own Activity Log",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/activity",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "activity"
+              ]
+            },
+            "description": "Retrieve recent activity audit log entries for logged-in employee."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"activity\": [\n    {\n      \"id\": \"evt-10\",\n      \"action\": \"PROFILE_UPDATED\",\n      \"createdAt\": \"2026-10-02T14:30:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
         }
       ]
     },
@@ -2678,6 +4267,98 @@
       "name": "Compliance & Tax Engine",
       "description": "Statutory compliance rule sets, PAYE progressive tax bands, pension basis, NHF opt-in, and rent relief configuration managed by StackHR Admin users.",
       "item": [
+        {
+          "name": "Get Active Tax Rule Set (Tenant)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/compliance/active-rule-set?country=NG",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "compliance",
+                "active-rule-set"
+              ],
+              "query": [
+                {
+                  "key": "country",
+                  "value": "NG"
+                }
+              ]
+            },
+            "description": "Tenant read-only endpoint returning the active tax rule set and statutory contribution rates."
+          },
+          "response": [
+            {
+              "name": "200 OK - Active Tax Rules",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/compliance/active-rule-set?country=NG"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"TRS-NTA-2026\",\n    \"country\": \"NG\",\n    \"name\": \"Nigeria Tax Act 2025/2026 (NTA)\",\n    \"effectiveFrom\": \"2026-01-01T00:00:00.000Z\",\n    \"rentReliefPercentage\": 0.2,\n    \"rentReliefCap\": 500000,\n    \"pensionEmployeeRate\": 0.08,\n    \"pensionEmployerRate\": 0.1,\n    \"nhfRate\": 0.025,\n    \"taxFreeThreshold\": 800000,\n    \"applicability\": {\n      \"pension\": {\n        \"mandatoryThreshold\": 15,\n        \"voluntaryBelowThreshold\": true,\n        \"employeeRate\": 0.08,\n        \"employerRate\": 0.1\n      },\n      \"nhf\": {\n        \"rate\": 0.025,\n        \"voluntary\": true\n      },\n      \"nsitf\": {\n        \"rate\": 0.01,\n        \"mandatory\": true\n      },\n      \"itf\": {\n        \"rate\": 0.01,\n        \"mandatoryThreshold\": 5\n      }\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Organization Compliance Alerts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/compliance/alerts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "compliance",
+                "alerts"
+              ]
+            },
+            "description": "Tenant endpoint returning organization-wide compliance alerts (e.g. active employees missing TIN or RSA PIN)."
+          },
+          "response": [
+            {
+              "name": "200 OK - Compliance Alerts",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"alerts\": [\n      {\n        \"type\": \"MISSING_PENSION_RSA\",\n        \"severity\": \"MEDIUM\",\n        \"count\": 1,\n        \"message\": \"1 active employee is missing a Pension RSA Number\",\n        \"affectedEmployees\": [\n          {\n            \"id\": \"emp-1\",\n            \"fullName\": \"Moses Test\",\n            \"email\": \"moses@acme.com\",\n            \"department\": \"Engineering\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
         {
           "name": "List Tax Rule Sets",
           "request": {
@@ -2888,6 +4569,44 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"TRS-NTA-2026\",\n    \"name\": \"Nigeria Tax Act 2025/2026 (NTA)\",\n    \"isDefault\": true\n  }\n}"
             }
           ]
+        },
+        {
+          "name": "Get Compliance Alerts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/compliance/alerts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "compliance",
+                "alerts"
+              ]
+            },
+            "description": "Fetch compliance risk alerts (missing TIN, missing RSA, PAYE remittance due) for active organization (Admin/HR)."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"alerts\": [\n    {\n      \"type\": \"MISSING_TAX_ID\",\n      \"title\": \"Missing Tax IDs (TIN)\",\n      \"severity\": \"HIGH\",\n      \"count\": 2,\n      \"message\": \"2 active employees are missing a Tax Identification Number (TIN)\",\n      \"affectedEmployees\": [\n        {\n          \"id\": \"emp-1\",\n          \"fullName\": \"John Doe\",\n          \"email\": \"john@acme.com\",\n          \"department\": \"Engineering\"\n        }\n      ]\n    },\n    {\n      \"type\": \"MISSING_PENSION_RSA\",\n      \"title\": \"Missing Pension PINs\",\n      \"severity\": \"MEDIUM\",\n      \"count\": 1,\n      \"message\": \"1 active employee is missing a Pension RSA PIN\",\n      \"affectedEmployees\": [\n        {\n          \"id\": \"emp-2\",\n          \"fullName\": \"Jane Smith\",\n          \"email\": \"jane@acme.com\",\n          \"department\": \"Design\"\n        }\n      ]\n    },\n    {\n      \"type\": \"UPCOMING_STATUTORY_DEADLINE\",\n      \"title\": \"PAYE Tax Remittance Due\",\n      \"severity\": \"MEDIUM\",\n      \"count\": 1,\n      \"message\": \"Monthly PAYE tax remittance is due on the 10th of each month\",\n      \"dueDate\": \"2026-10-10\"\n    }\n  ]\n}"
+            }
+          ]
         }
       ]
     },
@@ -2896,10 +4615,52 @@
       "description": "Organization workspace management endpoints.",
       "item": [
         {
+          "name": "List Organizations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/organizations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organizations"
+              ]
+            },
+            "description": "Retrieve organization details for active session context."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"organization\": {\n    \"id\": \"org-123\",\n    \"name\": \"Acme Corp\",\n    \"slug\": \"acme-corp\",\n    \"currency\": \"NGN\",\n    \"payrollFrequency\": \"MONTHLY\"\n  }\n}"
+            }
+          ]
+        },
+        {
           "name": "Get Current Organization",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/organizations/current",
               "host": [
@@ -2912,7 +4673,21 @@
             },
             "description": "Retrieve active organization profile for current business session."
           },
-          "response": []
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"organization\": {\n    \"id\": \"org-123\",\n    \"name\": \"Acme Corp\",\n    \"slug\": \"acme-corp\",\n    \"currency\": \"NGN\",\n    \"payrollFrequency\": \"MONTHLY\"\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -2992,30 +4767,10 @@
               "name": "Get Employee Profile",
               "request": {
                 "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/people/employees/:employeeId",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "people",
-                    "employees",
-                    ":employeeId"
-                  ]
-                },
-                "description": "Get comprehensive employee profile, compensation, leave summary, and activity feed."
-              },
-              "response": []
-            },
-            {
-              "name": "Update Employee Profile",
-              "request": {
-                "method": "PATCH",
                 "header": [
                   {
-                    "key": "Content-Type",
-                    "value": "application/json"
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
                   }
                 ],
                 "url": {
@@ -3029,13 +4784,83 @@
                     ":employeeId"
                   ]
                 },
-                "description": "Update employee profile details.",
+                "description": "Get comprehensive employee profile, compensation, leave summary, and activity feed. Returns bankAccountLast4 masked for security."
+              },
+              "response": [
+                {
+                  "name": "Success (200 OK)",
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"profile\": {\n    \"id\": \"emp_ada\",\n    \"fullName\": \"Ada Lovelace\",\n    \"firstName\": \"Ada\",\n    \"lastName\": \"Lovelace\",\n    \"email\": \"ada@example.com\",\n    \"jobTitle\": \"Lead Engineer\",\n    \"department\": \"Engineering\",\n    \"departmentId\": \"dept_123\",\n    \"employmentType\": \"Full-Time\",\n    \"employmentStatus\": \"active\",\n    \"startDate\": \"2026-03-01\",\n    \"managerId\": \"emp_456\",\n    \"workLocation\": \"Lagos\",\n    \"personal\": {\n      \"phone\": \"+2348012345678\"\n    },\n    \"compensation\": {\n      \"annualSalaryMinor\": 600000000,\n      \"currency\": \"NGN\",\n      \"payFrequency\": \"MONTHLY\",\n      \"bankName\": \"GTBank\",\n      \"bankAccountLast4\": \"6789\"\n    }\n  }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Update Employee Profile",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/employees/:employeeId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "employees",
+                    ":employeeId"
+                  ]
+                },
+                "description": "Update employee profile details using nested personal, employment (departmentId, employmentType, startDate, status, jobTitle), compensation, and payment sections.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"jobTitle\": \"Senior Software Engineer\",\n  \"status\": \"ACTIVE\"\n}"
+                  "raw": "{\n  \"personal\": {\n    \"firstName\": \"Ada\",\n    \"lastName\": \"Lovelace\",\n    \"phone\": \"+2348012345678\"\n  },\n  \"employment\": {\n    \"jobTitle\": \"Lead Engineer\",\n    \"departmentId\": \"dept_123\",\n    \"employmentType\": \"FULL_TIME\",\n    \"startDate\": \"2026-03-01\",\n    \"status\": \"ACTIVE\",\n    \"managerId\": \"emp_456\",\n    \"workLocation\": \"Lagos\"\n  },\n  \"compensation\": {\n    \"annualSalaryMinor\": 600000000,\n    \"currency\": \"NGN\",\n    \"payFrequency\": \"MONTHLY\",\n    \"effectiveDate\": \"2026-11-01\"\n  },\n  \"payment\": {\n    \"bankName\": \"GTBank\",\n    \"accountNumber\": \"0123456789\"\n  }\n}"
                 }
               },
-              "response": []
+              "response": [
+                {
+                  "name": "Success (200 OK)",
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"profile\": {\n    \"id\": \"emp_ada\",\n    \"fullName\": \"Ada Lovelace\",\n    \"email\": \"ada@example.com\",\n    \"jobTitle\": \"Lead Engineer\",\n    \"departmentId\": \"dept_123\",\n    \"employmentType\": \"Full-Time\",\n    \"employmentStatus\": \"active\",\n    \"startDate\": \"2026-03-01\"\n  }\n}"
+                },
+                {
+                  "name": "Error (400 Bad Request)",
+                  "status": "Bad Request",
+                  "code": 400,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Department does not exist in your organization\",\n  \"error\": \"Bad Request\"\n}"
+                }
+              ]
             },
             {
               "name": "Resend Employee Invitation",
@@ -3077,7 +4902,21 @@
                 },
                 "description": "Get compensation change log for employee."
               },
-              "response": []
+              "response": [
+                {
+                  "name": "Success (Flat Array)",
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "[\n  {\n    \"id\": \"comp-hist-1\",\n    \"effectiveDate\": \"2026-01-01\",\n    \"annualSalaryMinor\": 1200000000,\n    \"previousSalary\": 1000000000,\n    \"newSalary\": 1200000000,\n    \"reason\": \"Annual merit increase\",\n    \"currency\": \"NGN\",\n    \"payFrequency\": \"MONTHLY\"\n  }\n]"
+                }
+              ]
             }
           ]
         },
@@ -3306,6 +5145,75 @@
                 }
               },
               "response": []
+            },
+            {
+              "name": "Download Document",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/documents/:id/download",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "documents",
+                    ":id",
+                    "download"
+                  ]
+                },
+                "description": "Download a document file. Accessible by admins for any document in the organization, and by employees for their own assigned documents or company-wide documents."
+              },
+              "response": [
+                {
+                  "name": "Success",
+                  "status": "OK",
+                  "code": 200,
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/pdf"
+                    },
+                    {
+                      "key": "Content-Disposition",
+                      "value": "attachment; filename=\"offer-letter.pdf\""
+                    }
+                  ],
+                  "body": "<binary file stream>"
+                },
+                {
+                  "name": "Forbidden",
+                  "status": "Forbidden",
+                  "code": 403,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"statusCode\": 403,\n  \"message\": \"You do not have permission to download this document\",\n  \"error\": \"Forbidden\"\n}"
+                },
+                {
+                  "name": "Not Found",
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Document with ID \\\"doc-123\\\" not found\",\n  \"error\": \"Not Found\"\n}"
+                }
+              ]
             }
           ]
         },
@@ -3532,6 +5440,857 @@
                 }
               },
               "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Billing",
+      "description": "Subscription and billing status management endpoints.",
+      "item": [
+        {
+          "name": "Get Billing & Subscription Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/billing/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "billing",
+                "status"
+              ]
+            },
+            "description": "Retrieve organization billing tier, trial status, and seat usage."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"TRIALING\",\n  \"planName\": \"GROWTH_TIER\",\n  \"trialStartedAt\": \"2026-09-25T12:00:00.000Z\",\n  \"trialEndsAt\": \"2026-10-25T12:00:00.000Z\",\n  \"trialLengthDays\": 30,\n  \"activeEmployeeCount\": 15,\n  \"seatLimit\": 50,\n  \"billingCycle\": \"MONTHLY\",\n  \"nextBillingDate\": \"2026-10-25T12:00:00.000Z\"\n}"
+            },
+            {
+              "name": "Error (400 Bad Request / 404 Not Found)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 401,\n  \"message\": \"Authentication is required\",\n  \"error\": \"Unauthorized\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pension & Statutory Remittance (PenCentral)",
+      "description": "Automated electronic pension remittance and PenCom statutory compliance integration via PenCentral Partner API.",
+      "item": [
+        {
+          "name": "Validate Employer Code (PenCentral Onboarding)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employerCode\": \"PR0000126311\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/pension/employers/validate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "employers",
+                "validate"
+              ]
+            },
+            "description": "Read-only validation of a PenCom employer code before linking. Returns official employer name and a short-lived validation ID (valid 30 minutes). Accepts either employerCode or employer_code. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"validationId\": \"ev_ac33fd33551d4120935e764467322652\",\n    \"validation_id\": \"ev_ac33fd33551d4120935e764467322652\",\n    \"employerCode\": \"PR0000126311\",\n    \"employer_code\": \"PR0000126311\",\n    \"employerName\": \"UNDERDOG PRODUCTIONS LIMITED\",\n    \"employer_name\": \"UNDERDOG PRODUCTIONS LIMITED\",\n    \"valid\": true,\n    \"expiresAt\": \"2026-10-16T04:03:02.485Z\",\n    \"expires_at\": \"2026-10-16T04:03:02.485Z\"\n  }\n}"
+            },
+            {
+              "name": "Invalid Employer Code (422 Unprocessable Entity)",
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 422,\n  \"message\": \"PENCOM did not validate employer code 'PR9999999999'. Employer not found.\",\n  \"error\": \"Unprocessable Entity\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Attach Confirmed Employer (PenCentral Onboarding)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"validationId\": \"ev_ac33fd33551d4120935e764467322652\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/pension/employers/attach",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "employers",
+                "attach"
+              ]
+            },
+            "description": "Attach confirmed employer to partner portal using validation ID and configure current organization. Accepts either validationId or validation_id. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (201 Created)",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": \"Employer attached successfully\",\n    \"grantId\": \"grant_d4d8484fe34a4fcda0ee9fcc7a471c70\",\n    \"id\": \"grant_d4d8484fe34a4fcda0ee9fcc7a471c70\",\n    \"employerCode\": \"PR0000126311\",\n    \"employer_code\": \"PR0000126311\",\n    \"employerName\": \"UNDERDOG PRODUCTIONS LIMITED\",\n    \"employer_name\": \"UNDERDOG PRODUCTIONS LIMITED\",\n    \"status\": \"active\",\n    \"attachedAt\": \"2026-10-16T03:33:03.535Z\",\n    \"attached_at\": \"2026-10-16T03:33:03.535Z\"\n  }\n}"
+            },
+            {
+              "name": "Validation Expired / Not Found (404 Not Found)",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Employer validation 'ev_expired' was not found for this partner.\",\n  \"error\": \"Not Found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Employer Onboarding Status (PenCentral Onboarding)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/employers/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "employers",
+                "status"
+              ]
+            },
+            "description": "Check live attachment status of the active organization's employer code with PenCentral. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success - Attached (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"isAttached\": true,\n    \"employerCode\": \"PR0000126311\",\n    \"employer_code\": \"PR0000126311\",\n    \"employerName\": \"UNDERDOG PRODUCTIONS LIMITED\",\n    \"employer_name\": \"UNDERDOG PRODUCTIONS LIMITED\",\n    \"grant\": {\n      \"id\": \"grant_d4d8484fe34a4fcda0ee9fcc7a471c70\",\n      \"status\": \"active\",\n      \"attachedAt\": \"2026-10-16T03:33:03.535Z\",\n      \"attached_at\": \"2026-10-16T03:33:03.535Z\"\n    }\n  }\n}"
+            },
+            {
+              "name": "Success - Not Attached (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"isAttached\": false,\n    \"employerCode\": null,\n    \"employer_code\": null,\n    \"employerName\": null,\n    \"employer_name\": null,\n    \"grant\": null\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Revoke Employer Access (PenCentral Onboarding)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/employers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "employers"
+              ]
+            },
+            "description": "Revoke partner access to the employer on PenCentral and disconnect from active organization. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"message\": \"Employer access revoked successfully\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Registered PFAs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/pfas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "pfas"
+              ]
+            },
+            "description": "Retrieve list of official Nigerian Pension Fund Administrators (PFAs) with their registered PenCom 3-digit codes."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"pfas\": [\n      {\n        \"code\": \"001\",\n        \"name\": \"Leadway Pensure PFA\"\n      },\n      {\n        \"code\": \"021\",\n        \"name\": \"ARM Pension Managers\"\n      },\n      {\n        \"code\": \"022\",\n        \"name\": \"Stanbic IBTC Pension Managers\"\n      },\n      {\n        \"code\": \"026\",\n        \"name\": \"Access Pensions Limited\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Employer PenCentral Config",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "config"
+              ]
+            },
+            "description": "Retrieve organization's PenCentral configuration including employer_code. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"org_123\",\n    \"name\": \"Acme Nigeria Ltd\",\n    \"penCentralEmployerCode\": \"EMP001\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Employer PenCentral Config",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"penCentralEmployerCode\": \"EMP001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/pension/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "config"
+              ]
+            },
+            "description": "Update organization's PenCentral employer code. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"PenCentral employer code updated successfully\",\n  \"data\": {\n    \"penCentralEmployerCode\": \"EMP001\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Remittance Schedule from Payroll",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/from-payroll/{{payrollRunId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "from-payroll",
+                "{{payrollRunId}}"
+              ]
+            },
+            "description": "Generate a DRAFT PenCentral remittance schedule from an approved or executed payroll run. Automatically aggregates statutory employee (8%) and employer (10%) pension contributions per employee. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (201 Created)",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Draft pension remittance schedule created successfully\",\n  \"data\": {\n    \"id\": \"sch_01928374\",\n    \"organizationId\": \"org_123\",\n    \"payrollRunId\": \"run_456\",\n    \"periodMonth\": \"September\",\n    \"periodYear\": 2026,\n    \"employerCode\": \"EMP001\",\n    \"totalEmployeePension\": 80000,\n    \"totalEmployerPension\": 100000,\n    \"totalAmount\": 180000,\n    \"employeeCount\": 10,\n    \"status\": \"DRAFT\"\n  }\n}"
+            },
+            {
+              "name": "Validation Error - Missing RSA/PFA (400 Bad Request)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Cannot create pension remittance schedule: Some employees have missing or invalid pension details\",\n  \"invalidEmployees\": [\n    {\n      \"employeeId\": \"emp_99\",\n      \"fullName\": \"John Doe\",\n      \"missing\": [\n        \"pensionRsaNumber\",\n        \"pfaCode\"\n      ]\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Remittance Schedules",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules?periodYear=2026",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules"
+              ],
+              "query": [
+                {
+                  "key": "periodYear",
+                  "value": "2026"
+                }
+              ]
+            },
+            "description": "List all pension remittance schedules for the active organization. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"schedules\": [\n      {\n        \"id\": \"sch_01928374\",\n        \"periodMonth\": \"September\",\n        \"periodYear\": 2026,\n        \"totalAmount\": 180000,\n        \"status\": \"PAID\",\n        \"virtualAccountNumber\": \"9990001234\",\n        \"receiptId\": \"rcp_rls2t3\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Remittance Schedule by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}"
+              ]
+            },
+            "description": "Retrieve details of a pension remittance schedule by ID. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"sch_01928374\",\n    \"periodMonth\": \"September\",\n    \"periodYear\": 2026,\n    \"status\": \"VALIDATED\",\n    \"totalAmount\": 180000,\n    \"penCentralValidationId\": \"val_alb2c3\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Validate Remittance Schedule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/validate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "validate"
+              ]
+            },
+            "description": "Format and dispatch remittance schedule to PenCentral Partner API for PenCom/PFA verification. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Schedule validation dispatched. PenCentral status: success\",\n  \"data\": {\n    \"schedule\": {\n      \"id\": \"sch_01928374\",\n      \"status\": \"VALIDATED\",\n      \"penCentralValidationId\": \"val_alb2c3\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Check Validation Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/validation-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "validation-status"
+              ]
+            },
+            "description": "Poll PenCentral validation status (pending, success, or failed) and retrieve any row-level validation errors."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"schedule\": {\n      \"id\": \"sch_01928374\",\n      \"status\": \"VALIDATED\"\n    },\n    \"penCentralStatus\": \"success\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Submit Remittance Schedule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/submit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "submit"
+              ]
+            },
+            "description": "Submit the validated remittance schedule to PenCentral, creating an immutable schedule_id ready for settlement. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Schedule successfully submitted to PenCentral\",\n  \"data\": {\n    \"schedule\": {\n      \"id\": \"sch_01928374\",\n      \"status\": \"SUBMITTED\",\n      \"penCentralScheduleId\": \"sch_x1y2z3\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Initiate Virtual Account Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/payment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "payment"
+              ]
+            },
+            "description": "Generate synthetic Monnify/Zenith dynamic virtual account details to fund the consolidated pension remittance. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Virtual account generated successfully for pension remittance payment\",\n  \"data\": {\n    \"schedule\": {\n      \"id\": \"sch_01928374\",\n      \"status\": \"PAYMENT_PENDING\",\n      \"virtualAccountNumber\": \"9990001234\",\n      \"virtualAccountBank\": \"Moniepoint Microfinance Bank\",\n      \"virtualAccountName\": \"PenCentral Collection\"\n    },\n    \"paymentDetails\": {\n      \"payment_id\": \"pay_plq2r3\",\n      \"account_number\": \"9990001234\",\n      \"bank_name\": \"Moniepoint Microfinance Bank\",\n      \"total_amount\": \"180000.00\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Sync Payment Status & Receipt",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/payment-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "payment-status"
+              ]
+            },
+            "description": "Check payment status and retrieve official PenCom/PenCentral issued receipt when succeeded. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Payment status synced: succeeded\",\n  \"data\": {\n    \"schedule\": {\n      \"id\": \"sch_01928374\",\n      \"status\": \"PAID\",\n      \"receiptId\": \"rcp_rls2t3\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Sync PFA Disbursements",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/disbursements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "disbursements"
+              ]
+            },
+            "description": "Track settlement breakdown per PFA, confirming credited amounts per employee pension fund custodian."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Disbursements status: completed\",\n  \"data\": {\n    \"disbursements\": {\n      \"schedule_id\": \"sch_x1y2z3\",\n      \"status\": \"completed\",\n      \"pfas\": [\n        {\n          \"pfa_code\": \"001\",\n          \"pfa_name\": \"Leadway PFA\",\n          \"amount\": \"180000.00\",\n          \"credited_amount\": \"180000.00\",\n          \"status\": \"completed\"\n        }\n      ]\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get PenCentral Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "dashboard"
+              ]
+            },
+            "description": "Retrieve organization's aggregate remittance statistics from PenCentral."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employer_code\": \"EMP001\",\n    \"schedule_count\": 12,\n    \"unsubmitted_count\": 2,\n    \"submitted_count\": 10,\n    \"cancelled_count\": 0,\n    \"total_remittance\": \"1250000.00\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get PenCentral Compliance Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/compliance-report",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "compliance-report"
+              ]
+            },
+            "description": "Retrieve PenCom statutory compliance metrics for submitted, paid, and disbursed remittances."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employer_code\": \"EMP001\",\n    \"submitted_count\": 10,\n    \"submitted_amount\": \"1250000.00\",\n    \"paid_count\": 8,\n    \"paid_amount\": \"1000000.00\",\n    \"disbursed_count\": 5,\n    \"disbursed_amount\": \"625000.00\"\n  }\n}"
             }
           ]
         }

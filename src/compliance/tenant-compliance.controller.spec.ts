@@ -1,0 +1,58 @@
+/* eslint-disable @typescript-eslint/unbound-method */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+import { Test, TestingModule } from '@nestjs/testing';
+import { TenantComplianceController } from './tenant-compliance.controller';
+import { ComplianceService } from './compliance.service';
+import { AuthGuard } from '../auth/auth.guard';
+
+describe('TenantComplianceController', () => {
+  let controller: TenantComplianceController;
+  let service: jest.Mocked<ComplianceService>;
+
+  beforeEach(async () => {
+    service = {
+      getEffectiveTaxRuleSet: jest.fn(),
+    } as unknown as jest.Mocked<ComplianceService>;
+
+    const builder = Test.createTestingModule({
+      controllers: [TenantComplianceController],
+      providers: [
+        {
+          provide: ComplianceService,
+          useValue: service,
+        },
+      ],
+    });
+
+    builder.overrideGuard(AuthGuard).useValue({ canActivate: () => true });
+
+    const module: TestingModule = await builder.compile();
+
+    controller = module.get<TenantComplianceController>(
+      TenantComplianceController,
+    );
+  });
+
+  it('should return effective tax rule set for active tenant', async () => {
+    const mockRuleSet = {
+      id: 'rule-set-1',
+      country: 'NG',
+      name: 'Nigeria Tax Act 2026',
+    };
+    service.getEffectiveTaxRuleSet.mockResolvedValue(mockRuleSet as any);
+
+    const result = await controller.getActiveRuleSet('NG');
+    expect(result).toEqual(mockRuleSet);
+    expect(service.getEffectiveTaxRuleSet).toHaveBeenCalledWith('NG');
+  });
+
+  it('should return alerts for authenticated user organization', async () => {
+    const mockAlerts = { alerts: [{ type: 'MISSING_TAX_ID', count: 1 }] };
+    (service as any).getAlerts = jest.fn().mockResolvedValue(mockAlerts);
+
+    const mockUser: any = { id: 'u-1', organizationId: 'org-1' };
+    const result = await controller.getAlerts(mockUser);
+    expect(result).toEqual(mockAlerts);
+    expect((service as any).getAlerts).toHaveBeenCalledWith(mockUser);
+  });
+});

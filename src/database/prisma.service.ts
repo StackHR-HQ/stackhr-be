@@ -3,6 +3,12 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { getTenantContext } from './tenant-context';
 
+if (!('toJSON' in BigInt.prototype)) {
+  (BigInt.prototype as any).toJSON = function () {
+    return Number(this);
+  };
+}
+
 const TENANT_SCOPED_MODELS = [
   'Employee',
   'Member',
@@ -19,6 +25,10 @@ const TENANT_SCOPED_MODELS = [
   'PayrollRun',
   'PayrollItem',
   'Payslip',
+  'PensionRemittanceSchedule',
+  'IdempotencyKey',
+  'OutboxEvent',
+  'DeadLetterEvent',
 ];
 
 @Injectable()
@@ -83,7 +93,10 @@ export class PrismaService
                 };
               }
 
-              if (operation === 'createMany') {
+              if (
+                operation === 'createMany' ||
+                operation === 'createManyAndReturn'
+              ) {
                 if (Array.isArray((args as any).data)) {
                   (args as any).data = (args as any).data.map((item: any) => ({
                     ...item,

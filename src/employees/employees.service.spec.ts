@@ -19,6 +19,12 @@ describe('EmployeesService', () => {
       findFirst: jest.Mock;
       update: jest.Mock;
     };
+    compensationRecord: {
+      create: jest.Mock;
+    };
+    compensationHistory: {
+      create: jest.Mock;
+    };
   };
 
   const mockUser: AuthenticatedUser = {
@@ -38,6 +44,12 @@ describe('EmployeesService', () => {
         count: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
+      },
+      compensationRecord: {
+        create: jest.fn(),
+      },
+      compensationHistory: {
+        create: jest.fn(),
       },
     };
 

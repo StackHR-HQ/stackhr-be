@@ -35,6 +35,16 @@ export class LeaveListener {
       return;
     }
 
+    if (
+      leaveRequest.status === 'APPROVED' ||
+      leaveRequest.status === 'REJECTED'
+    ) {
+      this.logger.warn(
+        `Leave request ${leaveRequestId} already has terminal status "${leaveRequest.status}". Skipping duplicate processing.`,
+      );
+      return;
+    }
+
     const balance = await this.prisma.leaveBalance.findFirst({
       where: {
         organizationId: event.organizationId,
@@ -62,7 +72,11 @@ export class LeaveListener {
       await Promise.all([
         this.prisma.leaveRequest.update({
           where: { id: leaveRequestId },
-          data: { status: 'APPROVED' },
+          data: {
+            status: 'APPROVED',
+            decidedAt: new Date(),
+            decidedByUserId: event.approverId,
+          },
         }),
         this.prisma.leaveBalance.update({
           where: { id: balance.id },
@@ -70,6 +84,18 @@ export class LeaveListener {
             pendingDays: newPendingDays,
             usedDays: newUsedDays,
             remainingDays: newRemainingDays,
+          },
+        }),
+        this.prisma.auditEvent.create({
+          data: {
+            organizationId: event.organizationId,
+            actorUserId: event.approverId,
+            action: 'LEAVE_APPROVED',
+            targetType: 'leave_request',
+            targetId: leaveRequestId,
+            employeeId: leaveRequest.employeeId,
+            description: `Leave request for ${leaveRequest.totalDays} day(s) was approved`,
+            createdAt: new Date(),
           },
         }),
       ]);
@@ -88,13 +114,29 @@ export class LeaveListener {
       await Promise.all([
         this.prisma.leaveRequest.update({
           where: { id: leaveRequestId },
-          data: { status: 'REJECTED' },
+          data: {
+            status: 'REJECTED',
+            decidedAt: new Date(),
+            decidedByUserId: event.approverId,
+          },
         }),
         this.prisma.leaveBalance.update({
           where: { id: balance.id },
           data: {
             pendingDays: newPendingDays,
             remainingDays: newRemainingDays,
+          },
+        }),
+        this.prisma.auditEvent.create({
+          data: {
+            organizationId: event.organizationId,
+            actorUserId: event.approverId,
+            action: 'LEAVE_REJECTED',
+            targetType: 'leave_request',
+            targetId: leaveRequestId,
+            employeeId: leaveRequest.employeeId,
+            description: `Leave request for ${leaveRequest.totalDays} day(s) was rejected`,
+            createdAt: new Date(),
           },
         }),
       ]);

@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { RequestContextService } from '../context/request-context.service';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -54,9 +55,25 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         errorString = exception.name;
       }
     } else if (exception instanceof Error) {
-      this.logger.error(exception.stack);
       message = exception.message || message;
       errorString = exception.name;
+    }
+
+    const correlationId = RequestContextService.getCorrelationId();
+    const traceId = RequestContextService.getTraceId();
+
+    if (status >= 500) {
+      const stack = exception instanceof Error ? exception.stack : undefined;
+      this.logger.error(
+        `${message} [${errorString}]`,
+        stack,
+        JSON.stringify({ correlationId, traceId, status }),
+      );
+    } else {
+      this.logger.warn(
+        `${message} [${errorString}] (Status: ${status})`,
+        JSON.stringify({ correlationId, traceId }),
+      );
     }
 
     response.status(status).json({
@@ -66,6 +83,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       error: {
         error: errorString,
         statusCode: status,
+        correlationId: correlationId || undefined,
+        traceId: traceId || undefined,
       },
     });
   }

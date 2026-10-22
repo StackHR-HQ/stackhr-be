@@ -4,6 +4,13 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { AppLoggerService } from './common/logger/app-logger.service';
+
+if (!('toJSON' in BigInt.prototype)) {
+  (BigInt.prototype as any).toJSON = function () {
+    return Number(this);
+  };
+}
 
 const DEV_ALLOWED_ORIGINS = [
   'http://localhost:3000',
@@ -23,14 +30,24 @@ const PROD_DEFAULT_ORIGINS = [
 ];
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
+
+  const appLogger = app.get(AppLoggerService);
+  app.useLogger(appLogger);
+
+  // Enable graceful shutdown hooks for PM2, Docker, and system signals (SIGINT/SIGTERM)
+  app.enableShutdownHooks();
 
   // Security HTTP headers
   app.use(helmet());
 
   app.useBodyParser('json', { limit: '100kb' });
 
-  app.setGlobalPrefix('v1/api');
+  app.setGlobalPrefix('v1/api', {
+    exclude: ['metrics', 'v1/api/metrics', 'health', 'v1/api/health', ''],
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -59,6 +76,9 @@ async function bootstrap() {
 
   await app.listen(port, '0.0.0.0');
 
-  console.log(`Application is running on: ${await app.getUrl()}`);
+  appLogger.log(
+    `Application is running on: ${await app.getUrl()}`,
+    'Bootstrap',
+  );
 }
 void bootstrap();

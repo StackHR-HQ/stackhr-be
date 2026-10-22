@@ -11,17 +11,21 @@ response:
     type: json
     content: |-
       {
-        "organization": {
-          "id": "org-123",
-          "name": "Acme Corp",
-          "industry": "Fintech",
-          "companySize": "11-50",
-          "currency": "NGN"
-        },
-        "onboarding": {
-          "organizationId": "org-123",
-          "companyInfoComplete": true,
-          "nextStep": "FIRST_EMPLOYEE"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "organization": {
+            "id": "org-123",
+            "name": "Acme Corp",
+            "industry": "Fintech",
+            "companySize": "11-50",
+            "currency": "NGN"
+          },
+          "onboarding": {
+            "organizationId": "org-123",
+            "companyInfoComplete": true,
+            "nextStep": "FIRST_EMPLOYEE"
+          }
         }
       }
 order: 1000

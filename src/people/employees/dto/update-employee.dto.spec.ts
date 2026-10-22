@@ -40,17 +40,38 @@ describe('UpdateEmployeeDto validation', () => {
     },
   );
 
-  it('requires an effective date on every compensation change', async () => {
-    await expectFieldError(
-      {
+  it('allows compensation change with optional effective date, currency, and payFrequency', async () => {
+    await expect(
+      validate({
         compensation: {
           annualSalaryMinor: 600_000_000,
-          currency: 'NGN',
-          payFrequency: 'MONTHLY',
         },
+      }),
+    ).resolves.toMatchObject({
+      compensation: {
+        annualSalaryMinor: 600_000_000,
       },
-      'compensation.effectiveDate',
-    );
+    });
+  });
+
+  it('accepts departmentId, employmentType, startDate, and status in employment', async () => {
+    await expect(
+      validate({
+        employment: {
+          departmentId: DATABASE_ID,
+          employmentType: 'FULL_TIME',
+          startDate: '2026-02-01',
+          status: 'ACTIVE',
+        },
+      }),
+    ).resolves.toMatchObject({
+      employment: {
+        departmentId: DATABASE_ID,
+        employmentType: 'FULL_TIME',
+        startDate: '2026-02-01',
+        status: 'ACTIVE',
+      },
+    });
   });
 
   it('reports an invalid emergency contact phone at its nested path', async () => {

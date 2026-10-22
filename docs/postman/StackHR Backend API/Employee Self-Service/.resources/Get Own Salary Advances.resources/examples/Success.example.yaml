@@ -11,6 +11,10 @@ response:
     type: json
     content: |-
       {
-        "salaryAdvances": []
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "salaryAdvances": []
+        }
       }
 order: 1000

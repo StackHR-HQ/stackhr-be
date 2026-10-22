@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { RequireRoles, CurrentUser } from '../auth/auth.decorators';
@@ -8,6 +16,7 @@ import { PayrollService } from './payroll.service';
 import { SetCompensationDto } from './dto/set-compensation.dto';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { FundingCheckDto } from './dto/funding-check.dto';
+import { Idempotent } from '../common/idempotency/idempotency.decorator';
 
 const ADMIN_ROLES = [
   USER_ROLES.BUSINESS_OWNER,
@@ -27,6 +36,12 @@ export class PayrollController {
     @Body() dto: SetCompensationDto,
   ) {
     return this.payrollService.setCompensation(user, dto);
+  }
+
+  @Get('compensation')
+  @RequireRoles(...ADMIN_ROLES)
+  getAllCompensations(@CurrentUser() user: AuthenticatedUser) {
+    return this.payrollService.getAllCompensations(user);
   }
 
   @Get('compensation/:employeeId')
@@ -76,6 +91,7 @@ export class PayrollController {
 
   @Post('runs/:id/execute')
   @RequireRoles(...ADMIN_ROLES)
+  @Idempotent({ required: true })
   executePayment(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') runId: string,
@@ -105,5 +121,24 @@ export class PayrollController {
     @Param('id') runId: string,
   ) {
     return this.payrollService.getRunById(user, runId);
+  }
+
+  @Get('runs/:id/audit-events')
+  @RequireRoles(...ADMIN_ROLES)
+  getRunAuditEvents(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') runId: string,
+  ) {
+    return this.payrollService.getRunAuditEvents(user, runId);
+  }
+
+  @Get('payslips')
+  @RequireRoles(...ADMIN_ROLES)
+  getPayslips(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('payrollRunId') payrollRunId?: string,
+    @Query('employeeId') employeeId?: string,
+  ) {
+    return this.payrollService.getPayslips(user, { payrollRunId, employeeId });
   }
 }

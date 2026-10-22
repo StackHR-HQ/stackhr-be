@@ -1,0 +1,8 @@
+$kind: http-request
+description: Retrieve all waitlist submissions. Requires StackHR Admin privileges.
+url: "{{baseUrl}}/waitlist"
+method: GET
+headers:
+  Authorization: Bearer {{bearer_token}}
+examples: ./.resources/Get Waitlist Entries (Admin).resources/examples
+order: 2000

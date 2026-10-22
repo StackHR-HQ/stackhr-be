@@ -55,4 +55,12 @@ export class PeopleOnboardingController {
       completed: body?.completed,
     });
   }
+
+  @Post('employees/:employeeId/complete')
+  completeOnboarding(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('employeeId') employeeId: string,
+  ) {
+    return this.onboardingService.completeOnboarding(user, employeeId);
+  }
 }

@@ -66,6 +66,28 @@ export class WaitlistService {
         );
       });
 
+    // Subscribe the user to the SendByte marketing list (fire-and-forget)
+    void this.emailService
+      .subscribeToList({
+        email: dto.businessEmail,
+        name: dto.name,
+        attributes: {
+          position: dto.position,
+          businessName: dto.businessName,
+          source: 'waitlist',
+        },
+      })
+      .then(() => {
+        this.logger.log(
+          `Waitlist subscriber added to SendByte list: ${dto.businessEmail}`,
+        );
+      })
+      .catch((error: any) => {
+        this.logger.error(
+          `Failed to subscribe ${dto.businessEmail} to SendByte list: ${error?.message ?? error}`,
+        );
+      });
+
     return {
       id: entry.id,
       name: entry.name,

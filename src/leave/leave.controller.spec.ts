@@ -10,11 +10,14 @@ describe('LeaveController', () => {
   let controller: LeaveController;
   let serviceMock: {
     createLeaveType: jest.Mock;
+    updateLeaveType: jest.Mock;
+    deleteLeaveType: jest.Mock;
     getLeaveTypes: jest.Mock;
     getLeaveBalances: jest.Mock;
     submitLeaveRequest: jest.Mock;
     getLeaveHistory: jest.Mock;
     getLeaveRequestDetails: jest.Mock;
+    cancelLeaveRequest: jest.Mock;
   };
 
   const mockAdminUser: AuthenticatedUser = {
@@ -29,11 +32,14 @@ describe('LeaveController', () => {
   beforeEach(async () => {
     serviceMock = {
       createLeaveType: jest.fn(),
+      updateLeaveType: jest.fn(),
+      deleteLeaveType: jest.fn(),
       getLeaveTypes: jest.fn(),
       getLeaveBalances: jest.fn(),
       submitLeaveRequest: jest.fn(),
       getLeaveHistory: jest.fn(),
       getLeaveRequestDetails: jest.fn(),
+      cancelLeaveRequest: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -135,6 +141,50 @@ describe('LeaveController', () => {
     );
 
     expect(serviceMock.getLeaveRequestDetails).toHaveBeenCalledWith(
+      mockAdminUser,
+      'lr-1',
+    );
+    expect(result.leaveRequest.id).toBe('lr-1');
+  });
+
+  it('should delegate updateLeaveType to service', async () => {
+    const dto = { daysPerYear: 15 };
+    serviceMock.updateLeaveType.mockResolvedValue({
+      leaveType: { id: 'lt-1', daysPerYear: 15 },
+    });
+
+    const result = await controller.updateLeaveType(mockAdminUser, 'lt-1', dto);
+
+    expect(serviceMock.updateLeaveType).toHaveBeenCalledWith(
+      mockAdminUser,
+      'lt-1',
+      dto,
+    );
+    expect(result.leaveType.id).toBe('lt-1');
+  });
+
+  it('should delegate deleteLeaveType to service', async () => {
+    serviceMock.deleteLeaveType.mockResolvedValue({
+      message: 'Leave type deleted successfully',
+    });
+
+    const result = await controller.deleteLeaveType(mockAdminUser, 'lt-1');
+
+    expect(serviceMock.deleteLeaveType).toHaveBeenCalledWith(
+      mockAdminUser,
+      'lt-1',
+    );
+    expect(result.message).toBe('Leave type deleted successfully');
+  });
+
+  it('should delegate cancelLeaveRequest to service', async () => {
+    serviceMock.cancelLeaveRequest.mockResolvedValue({
+      leaveRequest: { id: 'lr-1', status: 'CANCELLED' },
+    });
+
+    const result = await controller.cancelLeaveRequest(mockAdminUser, 'lr-1');
+
+    expect(serviceMock.cancelLeaveRequest).toHaveBeenCalledWith(
       mockAdminUser,
       'lr-1',
     );

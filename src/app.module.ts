@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -22,11 +22,21 @@ import { MeModule } from './me/me.module';
 import { ComplianceModule } from './compliance/compliance.module';
 import { PeopleModule } from './people/people.module';
 import { WaitlistModule } from './waitlist/waitlist.module';
+import { PensionModule } from './pension/pension.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TenantInterceptor } from './database/tenant.interceptor';
 import { AuditInterceptor } from './audit/audit.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { RequestContextService } from './common/context/request-context.service';
+import { RequestContextMiddleware } from './common/context/request-context.middleware';
+import { AppLoggerService } from './common/logger/app-logger.service';
+import { IdempotencyModule } from './common/idempotency/idempotency.module';
+import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor';
+import { ResilienceModule } from './common/resilience/resilience.module';
+import { OutboxModule } from './common/outbox/outbox.module';
+import { MetricsModule } from './common/metrics/metrics.module';
+import { MetricsInterceptor } from './common/metrics/metrics.interceptor';
 
 @Module({
   imports: [
@@ -43,6 +53,8 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
       },
     ]),
     PrismaModule,
+    ResilienceModule,
+    OutboxModule,
     AuthModule,
     OrganizationsModule,
     EmployeesModule,
@@ -60,10 +72,15 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     ComplianceModule,
     PeopleModule,
     WaitlistModule,
+    PensionModule,
+    IdempotencyModule,
+    MetricsModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    RequestContextService,
+    AppLoggerService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
@@ -74,7 +91,15 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     },
     {
       provide: APP_INTERCEPTOR,
+      useClass: MetricsInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
       useClass: TenantInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: IdempotencyInterceptor,
     },
     {
       provide: APP_INTERCEPTOR,
@@ -85,5 +110,10 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
       useClass: TransformInterceptor,
     },
   ],
+  exports: [RequestContextService, AppLoggerService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestContextMiddleware).forRoutes('*');
+  }
+}

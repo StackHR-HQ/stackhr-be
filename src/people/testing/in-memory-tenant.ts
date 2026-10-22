@@ -25,6 +25,7 @@ const MODELS = [
   'onboardingItemCompletion',
   'auditEvent',
   'compensationHistory',
+  'compensationRecord',
   'invitation',
 ] as const;
 

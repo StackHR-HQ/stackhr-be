@@ -30,8 +30,9 @@ export interface LeaveRequestWithEmployee {
 }
 
 function parseDecision(value: unknown): 'APPROVED' | 'REJECTED' {
-  if (value === 'approved') return 'APPROVED';
-  if (value === 'rejected') return 'REJECTED';
+  const normalized = typeof value === 'string' ? value.toLowerCase() : value;
+  if (normalized === 'approved') return 'APPROVED';
+  if (normalized === 'rejected') return 'REJECTED';
   const message = 'status must be approved or rejected';
   throw new UnprocessableEntityException({
     code: 'VALIDATION_ERROR',
@@ -68,7 +69,7 @@ export class PeopleLeaveService {
       return types.map((type) => ({
         id: type.id,
         name: type.name,
-        defaultDays: type.defaultDays,
+        defaultDays: type.defaultDays ?? type.daysPerYear,
         paid: type.paid,
         tone: type.tone,
         description: type.description,
@@ -260,9 +261,15 @@ export class PeopleLeaveService {
         avatarInitials: avatarInitials(employee.fullName),
         balances: types.map((type) => {
           const balance = byEmployeeAndType.get(`${employee.id}:${type.id}`);
+          const totalDays =
+            balance?.totalDays && balance.totalDays > 0
+              ? balance.totalDays
+              : balance?.allocatedDays && balance.allocatedDays > 0
+                ? balance.allocatedDays
+                : (type.daysPerYear ?? type.defaultDays);
           return {
             type: type.name,
-            totalDays: balance?.totalDays ?? type.defaultDays,
+            totalDays,
             usedDays: balance?.usedDays ?? 0,
           };
         }),
@@ -298,12 +305,29 @@ function toLeaveRequestView(
     startDate: Date;
     endDate: Date;
     days: number;
+    totalDays?: number;
     status: string;
   },
   lookups: Lookups,
 ): LeaveRequestWithEmployee {
   const employeeName =
     lookups.employees.get(request.employeeId)?.fullName ?? '';
+
+  let duration = (request as any).totalDays ?? request.days;
+  if (!duration || duration <= 1) {
+    if (request.startDate && request.endDate) {
+      const start = new Date(request.startDate).getTime();
+      const end = new Date(request.endDate).getTime();
+      if (!isNaN(start) && !isNaN(end) && end >= start) {
+        const diffMs = end - start;
+        const calculated = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
+        if (calculated > 1) {
+          duration = calculated;
+        }
+      }
+    }
+  }
+
   return {
     id: request.id,
     employeeId: request.employeeId,
@@ -312,7 +336,7 @@ function toLeaveRequestView(
     type: lookups.leaveTypes.get(request.leaveTypeId)?.name ?? '',
     startDate: toDateOnly(request.startDate),
     endDate: toDateOnly(request.endDate),
-    days: request.days,
+    days: duration ?? 1,
     status: request.status.toLowerCase(),
   };
 }

@@ -11,10 +11,14 @@ response:
     type: json
     content: |-
       {
-        "message": "Payroll run submitted for approval and locked from edits",
-        "payrollRun": {
-          "id": "run-123",
-          "status": "PENDING_APPROVAL"
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "message": "Payroll run submitted for approval and locked from edits",
+          "payrollRun": {
+            "id": "run-123",
+            "status": "PENDING_APPROVAL"
+          }
         }
       }
 order: 1000

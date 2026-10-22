@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
@@ -11,10 +12,17 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { USER_TYPES } from '../auth/auth.constants';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
+import { EmailService } from '../notifications/email.service';
+import { invitationEmail } from '../notifications/email-templates';
 
 @Injectable()
 export class InvitationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(InvitationsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   private checkOrgContext(user: AuthenticatedUser): string {
     if (!user.organizationId) {
@@ -55,6 +63,35 @@ export class InvitationsService {
       },
     });
 
+    const frontendBase =
+      (process.env.FRONTEND_URL ?? '')
+        .split(',')[0]
+        .trim()
+        .replace(/\/+$/, '') || 'https://app.stackhr.app';
+    const inviteLink = `${frontendBase}/accept-invitation?invitationId=${invitation.id}`;
+
+    void this.prisma.organization
+      .findUnique({
+        where: { id: orgId },
+        select: { name: true },
+      })
+      .then((org) => {
+        const orgName = org?.name ? ` to join ${org.name}` : '';
+        const emailPayload = invitationEmail(dto.email, inviteLink);
+        return this.emailService.send({
+          to: dto.email,
+          subject: `You have been invited${orgName} on StackHR`,
+          html: emailPayload.html,
+          text: emailPayload.text,
+          idempotencyKey: `admin-invitation:${invitation.id}`,
+        });
+      })
+      .catch((err: any) => {
+        this.logger.warn(
+          `Failed to dispatch invitation email to ${dto.email}: ${err?.message ?? err}`,
+        );
+      });
+
     return { invitation };
   }
 
@@ -73,7 +110,13 @@ export class InvitationsService {
       },
     });
 
-    return { invitations };
+    return {
+      invitations: invitations.map((inv) => {
+        const copy = { ...inv };
+        delete (copy as any).tokenHash;
+        return copy;
+      }),
+    };
   }
 
   async getInvitationDetails(id: string) {
@@ -104,7 +147,9 @@ export class InvitationsService {
       invitation.status = 'expired';
     }
 
-    return { invitation };
+    const safeInvitation = { ...invitation };
+    delete (safeInvitation as any).tokenHash;
+    return { invitation: safeInvitation };
   }
 
   async acceptInvitation(id: string, dto: AcceptInvitationDto) {
@@ -124,92 +169,89 @@ export class InvitationsService {
       type: argon2.argon2id,
     });
 
-    let existingUser = await this.prisma.user.findUnique({
-      where: { email: invitation.email },
-    });
+    const userResult = await this.prisma.$transaction(async (tx) => {
+      let existingUser = await tx.user.findUnique({
+        where: { email: invitation.email },
+      });
 
-    if (!existingUser) {
-      const userId = randomUUID();
-      existingUser = await this.prisma.user.create({
-        data: {
-          id: userId,
-          name: dto.fullName,
-          email: invitation.email,
-          emailVerified: true,
-          userType: USER_TYPES.BUSINESS,
-          role: invitation.role ?? 'EMPLOYEE',
-          accounts: {
-            create: {
-              id: randomUUID(),
-              accountId: invitation.email,
-              providerId: 'credential',
-              password: hashedPassword,
+      if (!existingUser) {
+        const userId = randomUUID();
+        existingUser = await tx.user.create({
+          data: {
+            id: userId,
+            name: dto.fullName,
+            email: invitation.email,
+            emailVerified: true,
+            userType: USER_TYPES.BUSINESS,
+            role: invitation.role ?? 'EMPLOYEE',
+            accounts: {
+              create: {
+                id: randomUUID(),
+                accountId: invitation.email,
+                providerId: 'credential',
+                password: hashedPassword,
+              },
             },
           },
-        },
-      });
-    }
+        });
+      }
 
-    const existingMember = await this.prisma.member.findFirst({
-      where: {
-        organizationId: invitation.organizationId,
-        userId: existingUser.id,
-      },
-    });
-
-    if (!existingMember) {
-      await this.prisma.member.create({
-        data: {
-          id: randomUUID(),
+      const existingMember = await tx.member.findFirst({
+        where: {
           organizationId: invitation.organizationId,
           userId: existingUser.id,
-          role: invitation.role ?? 'member',
-          createdAt: new Date(),
         },
       });
-    }
 
-    const existingEmployee = await this.prisma.employee.findFirst({
-      where: {
-        organizationId: invitation.organizationId,
-        email: invitation.email,
-      },
-    });
+      if (!existingMember) {
+        await tx.member.create({
+          data: {
+            id: randomUUID(),
+            organizationId: invitation.organizationId,
+            userId: existingUser.id,
+            role: invitation.role ?? 'member',
+            createdAt: new Date(),
+          },
+        });
+      }
 
-    if (!existingEmployee) {
-      await this.prisma.employee.create({
-        data: {
-          id: randomUUID(),
-          organizationId: invitation.organizationId,
-          fullName: dto.fullName,
-          email: invitation.email,
-          department: 'General',
-          jobTitle: invitation.role ?? 'Employee',
-          employmentType: 'FULL_TIME',
-          salaryAmount: 0,
-          startDate: new Date(),
-          status: 'ACTIVE',
-        },
+      const existingEmployee = invitation.employeeId
+        ? await tx.employee.findUnique({
+            where: { id: invitation.employeeId },
+          })
+        : await tx.employee.findFirst({
+            where: {
+              organizationId: invitation.organizationId,
+              email: invitation.email,
+            },
+          });
+
+      if (
+        existingEmployee &&
+        (existingEmployee.status === 'PENDING_INVITATION' ||
+          existingEmployee.status === 'ONBOARDING')
+      ) {
+        await tx.employee.update({
+          where: { id: existingEmployee.id },
+          data: { status: 'ACTIVE' },
+        });
+      }
+
+      await tx.invitation.update({
+        where: { id },
+        data: { status: 'accepted' },
       });
-    } else if (existingEmployee.status === 'PENDING_INVITATION') {
-      await this.prisma.employee.update({
-        where: { id: existingEmployee.id },
-        data: { status: 'ACTIVE' },
-      });
-    }
 
-    await this.prisma.invitation.update({
-      where: { id },
-      data: { status: 'accepted' },
+      return {
+        id: existingUser.id,
+        name: existingUser.name,
+        email: existingUser.email,
+      };
     });
 
     return {
       message: 'Invitation accepted successfully',
-      user: {
-        id: existingUser.id,
-        name: existingUser.name,
-        email: existingUser.email,
-      },
+      user: userResult,
     };
   }
 

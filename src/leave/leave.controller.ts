@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -14,6 +16,7 @@ import { USER_ROLES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { LeaveService } from './leave.service';
 import { CreateLeaveTypeDto } from './dto/create-leave-type.dto';
+import { UpdateLeaveTypeDto } from './dto/update-leave-type.dto';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import { LeaveQueryDto } from './dto/leave-query.dto';
 
@@ -35,6 +38,25 @@ export class LeaveController {
     @Body() dto: CreateLeaveTypeDto,
   ) {
     return this.leaveService.createLeaveType(user, dto);
+  }
+
+  @Patch('types/:id')
+  @RequireRoles(...ADMIN_ROLES)
+  updateLeaveType(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateLeaveTypeDto,
+  ) {
+    return this.leaveService.updateLeaveType(user, id, dto);
+  }
+
+  @Delete('types/:id')
+  @RequireRoles(...ADMIN_ROLES)
+  deleteLeaveType(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.leaveService.deleteLeaveType(user, id);
   }
 
   @Get('types')
@@ -69,5 +91,13 @@ export class LeaveController {
     @Param('id') id: string,
   ) {
     return this.leaveService.getLeaveRequestDetails(user, id);
+  }
+
+  @Patch('requests/:id/cancel')
+  cancelLeaveRequest(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.leaveService.cancelLeaveRequest(user, id);
   }
 }

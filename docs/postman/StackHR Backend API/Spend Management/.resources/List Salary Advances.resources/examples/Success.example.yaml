@@ -11,14 +11,18 @@ response:
     type: json
     content: |-
       {
-        "advances": [
-          {
-            "id": "adv-123",
-            "amount": 100000,
-            "repaymentMonths": 2,
-            "monthlyDeduction": 50000,
-            "status": "PENDING"
-          }
-        ]
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "advances": [
+            {
+              "id": "adv-123",
+              "amount": 100000,
+              "repaymentMonths": 2,
+              "monthlyDeduction": 50000,
+              "status": "PENDING"
+            }
+          ]
+        }
       }
 order: 1000
