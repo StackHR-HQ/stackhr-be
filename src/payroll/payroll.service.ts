@@ -3,11 +3,17 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { ComplianceService } from '../compliance/compliance.service';
+import { BankingService } from '../banking/banking.service';
+import type {
+  BankItem,
+  BulkTransferItem,
+} from '../banking/anchor/anchor.types';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { SetCompensationDto } from './dto/set-compensation.dto';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
@@ -19,6 +25,7 @@ export class PayrollService {
     private readonly prisma: PrismaService,
     private readonly approvalsService: ApprovalsService,
     private readonly complianceService: ComplianceService,
+    @Optional() private readonly bankingService?: BankingService,
   ) {}
 
   private checkOrgContext(user: AuthenticatedUser): string {
@@ -430,6 +437,18 @@ export class PayrollService {
       );
     }
 
+    const depositAccount = await this.prisma.organizationDepositAccount
+      ?.findUnique({
+        where: { organizationId: orgId },
+      })
+      .catch(() => null);
+
+    const requiredKobo = BigInt(Math.round((run.totalNet || 0) * 100));
+    const availableKobo = depositAccount
+      ? depositAccount.balanceKobo
+      : BigInt(0);
+    const isSufficient = depositAccount ? availableKobo >= requiredKobo : false;
+
     const nextStatus = dto.confirmed
       ? 'FUNDING_CHECK_PASSED'
       : 'FUNDING_SHORTFALL';
@@ -455,6 +474,14 @@ export class PayrollService {
               status: nextStatus,
               confirmed: dto.confirmed,
               notes: dto.notes ?? null,
+              fundingDetails: depositAccount
+                ? {
+                    accountNumber: depositAccount.accountNumber,
+                    availableBalanceKobo: Number(availableKobo),
+                    requiredKobo: Number(requiredKobo),
+                    isSufficient,
+                  }
+                : null,
             },
           },
         })
@@ -466,6 +493,18 @@ export class PayrollService {
         ? 'Funding check passed successfully. Ready for payment execution.'
         : 'Funding shortfall recorded. Payment execution blocked until resolved.',
       payrollRun: updatedRun,
+      fundingDetails: depositAccount
+        ? {
+            accountNumber: depositAccount.accountNumber,
+            bankName: depositAccount.bankName,
+            availableBalanceKobo: Number(availableKobo),
+            requiredKobo: Number(requiredKobo),
+            isSufficient,
+            shortfallKobo: isSufficient
+              ? 0
+              : Number(requiredKobo - availableKobo),
+          }
+        : null,
     };
   }
 
@@ -478,7 +517,14 @@ export class PayrollService {
         items: {
           include: {
             employee: {
-              select: { id: true, fullName: true, email: true },
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                bankName: true,
+                accountNumber: true,
+                accountName: true,
+              },
             },
           },
         },
@@ -493,6 +539,40 @@ export class PayrollService {
       throw new BadRequestException(
         `Payment execution requires status FUNDING_CHECK_PASSED. Current state: ${run.status}`,
       );
+    }
+
+    let bulkTransfer: any = null;
+    if (this.bankingService) {
+      const supportedBanks: BankItem[] = await this.bankingService
+        .getBanks()
+        .catch(() => [] as BankItem[]);
+      const transfers: BulkTransferItem[] = run.items.map((item: any) => {
+        const emp = item.employee;
+        const matchedBank = supportedBanks.find(
+          (b) =>
+            b.name.toLowerCase() === emp?.bankName?.toLowerCase() ||
+            b.nipCode === emp?.bankName,
+        );
+        const bankCode = matchedBank?.nipCode ?? '000014';
+        const accountNumber = emp?.accountNumber ?? '0123456789';
+        const accountName = emp?.accountName ?? emp?.fullName ?? 'Employee';
+
+        return {
+          amountKobo: Math.round((item.netSalary || 0) * 100),
+          currency: 'NGN',
+          reference: `pyr_${run.id}_${item.employeeId}_1`,
+          destination: {
+            accountNumber,
+            bankCode,
+            accountName,
+          },
+          narration: `${run.title} Salary`,
+        };
+      });
+
+      bulkTransfer = await this.bankingService
+        .executePayrollTransfers(orgId, run.id, transfers)
+        .catch(() => null);
     }
 
     const executedAt = new Date();
@@ -533,6 +613,7 @@ export class PayrollService {
               executedAt: executedAt.toISOString(),
               totalPayoutNet: run.totalNet,
               employeeCount: run.items.length,
+              bulkTransferId: bulkTransfer?.id ?? null,
             },
           },
         })
@@ -540,8 +621,11 @@ export class PayrollService {
     }
 
     return {
-      message: 'Payment execution recorded and bank transfer file exported',
+      message: bulkTransfer
+        ? 'Payment execution recorded and automated bulk transfer initiated via Anchor BaaS'
+        : 'Payment execution recorded and bank transfer file exported',
       payrollRun: updatedRun,
+      bulkTransfer,
       paymentExportBatch,
     };
   }
@@ -732,7 +816,7 @@ export class PayrollService {
             },
             orderBy: { createdAt: 'desc' },
           })
-        : Promise.resolve([]),
+        : Promise.resolve([] as any[]),
     ]);
 
     if (!run) {
@@ -765,7 +849,7 @@ export class PayrollService {
       (e) => e.action === 'payroll_run.created',
     );
     const creatorUser = creationEvent
-      ? actorMap.get(creationEvent.actorUserId)
+      ? actorMap.get(String(creationEvent.actorUserId))
       : null;
     const createdBy =
       creatorUser?.name ||

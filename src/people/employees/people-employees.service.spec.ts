@@ -160,6 +160,7 @@ describe('PeopleEmployeesService', () => {
 
       expect(created).toEqual({
         id: expect.any(String) as unknown,
+        employeeNumber: 'EMP-0001',
         fullName: 'Ada Okafor',
         email: 'ada@example.com',
         avatarInitials: 'AO',
@@ -391,6 +392,7 @@ describe('PeopleEmployeesService', () => {
       await expect(service.listEmployees(adminUser())).resolves.toEqual([
         {
           id: 'emp_ada',
+          employeeNumber: null,
           fullName: 'Ada Okafor',
           email: 'ada@acme.test',
           avatarInitials: 'AO',
@@ -560,6 +562,7 @@ describe('PeopleEmployeesService', () => {
 
       expect(detail).toEqual({
         id: 'emp_ada',
+        employeeNumber: null,
         fullName: 'Ada Okafor',
         email: 'ada@acme.test',
         avatarInitials: 'AO',

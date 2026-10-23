@@ -3,7 +3,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { SpendService } from './spend.service';
 import { PrismaService } from '../database/prisma.service';
 import { ApprovalsService } from '../approvals/approvals.service';
+import { BankingService } from '../banking/banking.service';
 import { USER_ROLES, USER_TYPES } from '../auth/auth.constants';
+
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 describe('SpendService', () => {
@@ -287,6 +289,62 @@ describe('SpendService', () => {
       const result = await service.payReimbursement(mockUser, 'rmb-1');
       expect(result.reimbursement.status).toBe('PAID');
     });
+
+    it('should dispatch single transfer via bankingService when available', async () => {
+      const bankingMock = {
+        getBanks: jest
+          .fn()
+          .mockResolvedValue([{ name: 'ACCESS BANK', nipCode: '000014' }]),
+        executeSingleTransfer: jest.fn().mockResolvedValue({
+          id: 'trf-rem-1',
+          reference: 'rem_rmb-1_1',
+          status: 'PROCESSING',
+          amountKobo: 5000000,
+          currency: 'NGN',
+        }),
+      };
+      const serviceWithBanking = new SpendService(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        prismaMock,
+        approvalsServiceMock as unknown as ApprovalsService,
+        bankingMock as unknown as BankingService,
+      );
+
+      prismaMock.reimbursement.findFirst.mockResolvedValue({
+        id: 'rmb-1',
+        amount: 50000,
+        status: 'APPROVED',
+        employee: {
+          fullName: 'Jane Doe',
+          accountNumber: '0123456789',
+          bankName: 'ACCESS BANK',
+        },
+      });
+      prismaMock.reimbursement.update.mockResolvedValue({
+        id: 'rmb-1',
+        status: 'PAID',
+      });
+
+      const result = await serviceWithBanking.payReimbursement(
+        mockUser,
+        'rmb-1',
+      );
+
+      expect(bankingMock.executeSingleTransfer).toHaveBeenCalledWith(
+        'org-123',
+        expect.objectContaining({
+          amountKobo: 5000000,
+          reference: 'rem_rmb-1_1',
+          destination: {
+            accountNumber: '0123456789',
+            bankCode: '000014',
+            accountName: 'Jane Doe',
+          },
+        }),
+      );
+      expect(result.transfer).toBeDefined();
+      expect(result.transfer?.reference).toBe('rem_rmb-1_1');
+    });
   });
 
   describe('getExpenseDetails', () => {
@@ -356,6 +414,62 @@ describe('SpendService', () => {
 
       const result = await service.disburseSalaryAdvance(mockUser, 'adv-1');
       expect(result.advance.status).toBe('DISBURSED');
+    });
+
+    it('should dispatch single transfer via bankingService when available', async () => {
+      const bankingMock = {
+        getBanks: jest
+          .fn()
+          .mockResolvedValue([{ name: 'GTBANK', nipCode: '000013' }]),
+        executeSingleTransfer: jest.fn().mockResolvedValue({
+          id: 'trf-adv-1',
+          reference: 'adv_adv-1_1',
+          status: 'PROCESSING',
+          amountKobo: 10000000,
+          currency: 'NGN',
+        }),
+      };
+      const serviceWithBanking = new SpendService(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        prismaMock,
+        approvalsServiceMock as unknown as ApprovalsService,
+        bankingMock as unknown as BankingService,
+      );
+
+      prismaMock.salaryAdvance.findFirst.mockResolvedValue({
+        id: 'adv-1',
+        amount: 100000,
+        status: 'APPROVED',
+        employee: {
+          fullName: 'Jane Doe',
+          accountNumber: '0987654321',
+          bankName: 'GTBANK',
+        },
+      });
+      prismaMock.salaryAdvance.update.mockResolvedValue({
+        id: 'adv-1',
+        status: 'DISBURSED',
+      });
+
+      const result = await serviceWithBanking.disburseSalaryAdvance(
+        mockUser,
+        'adv-1',
+      );
+
+      expect(bankingMock.executeSingleTransfer).toHaveBeenCalledWith(
+        'org-123',
+        expect.objectContaining({
+          amountKobo: 10000000,
+          reference: 'adv_adv-1_1',
+          destination: {
+            accountNumber: '0987654321',
+            bankCode: '000013',
+            accountName: 'Jane Doe',
+          },
+        }),
+      );
+      expect(result.transfer).toBeDefined();
+      expect(result.transfer?.reference).toBe('adv_adv-1_1');
     });
   });
 });

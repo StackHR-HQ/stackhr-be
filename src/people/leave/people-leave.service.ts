@@ -69,8 +69,10 @@ export class PeopleLeaveService {
       return types.map((type) => ({
         id: type.id,
         name: type.name,
-        defaultDays: type.defaultDays ?? type.daysPerYear,
+        defaultDays: type.defaultDays ?? type.daysPerYear ?? 20,
+        daysPerYear: type.daysPerYear ?? type.defaultDays ?? 20,
         paid: type.paid,
+        requiresApproval: type.requiresApproval ?? true,
         tone: type.tone,
         description: type.description,
       }));

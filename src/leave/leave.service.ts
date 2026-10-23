@@ -403,7 +403,7 @@ export class LeaveService {
     }
 
     if (leaveType._count.leaveRequests > 0) {
-      throw new BadRequestException(
+      throw new ConflictException(
         `Cannot delete leave type "${leaveType.name}" because it has ${leaveType._count.leaveRequests} associated leave request(s).`,
       );
     }

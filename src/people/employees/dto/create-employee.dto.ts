@@ -78,6 +78,12 @@ export class EmployeeEmploymentDto {
   @IsOptional()
   @Transform(trim)
   @IsString()
+  @MaxLength(100)
+  employeeNumber?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
   @MaxLength(150)
   workLocation?: string;
 }
