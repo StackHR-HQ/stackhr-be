@@ -31,6 +31,7 @@ import {
 
 export interface EmployeeSummary {
   id: string;
+  employeeNumber: string | null;
   fullName: string;
   email: string;
   avatarInitials: string;
@@ -217,10 +218,13 @@ export class PeopleEmployeesService {
           }
         }
 
-        const employeeCount = await client.employee.count({
-          where: { organizationId },
-        });
-        const employeeNumber = `EMP-${String(employeeCount + 1).padStart(4, '0')}`;
+        let employeeNumber = employment.employeeNumber;
+        if (!employeeNumber) {
+          const employeeCount = await client.employee.count({
+            where: { organizationId },
+          });
+          employeeNumber = `EMP-${String(employeeCount + 1).padStart(4, '0')}`;
+        }
 
         const employee = await client.employee.create({
           data: {
@@ -463,6 +467,9 @@ export class PeopleEmployeesService {
                 bankName: input.payment.bankName,
                 bankAccountLast4: input.payment.accountLast4,
               }
+            : {}),
+          ...(employment?.employeeNumber !== undefined
+            ? { employeeNumber: employment.employeeNumber }
             : {}),
           ...(employment?.jobTitle !== undefined
             ? { jobTitle: employment.jobTitle }
@@ -731,6 +738,7 @@ export class PeopleEmployeesService {
 
       return {
         ...toEmployeeSummary(employee),
+        employeeNumber: employee.employeeNumber ?? null,
         workLocation: employee.workLocation,
         personalInfo: {
           dateOfBirth: employee.dateOfBirth
@@ -797,6 +805,7 @@ export class PeopleEmployeesService {
 
 export function toEmployeeSummary(employee: {
   id: string;
+  employeeNumber?: string | null;
   fullName: string;
   email: string;
   jobTitle: string;
@@ -808,6 +817,7 @@ export function toEmployeeSummary(employee: {
 }): EmployeeSummary {
   return {
     id: employee.id,
+    employeeNumber: (employee as any).employeeNumber ?? null,
     fullName: employee.fullName,
     email: employee.email,
     avatarInitials: avatarInitials(employee.fullName),

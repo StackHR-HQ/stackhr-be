@@ -32,6 +32,7 @@ const PROD_DEFAULT_ORIGINS = [
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
+    rawBody: true,
   });
 
   const appLogger = app.get(AppLoggerService);
@@ -43,10 +44,22 @@ async function bootstrap() {
   // Security HTTP headers
   app.use(helmet());
 
-  app.useBodyParser('json', { limit: '100kb' });
+  app.useBodyParser('json', {
+    limit: '100kb',
+    verify: (req: any, _res: any, buf: Buffer) => {
+      req.rawBody = buf;
+    },
+  });
 
   app.setGlobalPrefix('v1/api', {
-    exclude: ['metrics', 'v1/api/metrics', 'health', 'v1/api/health', ''],
+    exclude: [
+      'metrics',
+      'v1/api/metrics',
+      'health',
+      'v1/api/health',
+      'banking/webhook',
+      '',
+    ],
   });
 
   app.useGlobalPipes(

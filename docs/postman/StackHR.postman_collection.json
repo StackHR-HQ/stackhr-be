@@ -2370,7 +2370,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"leaveType\": {\n    \"id\": \"lt-1\",\n    \"name\": \"Annual Paid Leave\",\n    \"daysPerYear\": 25,\n    \"paid\": true\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"leaveType\": {\n      \"id\": \"lt-1\",\n      \"name\": \"Annual Paid Leave\",\n      \"daysPerYear\": 25,\n      \"defaultDays\": 25,\n      \"paid\": true\n    }\n  }\n}"
             },
             {
               "name": "Error (400 Bad Request / 404 Not Found)",
@@ -2422,7 +2422,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Leave type deleted successfully\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Leave type \\\"QA 409 Test\\\" was successfully deleted\"\n  }\n}"
             },
             {
               "name": "Error (409 Conflict - Leave requests exist)",
@@ -3005,7 +3005,7 @@
                 "pay"
               ]
             },
-            "description": "Admin/Finance action to mark an approved reimbursement as paid."
+            "description": "Admin/Finance action to mark an approved reimbursement as paid. Dispatches an instant NIP transfer via Anchor BaaS when deposit account is configured, using deterministic idempotency reference (rem_<reimbursementId>_1)."
           },
           "response": [
             {
@@ -3019,8 +3019,9 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"reimbursement\": {\n    \"id\": \"rmb-1\",\n    \"status\": \"PAID\",\n    \"paidAt\": \"2026-10-05T12:00:00.000Z\"\n  }\n}"
+              "body": "{\n  \"reimbursement\": {\n    \"id\": \"rmb-1\",\n    \"status\": \"PAID\",\n    \"paidAt\": \"2026-10-05T12:00:00.000Z\"\n  },\n  \"transfer\": {\n    \"id\": \"trf_anc_789123\",\n    \"reference\": \"rem_rmb-1_1\",\n    \"status\": \"SUCCESSFUL\",\n    \"amountKobo\": 5000000,\n    \"currency\": \"NGN\",\n    \"feeKobo\": 1075\n  }\n}"
             },
+
             {
               "name": "Error (400 Bad Request / 404 Not Found)",
               "status": "Bad Request",
@@ -3216,7 +3217,7 @@
                 "disburse"
               ]
             },
-            "description": "Mark an approved salary advance as disbursed (Admin only). Sets status to DISBURSED and records disbursedAt timestamp."
+            "description": "Mark an approved salary advance as disbursed (Admin only). Sets status to DISBURSED and automatically dispatches an instant single NIP transfer via Anchor BaaS rails using deterministic reference (adv_<advanceId>_1)."
           },
           "response": [
             {
@@ -3230,8 +3231,9 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Salary advance marked as disbursed successfully\",\n    \"salaryAdvance\": {\n      \"id\": \"adv-123\",\n      \"status\": \"DISBURSED\",\n      \"disbursedAt\": \"2026-10-07T12:00:00.000Z\"\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Salary advance marked as disbursed successfully\",\n    \"salaryAdvance\": {\n      \"id\": \"adv-123\",\n      \"status\": \"DISBURSED\",\n      \"disbursedAt\": \"2026-10-07T12:00:00.000Z\"\n    },\n    \"transfer\": {\n      \"id\": \"trf_anc_456789\",\n      \"reference\": \"adv_adv-123_1\",\n      \"status\": \"SUCCESSFUL\",\n      \"amountKobo\": 10000000,\n      \"currency\": \"NGN\",\n      \"feeKobo\": 1075\n    }\n  }\n}"
             },
+
             {
               "name": "Bad Request - Not Approved",
               "status": "Bad Request",
@@ -3582,11 +3584,11 @@
                 "execute"
               ]
             },
-            "description": "Record payment execution and generate bank payment-file export batch (ADR-004)."
+            "description": "Executes payroll disbursements. Automatically dispatches bulk transfers via Anchor BaaS virtual NUBAN rails when configured, with dual-track bank transfer file export fallback (ADR-004)."
           },
           "response": [
             {
-              "name": "Success",
+              "name": "Success (Anchor BaaS Bulk Transfer Executed)",
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
@@ -3596,7 +3598,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Payment execution recorded and bank transfer file exported\",\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"status\": \"EXECUTED\",\n      \"executedAt\": \"2026-09-09T13:30:00.000Z\"\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Payment execution recorded and automated bulk transfer initiated via Anchor BaaS\",\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"status\": \"EXECUTED\",\n      \"executedAt\": \"2026-10-22T20:00:00.000Z\"\n    },\n    \"bulkTransfer\": {\n      \"id\": \"blk_anc_82716\",\n      \"reference\": \"blk_ref_run-123\",\n      \"status\": \"PROCESSING\",\n      \"transfersCount\": 25,\n      \"totalAmountKobo\": 1250000000\n    },\n    \"paymentExportBatch\": {\n      \"runId\": \"run-123\",\n      \"totalPayoutNet\": 12500000,\n      \"employeeTransfers\": [\n        {\n          \"employeeId\": \"emp-1\",\n          \"employeeName\": \"John Doe\",\n          \"amount\": 500000,\n          \"currency\": \"NGN\"\n        }\n      ]\n    }\n  }\n}"
             }
           ]
         },
@@ -6291,6 +6293,491 @@
                 }
               ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employer_code\": \"EMP001\",\n    \"submitted_count\": 10,\n    \"submitted_amount\": \"1250000.00\",\n    \"paid_count\": 8,\n    \"paid_amount\": \"1000000.00\",\n    \"disbursed_count\": 5,\n    \"disbursed_amount\": \"625000.00\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Banking & Rails (Anchor BaaS)",
+      "description": "Anchor Banking-as-a-Service integration for Nigerian bank list resolution, account verification (name inquiry), deposit accounts, and payout rails.",
+      "item": [
+        {
+          "name": "List Supported Nigerian Banks",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/banking/banks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "banking",
+                "banks"
+              ]
+            },
+            "description": "List all Nigerian commercial banks, microfinance banks, and fintechs (Access, GTB, Zenith, OPay, PalmPay, Moniepoint, etc.) with NIP routing codes. Results are cached in-memory for 24 hours."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"banks\": [\n      {\n        \"id\": \"anc_bk_access\",\n        \"name\": \"ACCESS BANK\",\n        \"nipCode\": \"000014\",\n        \"cbnCode\": \"044\"\n      },\n      {\n        \"id\": \"anc_bk_gtb\",\n        \"name\": \"GUARANTY TRUST BANK\",\n        \"nipCode\": \"000013\",\n        \"cbnCode\": \"058\"\n      },\n      {\n        \"id\": \"anc_bk_opay\",\n        \"name\": \"OPAY DIGITAL SERVICES LIMITED\",\n        \"nipCode\": \"090405\",\n        \"cbnCode\": \"090405\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify Bank Account (Name Inquiry)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bankCode\": \"000014\",\n  \"accountNumber\": \"0123456789\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/banking/verify-account",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "banking",
+                "verify-account"
+              ]
+            },
+            "description": "Performs real-time NIP name inquiry against Anchor API to verify that the account exists and retrieve the registered account holder name before saving salary bank details or initiating payroll disbursements."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"account\": {\n      \"accountNumber\": \"0123456789\",\n      \"accountName\": \"CHUKWUEMEKA ASOGWA\",\n      \"bankCode\": \"000014\",\n      \"bankName\": \"ACCESS BANK\"\n    }\n  }\n}"
+            },
+            {
+              "name": "Error (404 Not Found - Invalid Account)",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Bank account 0000000000 not found for bank code 000014\",\n  \"error\": \"Not Found\"\n}"
+            },
+            {
+              "name": "Error (400 Bad Request - Validation Error)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": [\n    \"accountNumber must be a 10-digit Nigerian NUBAN\"\n  ],\n  \"error\": \"Bad Request\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Organization Deposit Account",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/banking/deposit-account",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "banking",
+                "deposit-account"
+              ]
+            },
+            "description": "Retrieves the dedicated virtual NUBAN deposit account assigned to the current active organization. If one has not yet been provisioned, Anchor automatically creates an account. Restricted to BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN, and FINANCE_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"depositAccount\": {\n      \"id\": \"0192e2b3-57aa-7b44-9345-0d65b1285620\",\n      \"organizationId\": \"org_udubonchi_123\",\n      \"anchorAccountId\": \"acc_anc_8273619\",\n      \"accountNumber\": \"9918273645\",\n      \"accountName\": \"StackHR - Udubonchi Tech Ltd\",\n      \"bankName\": \"PROVIDUS BANK\",\n      \"nipCode\": \"000023\",\n      \"currency\": \"NGN\",\n      \"balanceKobo\": 1500000000,\n      \"status\": \"ACTIVE\",\n      \"createdAt\": \"2026-10-22T19:00:00.000Z\",\n      \"updatedAt\": \"2026-10-22T19:00:00.000Z\"\n    }\n  }\n}"
+            },
+            {
+              "name": "Error (403 Forbidden - Role Required)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 403,\n  \"message\": \"Forbidden resource: requires one of [BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN, FINANCE_ADMIN]\",\n  \"error\": \"Forbidden\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Sync Deposit Account Balance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/banking/deposit-account/sync",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "banking",
+                "deposit-account",
+                "sync"
+              ]
+            },
+            "description": "Performs an on-demand real-time balance inquiry with Anchor BaaS and synchronizes the organization's cached wallet ledger balance."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"depositAccount\": {\n      \"id\": \"0192e2b3-57aa-7b44-9345-0d65b1285620\",\n      \"organizationId\": \"org_udubonchi_123\",\n      \"anchorAccountId\": \"acc_anc_8273619\",\n      \"accountNumber\": \"9918273645\",\n      \"accountName\": \"StackHR - Udubonchi Tech Ltd\",\n      \"bankName\": \"PROVIDUS BANK\",\n      \"nipCode\": \"000023\",\n      \"currency\": \"NGN\",\n      \"balanceKobo\": 1750000000,\n      \"status\": \"ACTIVE\",\n      \"createdAt\": \"2026-10-22T19:00:00.000Z\",\n      \"updatedAt\": \"2026-10-22T19:40:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Receive Inbound Anchor Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-anchor-signature",
+                "value": "h4K+8s1/Y0mG2JmC4z6+7y==",
+                "description": "Base64 encoded HMAC-SHA1 of the request raw body signed with ANCHOR_WEBHOOK_SECRET"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"deposit.successful\",\n  \"data\": {\n    \"id\": \"txn_918273\",\n    \"type\": \"Transaction\",\n    \"attributes\": {\n      \"amount\": 50000000,\n      \"fee\": 0,\n      \"currency\": \"NGN\",\n      \"reference\": \"dep_ref_9182\",\n      \"status\": \"SUCCESSFUL\",\n      \"accountId\": \"acc_anc_8273619\",\n      \"accountNumber\": \"9918273645\",\n      \"sender\": {\n        \"accountName\": \"UDUBONCHI TECH OVERFLOW\",\n        \"accountNumber\": \"0123456789\",\n        \"bankName\": \"GTBANK\"\n      },\n      \"createdAt\": \"2026-10-22T19:35:00.000Z\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/banking/webhook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "banking",
+                "webhook"
+              ]
+            },
+            "description": "Public webhook endpoint for Anchor server-to-server notifications. Protected exclusively by AnchorWebhookGuard which verifies the x-anchor-signature HMAC-SHA1 signature. Handles deposit.successful and emits domain events."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"received\": true,\n    \"event\": \"deposit.successful\",\n    \"organizationId\": \"org_udubonchi_123\",\n    \"newBalanceKobo\": 2000000000\n  }\n}"
+            },
+            {
+              "name": "Error (401 Unauthorized - Invalid Signature)",
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 401,\n  \"message\": \"Invalid webhook signature\",\n  \"error\": \"Unauthorized\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Issue Corporate Card (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"emp_123456\",\n  \"spendingLimitKobo\": 50000000,\n  \"spendingInterval\": \"MONTHLY\",\n  \"brand\": \"MASTERCARD\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/banking/cards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "banking",
+                "cards"
+              ]
+            },
+            "description": "Issues a programmable virtual Mastercard/Verve corporate debit card for an employee, setting card spend controls and interval."
+          },
+          "response": [
+            {
+              "name": "Success (201 Created)",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Corporate card issued successfully\",\n  \"data\": {\n    \"card\": {\n      \"id\": \"crd_stack_0192\",\n      \"anchorCardId\": \"crd_anc_9921\",\n      \"cardName\": \"CHUKWUEMEKA ASOGWA\",\n      \"maskedPan\": \"5399 **** **** 1234\",\n      \"expiryMonth\": \"12\",\n      \"expiryYear\": \"28\",\n      \"brand\": \"MASTERCARD\",\n      \"status\": \"ACTIVE\",\n      \"spendingLimitKobo\": 50000000,\n      \"spendingInterval\": \"MONTHLY\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Corporate Cards",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/banking/cards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "banking",
+                "cards"
+              ]
+            },
+            "description": "Lists corporate cards for the organization. If caller is an employee, only their cards are returned."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"cards\": [\n      {\n        \"id\": \"crd_stack_0192\",\n        \"cardName\": \"CHUKWUEMEKA ASOGWA\",\n        \"maskedPan\": \"5399 **** **** 1234\",\n        \"brand\": \"MASTERCARD\",\n        \"status\": \"ACTIVE\",\n        \"spendingLimitKobo\": 50000000,\n        \"spendingInterval\": \"MONTHLY\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Corporate Card Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/banking/cards/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "banking",
+                "cards",
+                ":id"
+              ]
+            },
+            "description": "Retrieves card details and live balance inquiry from Anchor BaaS."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"card\": {\n      \"id\": \"crd_stack_0192\",\n      \"cardName\": \"CHUKWUEMEKA ASOGWA\",\n      \"maskedPan\": \"5399 **** **** 1234\",\n      \"status\": \"ACTIVE\"\n    },\n    \"liveAnchorDetails\": {\n      \"balanceKobo\": 48200000,\n      \"status\": \"ACTIVE\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Toggle Card Freeze (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"FREEZE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/banking/cards/:id/freeze",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "banking",
+                "cards",
+                ":id",
+                "freeze"
+              ]
+            },
+            "description": "Freezes or unfreezes a corporate card (FREEZE or UNFREEZE)."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Corporate card frozen successfully\",\n  \"data\": {\n    \"card\": {\n      \"id\": \"crd_stack_0192\",\n      \"status\": \"FROZEN\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Card Spending Limit (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"spendingLimitKobo\": 75000000,\n  \"spendingInterval\": \"MONTHLY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/banking/cards/:id/limit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "banking",
+                "cards",
+                ":id",
+                "limit"
+              ]
+            },
+            "description": "Updates spending limit (in kobo) and replenishment interval for a corporate card."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Card spending limit updated successfully\",\n  \"data\": {\n    \"card\": {\n      \"id\": \"crd_stack_0192\",\n      \"spendingLimitKobo\": 75000000,\n      \"spendingInterval\": \"MONTHLY\"\n    }\n  }\n}"
             }
           ]
         }

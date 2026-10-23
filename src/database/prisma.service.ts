@@ -29,6 +29,8 @@ const TENANT_SCOPED_MODELS = [
   'IdempotencyKey',
   'OutboxEvent',
   'DeadLetterEvent',
+  'OrganizationDepositAccount',
+  'CorporateCard',
 ];
 
 @Injectable()

@@ -213,6 +213,58 @@ erDiagram
 
 ---
 
+### 1.5 Banking & Payments Architecture (Anchor BaaS Integration)
+
+StackHR integrates with [Anchor](https://docs.getanchor.co) (CBN-regulated Banking-as-a-Service & Payments API infrastructure) to power automated Nigerian banking operations, virtual accounts, and real-time payroll disbursement. In adherence to **ADR-001**, all payment and banking rails are isolated within a dedicated `BankingModule` bounded context:
+
+```mermaid
+flowchart TD
+    subgraph Core HR & Payroll Domains
+        EMP[Employees Module]
+        ME[Self-Service Me Module]
+        PAY[Payroll Module]
+        SPD[Spend & Reimbursements Module]
+    end
+
+    subgraph Banking Bounded Context
+        BC[BankingController]
+        BS[BankingService]
+        AC[AnchorClient]
+        RS[ResilienceService - CircuitBreaker & Retry]
+        WC[AnchorWebhookController]
+        WG[AnchorWebhookGuard - HMAC-SHA1]
+    end
+
+    subgraph External Anchor Rails
+        A_BANK[Anchor Banks & Account Verification]
+        A_ACC[Anchor Deposit Accounts / NUBAN]
+        A_TRF[Anchor Single & Bulk NIP Transfers]
+        A_CARD[Anchor Card Issuing]
+    end
+
+    EMP -->|Verify Bank Info| BS
+    ME -->|Verify Bank Info| BS
+    PAY -->|Funding Check & Bulk Payout| BS
+    SPD -->|Disburse Advance / Claim| BS
+
+    BS --> AC
+    AC --> RS
+    RS --> A_BANK
+    RS --> A_ACC
+    RS --> A_TRF
+    RS --> A_CARD
+
+    A_ACC -->|deposit.successful| WC
+    A_TRF -->|bulkTransfer.completed| WC
+    A_TRF -->|nip.transfer.successful| WC
+
+    WC --> WG
+    WC -->|Domain Events via EventEmitter2| PAY
+    WC -->|Domain Events via EventEmitter2| BS
+```
+
+---
+
 ## 2. Getting Started
 
 ### 2.1 Prerequisites
