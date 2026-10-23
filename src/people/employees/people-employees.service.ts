@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -219,11 +220,35 @@ export class PeopleEmployeesService {
         }
 
         let employeeNumber = employment.employeeNumber;
-        if (!employeeNumber) {
-          const employeeCount = await client.employee.count({
-            where: { organizationId },
+        if (employeeNumber) {
+          const existingWithNum = await client.employee.findFirst({
+            where: { organizationId, employeeNumber },
           });
-          employeeNumber = `EMP-${String(employeeCount + 1).padStart(4, '0')}`;
+          if (existingWithNum) {
+            throw new ConflictException(
+              `Employee number "${employeeNumber}" is already in use in this organization`,
+            );
+          }
+        } else {
+          const existingEmployees = await client.employee.findMany({
+            where: { organizationId, employeeNumber: { not: null } },
+            select: { employeeNumber: true },
+          });
+          const numbers = (
+            (existingEmployees as Array<{
+              employeeNumber: string | null;
+            }>) ?? []
+          )
+            .map((e) => {
+              const match =
+                typeof e?.employeeNumber === 'string'
+                  ? /^EMP-(\d+)$/i.exec(e.employeeNumber)
+                  : null;
+              return match ? parseInt(match[1], 10) : 0;
+            })
+            .filter((n) => !isNaN(n));
+          const nextNum = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
+          employeeNumber = `EMP-${String(nextNum).padStart(4, '0')}`;
         }
 
         const employee = await client.employee.create({
@@ -426,6 +451,21 @@ export class PeopleEmployeesService {
       const firstName = personal?.firstName ?? existing.firstName;
       const lastName = personal?.lastName ?? existing.lastName;
       const contact = personal?.emergencyContact;
+
+      if (employment?.employeeNumber) {
+        const duplicate = await client.employee.findFirst({
+          where: {
+            organizationId,
+            employeeNumber: employment.employeeNumber,
+            id: { not: employeeId },
+          },
+        });
+        if (duplicate) {
+          throw new ConflictException(
+            `Employee number "${employment.employeeNumber}" is already in use in this organization`,
+          );
+        }
+      }
 
       const employee = await client.employee.update({
         where: { id: employeeId },
