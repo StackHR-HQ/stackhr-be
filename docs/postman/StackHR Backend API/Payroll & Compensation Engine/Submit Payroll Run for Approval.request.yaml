@@ -1,0 +1,8 @@
+$kind: http-request
+description: Submit calculated payroll run to generic Approvals Engine (ADR-003) and lock from further edits.
+url: "{{baseUrl}}/payroll/runs/run-123/submit"
+method: POST
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Submit Payroll Run for Approval.resources/examples
+order: 5000

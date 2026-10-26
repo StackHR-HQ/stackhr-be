@@ -1,0 +1,14 @@
+$kind: http-request
+description: Authenticate platform administrator account.
+url: "{{baseUrl}}/auth/admin/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "admin@stackhr.app",
+      "password": "AdminPassword123!"
+    }
+order: 8000

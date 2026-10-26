@@ -1,0 +1,8 @@
+$kind: http-request
+description: Reconcile payroll run after manual outcome import (ADR-004).
+url: "{{baseUrl}}/payroll/runs/run-123/reconcile"
+method: POST
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Reconcile Payroll Run.resources/examples
+order: 8000

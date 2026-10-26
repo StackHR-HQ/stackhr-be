@@ -1,0 +1,8 @@
+$kind: http-request
+description: Record payment execution and generate bank payment-file export batch (ADR-004).
+url: "{{baseUrl}}/payroll/runs/run-123/execute"
+method: POST
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Execute Payment (Export File).resources/examples
+order: 7000

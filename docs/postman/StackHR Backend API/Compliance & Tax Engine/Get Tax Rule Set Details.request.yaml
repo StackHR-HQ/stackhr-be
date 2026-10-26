@@ -1,0 +1,10 @@
+$kind: http-request
+description: Retrieve detailed configuration and progressive tax bands for a specific tax rule set.
+url: "{{baseUrl}}/stackhr-admin/compliance/rule-sets/:id"
+method: GET
+pathVariables:
+  - key: id
+    value: TRS-NTA-2026
+    description: Tax Rule Set ID
+examples: ./.resources/Get Tax Rule Set Details.resources/examples
+order: 2000

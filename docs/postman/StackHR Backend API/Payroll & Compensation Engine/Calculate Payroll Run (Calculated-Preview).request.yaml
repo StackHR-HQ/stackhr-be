@@ -1,0 +1,9 @@
+$kind: http-request
+name: Calculate Payroll Run (Calculated/Preview)
+description: Compute line items for all active employees using compensation records and transition to CALCULATED preview state.
+url: "{{baseUrl}}/payroll/runs/run-123/calculate"
+method: POST
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Calculate Payroll Run (Calculated-Preview).resources/examples
+order: 4000

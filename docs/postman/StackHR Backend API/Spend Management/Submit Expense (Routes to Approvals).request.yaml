@@ -1,0 +1,18 @@
+$kind: http-request
+description: Submit an expense claim. Routes through the generic Approvals Engine (ADR-003).
+url: "{{baseUrl}}/spend/expenses"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "category": "Travel",
+      "amount": 25000,
+      "currency": "NGN",
+      "description": "Client visit taxi fare"
+    }
+examples: ./.resources/Submit Expense (Routes to Approvals).resources/examples
+order: 1000

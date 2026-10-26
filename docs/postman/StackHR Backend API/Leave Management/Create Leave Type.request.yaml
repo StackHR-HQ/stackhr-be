@@ -1,0 +1,19 @@
+$kind: http-request
+description: Create a new leave type and allocate initial balances to active employees.
+url: "{{baseUrl}}/leave/types"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "name": "Annual Paid Leave",
+      "description": "Standard annual paid time off",
+      "daysPerYear": 20,
+      "paid": true,
+      "requiresApproval": true
+    }
+examples: ./.resources/Create Leave Type.resources/examples
+order: 1000

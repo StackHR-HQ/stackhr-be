@@ -1,0 +1,26 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "organizationTree": [
+            {
+              "id": "emp-123",
+              "fullName": "Jane CEO",
+              "directReports": []
+            }
+          ]
+        }
+      }
+order: 1000

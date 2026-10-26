@@ -1,0 +1,8 @@
+$kind: http-request
+description: Resend invitation and refresh 7-day expiration date.
+url: "{{baseUrl}}/invitations/inv-123/resend"
+method: POST
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Resend Invitation.resources/examples
+order: 6000

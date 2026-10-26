@@ -1,0 +1,5 @@
+$kind: http-request
+description: Resend self-service portal invitation email to employee.
+url: "{{baseUrl}}/people/employees/:employeeId/invitations"
+method: POST
+order: 5000

@@ -1,0 +1,12 @@
+$kind: http-request
+description: Retrieve paginated, filterable employee listing for active organization.
+url: "{{baseUrl}}/employees?page=1&limit=10&department=Engineering"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+queryParams:
+  page: "1"
+  limit: "10"
+  department: Engineering
+examples: ./.resources/List Employees (Paginated).resources/examples
+order: 2000

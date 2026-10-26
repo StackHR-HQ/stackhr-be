@@ -1,0 +1,10 @@
+$kind: http-request
+description: Get directory listing of employees with search and pagination.
+url: "{{baseUrl}}/people/employees?query=john&status=ACTIVE&page=1&limit=20"
+method: GET
+queryParams:
+  query: john
+  status: ACTIVE
+  page: "1"
+  limit: "20"
+order: 1000

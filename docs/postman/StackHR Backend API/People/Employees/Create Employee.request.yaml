@@ -1,0 +1,20 @@
+$kind: http-request
+description: Create individual employee record.
+url: "{{baseUrl}}/people/employees"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "firstName": "John",
+      "lastName": "Doe",
+      "fullName": "John Doe",
+      "workEmail": "john.doe@acme.com",
+      "jobTitle": "Software Engineer",
+      "employmentType": "FULL_TIME",
+      "startDate": "2026-01-01",
+      "salaryAmount": 500000
+    }
+order: 2000

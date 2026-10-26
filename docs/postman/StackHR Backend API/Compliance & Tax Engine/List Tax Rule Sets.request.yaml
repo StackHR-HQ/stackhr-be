@@ -1,0 +1,10 @@
+$kind: http-request
+description: Retrieve all versioned tax rule sets for a country. Requires StackHR Admin role.
+url: "{{baseUrl}}/stackhr-admin/compliance/rule-sets?country=NG"
+method: GET
+queryParams:
+  - key: country
+    value: NG
+    description: "Filter by country code (default: NG)"
+examples: ./.resources/List Tax Rule Sets.resources/examples
+order: 1000

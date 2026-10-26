@@ -1,0 +1,26 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "leaveBalances": [
+            {
+              "allocatedDays": 20,
+              "usedDays": 5,
+              "remainingDays": 15
+            }
+          ]
+        }
+      }
+order: 1000

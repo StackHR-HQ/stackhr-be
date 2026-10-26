@@ -1,0 +1,5 @@
+$kind: http-request
+description: List organization company documents.
+url: "{{baseUrl}}/people/documents/company"
+method: GET
+order: 1000

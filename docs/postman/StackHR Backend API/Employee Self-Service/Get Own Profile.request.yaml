@@ -1,0 +1,8 @@
+$kind: http-request
+description: Retrieve own employee profile details (strictly self-scoped).
+url: "{{baseUrl}}/me/profile"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Get Own Profile.resources/examples
+order: 1000

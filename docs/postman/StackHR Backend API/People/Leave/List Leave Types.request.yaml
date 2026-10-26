@@ -1,0 +1,5 @@
+$kind: http-request
+description: List configured leave types.
+url: "{{baseUrl}}/people/leave/types"
+method: GET
+order: 1000

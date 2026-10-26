@@ -1,0 +1,14 @@
+$kind: http-request
+description: Approve or reject a leave request.
+url: "{{baseUrl}}/people/leave/requests/:requestId/decision"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "status": "APPROVED",
+      "notes": "Approved by HR manager"
+    }
+order: 5000

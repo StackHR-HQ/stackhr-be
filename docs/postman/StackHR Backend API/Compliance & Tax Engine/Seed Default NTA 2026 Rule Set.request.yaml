@@ -1,0 +1,6 @@
+$kind: http-request
+description: Trigger automatic seeding of the Nigeria Tax Act 2025/2026 default rule set into the database.
+url: "{{baseUrl}}/stackhr-admin/compliance/seed-nta2026"
+method: POST
+examples: ./.resources/Seed Default NTA 2026 Rule Set.resources/examples
+order: 5000

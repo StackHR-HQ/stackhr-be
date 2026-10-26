@@ -1,0 +1,8 @@
+$kind: http-request
+description: List all workspace invitations for active organization.
+url: "{{baseUrl}}/invitations"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/List Invitations.resources/examples
+order: 2000

@@ -1,0 +1,8 @@
+$kind: http-request
+description: Retrieve list of own generated payslips (strictly self-scoped).
+url: "{{baseUrl}}/me/payslips"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Get Own Payslips.resources/examples
+order: 2000

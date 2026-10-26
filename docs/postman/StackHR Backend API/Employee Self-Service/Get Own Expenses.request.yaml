@@ -1,0 +1,8 @@
+$kind: http-request
+description: Retrieve own expense claims.
+url: "{{baseUrl}}/me/expenses"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Get Own Expenses.resources/examples
+order: 5000

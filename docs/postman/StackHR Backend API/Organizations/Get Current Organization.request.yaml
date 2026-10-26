@@ -1,0 +1,5 @@
+$kind: http-request
+description: Retrieve active organization profile for current business session.
+url: "{{baseUrl}}/organizations/current"
+method: GET
+order: 1000

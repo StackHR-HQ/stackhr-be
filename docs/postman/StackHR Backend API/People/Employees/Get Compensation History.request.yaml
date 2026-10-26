@@ -1,0 +1,5 @@
+$kind: http-request
+description: Get compensation change log for employee.
+url: "{{baseUrl}}/people/employees/:employeeId/compensation-history"
+method: GET
+order: 6000

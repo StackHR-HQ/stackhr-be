@@ -1,0 +1,8 @@
+$kind: http-request
+description: List all payroll runs for the active organization.
+url: "{{baseUrl}}/payroll/runs"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/List Payroll Runs.resources/examples
+order: 9000

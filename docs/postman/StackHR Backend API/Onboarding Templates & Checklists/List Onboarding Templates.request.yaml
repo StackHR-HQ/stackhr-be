@@ -1,0 +1,8 @@
+$kind: http-request
+description: List department-based onboarding templates for active organization.
+url: "{{baseUrl}}/onboarding/templates"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/List Onboarding Templates.resources/examples
+order: 1000

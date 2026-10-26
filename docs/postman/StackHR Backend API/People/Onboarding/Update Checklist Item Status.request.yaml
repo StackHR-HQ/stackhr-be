@@ -1,0 +1,13 @@
+$kind: http-request
+description: Mark onboarding task item complete or incomplete.
+url: "{{baseUrl}}/people/onboarding/employees/:employeeId/checklist/:itemId"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "completed": true
+    }
+order: 4000

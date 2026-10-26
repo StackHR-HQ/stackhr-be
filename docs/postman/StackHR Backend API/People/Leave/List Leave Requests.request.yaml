@@ -1,0 +1,7 @@
+$kind: http-request
+description: List employee leave requests.
+url: "{{baseUrl}}/people/leave/requests?status=PENDING"
+method: GET
+queryParams:
+  status: PENDING
+order: 4000

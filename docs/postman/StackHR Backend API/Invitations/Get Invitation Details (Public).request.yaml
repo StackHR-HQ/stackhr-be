@@ -1,0 +1,6 @@
+$kind: http-request
+description: Public endpoint to inspect invitation validity and expiration status.
+url: "{{baseUrl}}/invitations/inv-123"
+method: GET
+examples: ./.resources/Get Invitation Details (Public).resources/examples
+order: 3000

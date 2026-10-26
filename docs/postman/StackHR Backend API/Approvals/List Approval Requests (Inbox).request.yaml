@@ -1,0 +1,12 @@
+$kind: http-request
+description: List unified approval inbox requests for current tenant. Non-elevated roles see their own requests.
+url: "{{baseUrl}}/approvals?status=PENDING&page=1&limit=20"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+queryParams:
+  status: PENDING
+  page: "1"
+  limit: "20"
+examples: ./.resources/List Approval Requests (Inbox).resources/examples
+order: 2000

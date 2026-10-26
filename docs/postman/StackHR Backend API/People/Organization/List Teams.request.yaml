@@ -1,0 +1,5 @@
+$kind: http-request
+description: List teams and team leads.
+url: "{{baseUrl}}/people/teams"
+method: GET
+order: 5000

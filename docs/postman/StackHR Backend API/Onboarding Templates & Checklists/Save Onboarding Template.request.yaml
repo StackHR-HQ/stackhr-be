@@ -1,0 +1,23 @@
+$kind: http-request
+description: Save or update a department onboarding template.
+url: "{{baseUrl}}/onboarding/templates"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "department": "Engineering",
+      "title": "Engineering Onboarding",
+      "tasks": [
+        {
+          "title": "Configure local dev environment",
+          "description": "Clone repos and install dependencies",
+          "required": true
+        }
+      ]
+    }
+examples: ./.resources/Save Onboarding Template.resources/examples
+order: 2000

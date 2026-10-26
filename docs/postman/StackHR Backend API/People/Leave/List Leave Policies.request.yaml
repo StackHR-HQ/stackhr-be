@@ -1,0 +1,5 @@
+$kind: http-request
+description: List organization leave policies.
+url: "{{baseUrl}}/people/leave/policies"
+method: GET
+order: 2000

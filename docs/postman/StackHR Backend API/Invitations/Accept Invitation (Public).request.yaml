@@ -1,0 +1,15 @@
+$kind: http-request
+description: Public endpoint to accept workspace invitation and create user account.
+url: "{{baseUrl}}/invitations/inv-123/accept"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "fullName": "New Member",
+      "password": "SecurePassword123!"
+    }
+examples: ./.resources/Accept Invitation (Public).resources/examples
+order: 4000

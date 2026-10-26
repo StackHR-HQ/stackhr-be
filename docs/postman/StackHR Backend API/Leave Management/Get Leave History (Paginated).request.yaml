@@ -1,0 +1,12 @@
+$kind: http-request
+description: Retrieve paginated leave request history with optional status and employee filters.
+url: "{{baseUrl}}/leave/history?page=1&limit=10&status=APPROVED"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+queryParams:
+  page: "1"
+  limit: "10"
+  status: APPROVED
+examples: ./.resources/Get Leave History (Paginated).resources/examples
+order: 5000

@@ -1,0 +1,17 @@
+$kind: http-request
+description: Request a salary advance with monthly deduction calculation. Routes through generic Approvals Engine (ADR-003).
+url: "{{baseUrl}}/spend/advances"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "amount": 100000,
+      "repaymentMonths": 2,
+      "reason": "Medical emergency advance"
+    }
+examples: ./.resources/Submit Salary Advance (Routes to Approvals).resources/examples
+order: 3000

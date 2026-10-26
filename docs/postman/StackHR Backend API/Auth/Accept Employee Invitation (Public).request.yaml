@@ -1,0 +1,14 @@
+$kind: http-request
+description: Public endpoint to set or confirm password and sign in using invitation token.
+url: "{{baseUrl}}/auth/invitations/accept"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "token": "invitation-token-123",
+      "password": "SecurePassword123!"
+    }
+order: 6000

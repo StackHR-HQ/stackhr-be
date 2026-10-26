@@ -1,0 +1,8 @@
+$kind: http-request
+description: Retrieve full versioned compensation history for an employee.
+url: "{{baseUrl}}/payroll/compensation/550e8400-e29b-41d4-a716-446655440000"
+method: GET
+headers:
+  Authorization: Bearer {{sessionToken}}
+examples: ./.resources/Get Compensation History.resources/examples
+order: 2000

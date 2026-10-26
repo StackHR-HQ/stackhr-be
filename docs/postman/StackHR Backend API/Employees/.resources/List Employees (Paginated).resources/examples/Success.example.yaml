@@ -1,0 +1,35 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "data": [
+            {
+              "id": "emp-123",
+              "fullName": "Jane Doe",
+              "email": "jane.doe@company.com",
+              "department": "Engineering",
+              "jobTitle": "Senior Software Engineer",
+              "status": "ACTIVE"
+            }
+          ],
+          "meta": {
+            "total": 1,
+            "page": 1,
+            "limit": 10,
+            "totalPages": 1
+          }
+        }
+      }
+order: 1000

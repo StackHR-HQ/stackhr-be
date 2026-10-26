@@ -1,0 +1,16 @@
+$kind: http-request
+name: Decide Approval Request (Approve/Reject)
+description: "Approve or reject a pending request. Maker-checker rule: requester cannot approve their own request. Roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN, MANAGER."
+url: "{{baseUrl}}/approvals/appr-123/decide"
+method: PATCH
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "status": "APPROVED"
+    }
+examples: ./.resources/Decide Approval Request (Approve-Reject).resources/examples
+order: 3000

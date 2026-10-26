@@ -1,0 +1,16 @@
+$kind: http-request
+description: Attest manual funding check (ADR-004) to confirm bank balance sufficiency. Transitions to FUNDING_CHECK_PASSED or FUNDING_SHORTFALL.
+url: "{{baseUrl}}/payroll/runs/run-123/funding-check"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "confirmed": true,
+      "notes": "Bank balance verified to cover total net payout of N2,070,000"
+    }
+examples: ./.resources/Attest Funding Check.resources/examples
+order: 6000

@@ -1,0 +1,5 @@
+$kind: http-request
+description: Retrieve employee leave balances.
+url: "{{baseUrl}}/people/leave/balances"
+method: GET
+order: 3000

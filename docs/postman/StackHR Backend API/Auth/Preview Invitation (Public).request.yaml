@@ -1,0 +1,5 @@
+$kind: http-request
+description: Public endpoint to preview employee invitation details before setting password.
+url: "{{baseUrl}}/auth/invitations/:token"
+method: GET
+order: 5000

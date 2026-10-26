@@ -1,0 +1,21 @@
+$kind: http-request
+description: "Add a single employee during onboarding. Required roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+url: "{{baseUrl}}/onboarding/employees"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "fullName": "Jane Doe",
+      "email": "jane@acme.com",
+      "department": "Engineering",
+      "jobTitle": "Staff Engineer",
+      "employmentType": "FULL_TIME",
+      "salary": 850000,
+      "startDate": "2026-01-15"
+    }
+examples: ./.resources/Add Employee.resources/examples
+order: 2000

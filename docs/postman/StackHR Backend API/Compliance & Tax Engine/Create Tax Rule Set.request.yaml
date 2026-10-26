@@ -1,0 +1,41 @@
+$kind: http-request
+description: Create a new versioned tax rule set with progressive tax bands. Requires StackHR Admin role.
+url: "{{baseUrl}}/stackhr-admin/compliance/rule-sets"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "country": "NG",
+      "name": "Nigeria Tax Act 2027 Amendment",
+      "effectiveFrom": "2027-01-01T00:00:00.000Z",
+      "isDefault": true,
+      "rentReliefPercentage": 0.20,
+      "rentReliefCap": 500000,
+      "pensionEmployeeRate": 0.08,
+      "pensionEmployerRate": 0.10,
+      "pensionBasisFields": "BASIC,HOUSING,TRANSPORT",
+      "nhfRate": 0.025,
+      "nhfBasisField": "BASIC",
+      "taxFreeThreshold": 800000,
+      "taxRules": [
+        {
+          "bandOrder": 1,
+          "bandName": "First ₦800,000",
+          "lowerLimit": 0,
+          "upperLimit": 800000,
+          "taxRate": 0.0
+        },
+        {
+          "bandOrder": 2,
+          "bandName": "Next ₦2,200,000",
+          "lowerLimit": 800000,
+          "upperLimit": 3000000,
+          "taxRate": 0.15
+        }
+      ]
+    }
+examples: ./.resources/Create Tax Rule Set.resources/examples
+order: 3000

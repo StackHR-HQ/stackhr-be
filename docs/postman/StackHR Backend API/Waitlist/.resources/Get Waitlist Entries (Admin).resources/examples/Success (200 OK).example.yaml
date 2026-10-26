@@ -1,0 +1,27 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "success": true,
+        "message": "Request successful",
+        "data": [
+          {
+            "id": "w_8f9a2b1c",
+            "name": "Jane Doe",
+            "position": "Head of HR",
+            "businessName": "Acme Technologies",
+            "businessEmail": "jane@acmetech.com",
+            "createdAt": "2026-09-21T12:00:00.000Z"
+          }
+        ]
+      }
+order: 1000

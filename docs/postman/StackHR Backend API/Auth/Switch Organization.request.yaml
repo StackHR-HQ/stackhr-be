@@ -1,0 +1,15 @@
+$kind: http-request
+description: Switch active session organization workspace context (ADR-009). Requires active session and user membership in target organization.
+url: "{{baseUrl}}/auth/switch-organization"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "organizationId": "org-456"
+    }
+examples: ./.resources/Switch Organization.resources/examples
+order: 4000

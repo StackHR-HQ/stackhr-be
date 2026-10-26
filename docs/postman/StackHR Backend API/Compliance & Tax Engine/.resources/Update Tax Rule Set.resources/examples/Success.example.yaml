@@ -1,0 +1,22 @@
+$kind: http-example
+request:
+  url: ""
+  method: GET
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "success": true,
+        "message": "Request successful",
+        "data": {
+          "id": "TRS-NTA-2026",
+          "rentReliefCap": 600000,
+          "pensionEmployerRate": 0.12
+        }
+      }
+order: 1000

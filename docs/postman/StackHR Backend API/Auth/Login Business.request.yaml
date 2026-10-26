@@ -1,0 +1,15 @@
+$kind: http-request
+description: Authenticate business user and set HttpOnly session cookie.
+url: "{{baseUrl}}/auth/business/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "owner@company.com",
+      "password": "SecurePass123!"
+    }
+examples: ./.resources/Login Business.resources/examples
+order: 3000

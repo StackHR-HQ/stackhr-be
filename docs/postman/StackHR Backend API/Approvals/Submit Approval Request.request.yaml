@@ -1,0 +1,19 @@
+$kind: http-request
+description: Submit a new approval request. Polymorphic type can be LEAVE, EXPENSE, REIMBURSEMENT, SALARY_ADVANCE, or PAYROLL.
+url: "{{baseUrl}}/approvals"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{sessionToken}}
+body:
+  type: text
+  content: |-
+    {
+      "type": "LEAVE",
+      "subjectTable": "leave_request",
+      "subjectId": "leave-123",
+      "amountSnapshot": 5,
+      "metadata": "{\"reason\": \"Annual Leave\"}"
+    }
+examples: ./.resources/Submit Approval Request.resources/examples
+order: 1000
