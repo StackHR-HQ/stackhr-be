@@ -76,11 +76,33 @@ export class EmployeesService {
     }
 
     let employeeNumber = dto.employeeNumber;
-    if (!employeeNumber) {
-      const count = await this.prisma.employee.count({
-        where: { organizationId: orgId },
+    if (employeeNumber) {
+      const existingWithNum = await this.prisma.employee.findFirst({
+        where: { organizationId: orgId, employeeNumber },
       });
-      employeeNumber = `EMP-${String(count + 1).padStart(4, '0')}`;
+      if (existingWithNum) {
+        throw new ConflictException(
+          `Employee number "${employeeNumber}" is already in use in this organization`,
+        );
+      }
+    } else {
+      const existingEmployees = await this.prisma.employee.findMany({
+        where: { organizationId: orgId, employeeNumber: { not: null } },
+        select: { employeeNumber: true },
+      });
+      const numbers = (
+        (existingEmployees as Array<{ employeeNumber: string | null }>) ?? []
+      )
+        .map((e) => {
+          const match =
+            typeof e?.employeeNumber === 'string'
+              ? /^EMP-(\d+)$/i.exec(e.employeeNumber)
+              : null;
+          return match ? parseInt(match[1], 10) : 0;
+        })
+        .filter((n) => !isNaN(n));
+      const nextNum = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
+      employeeNumber = `EMP-${String(nextNum).padStart(4, '0')}`;
     }
 
     const employee = await this.prisma.employee.create({
@@ -265,7 +287,7 @@ export class EmployeesService {
     id: string,
     dto: UpdateEmployeeDto,
   ) {
-    this.checkOrgContext(user);
+    const orgId = this.checkOrgContext(user);
     const employee = await this.prisma.employee.findFirst({
       where: { id },
     });
@@ -296,6 +318,21 @@ export class EmployeesService {
       if (existing) {
         throw new ConflictException(
           'An employee with this email already exists',
+        );
+      }
+    }
+
+    if (dto.employeeNumber) {
+      const duplicate = await this.prisma.employee.findFirst({
+        where: {
+          organizationId: orgId,
+          employeeNumber: dto.employeeNumber,
+          id: { not: id },
+        },
+      });
+      if (duplicate) {
+        throw new ConflictException(
+          `Employee number "${dto.employeeNumber}" is already in use in this organization`,
         );
       }
     }
