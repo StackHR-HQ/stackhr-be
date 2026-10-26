@@ -271,7 +271,7 @@ flowchart TD
 
 - Node.js `>= 20.0.0`
 - PostgreSQL `>= 15` (or Neon Serverless PostgreSQL)
-- pnpm / yarn / npm
+- Yarn (`1.22+` / Classic) — strictly Yarn is used for this project
 
 ### 2.2 Environment Configuration
 

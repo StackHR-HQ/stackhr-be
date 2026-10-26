@@ -7,12 +7,12 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y openssl python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 # Copy package manifests and Prisma schema
-COPY package*.json ./
+COPY package.json yarn.lock ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
 
 # Install all dependencies
-RUN npm ci
+RUN yarn install --frozen-lockfile
 
 # Copy TypeScript configs and application source code
 COPY tsconfig*.json ./
@@ -20,8 +20,8 @@ COPY nest-cli.json ./
 COPY src ./src/
 
 # Generate Prisma Client & compile NestJS application
-RUN npx prisma generate
-RUN npm run build
+RUN yarn db:generate
+RUN yarn build
 
 # Stage 2: Runtime Production Image
 FROM node:20-slim AS runner
@@ -33,7 +33,7 @@ RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/
 
 ENV NODE_ENV=production
 
-COPY package*.json ./
+COPY package.json yarn.lock ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
 

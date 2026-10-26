@@ -12,6 +12,10 @@ import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { OffboardEmployeeDto } from './dto/offboard-employee.dto';
 import { EmployeeQueryDto } from './dto/employee-query.dto';
 import { ReassignManagerDto } from './dto/reassign-manager.dto';
+import {
+  getOrgPrefix,
+  computeNextEmployeeNumber,
+} from '../common/utils/employee-number.util';
 
 @Injectable()
 export class EmployeesService {
@@ -86,23 +90,17 @@ export class EmployeesService {
         );
       }
     } else {
+      const org = await this.prisma.organization?.findUnique?.({
+        where: { id: orgId },
+        select: { slug: true, name: true },
+      });
+      const prefix = getOrgPrefix(org);
+
       const existingEmployees = await this.prisma.employee.findMany({
         where: { organizationId: orgId, employeeNumber: { not: null } },
         select: { employeeNumber: true },
       });
-      const numbers = (
-        (existingEmployees as Array<{ employeeNumber: string | null }>) ?? []
-      )
-        .map((e) => {
-          const match =
-            typeof e?.employeeNumber === 'string'
-              ? /^EMP-(\d+)$/i.exec(e.employeeNumber)
-              : null;
-          return match ? parseInt(match[1], 10) : 0;
-        })
-        .filter((n) => !isNaN(n));
-      const nextNum = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
-      employeeNumber = `EMP-${String(nextNum).padStart(4, '0')}`;
+      employeeNumber = computeNextEmployeeNumber(prefix, existingEmployees);
     }
 
     const employee = await this.prisma.employee.create({
