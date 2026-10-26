@@ -1,18 +1,18 @@
 # Stage 1: Dependencies & Build
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
 # Install build tools required for native C++ modules (e.g. argon2) and OpenSSL for Prisma
 RUN apt-get update && apt-get install -y openssl python3 make g++ && rm -rf /var/lib/apt/lists/*
 
-# Copy package manifests and Prisma schema
-COPY package.json yarn.lock ./
+# Copy package manifests, yarn config, and Prisma schema
+COPY package.json yarn.lock .yarnrc* ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
 
 # Install all dependencies
-RUN yarn install --frozen-lockfile
+RUN yarn install --frozen-lockfile --ignore-engines
 
 # Copy TypeScript configs and application source code
 COPY tsconfig*.json ./
@@ -24,7 +24,7 @@ RUN yarn db:generate
 RUN yarn build
 
 # Stage 2: Runtime Production Image
-FROM node:20-slim AS runner
+FROM node:22-slim AS runner
 
 WORKDIR /app
 
