@@ -25,6 +25,9 @@ describe('EmployeesService', () => {
     compensationHistory: {
       create: jest.Mock;
     };
+    organization: {
+      findUnique: jest.Mock;
+    };
   };
 
   const mockUser: AuthenticatedUser = {
@@ -50,6 +53,11 @@ describe('EmployeesService', () => {
       },
       compensationHistory: {
         create: jest.fn(),
+      },
+      organization: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 'org-123', name: 'Acme', slug: 'acme' }),
       },
     };
 

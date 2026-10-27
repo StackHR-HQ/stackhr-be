@@ -10,19 +10,19 @@ Note: that spec describes an existing separate production app. This backend curr
 
 ## Commands
 
-- Install deps: `pnpm install` (pnpm is the package manager — `pnpm-lock.yaml` is present)
-- Dev server (watch mode): `pnpm run start:dev`
-- Debug (watch mode + inspector): `pnpm run start:debug`
-- Build: `pnpm run build`
-- Production start (after build): `pnpm run start:prod`
-- Lint (auto-fix): `pnpm run lint`
-- Format: `pnpm run format`
-- Unit tests: `pnpm run test`
-- Watch unit tests: `pnpm run test:watch`
-- Single test file: `pnpm exec jest path/to/file.spec.ts`
-- Single test by name: `pnpm exec jest -t "test name"`
-- Coverage: `pnpm run test:cov`
-- E2E tests: `pnpm run test:e2e` (uses `test/jest-e2e.json`; specs live in `test/*.e2e-spec.ts`)
+- Install deps: `yarn install` (yarn is the exclusive package manager — `yarn.lock` is present)
+- Dev server (watch mode): `yarn start:dev`
+- Debug (watch mode + inspector): `yarn start:debug`
+- Build: `yarn build`
+- Production start (after build): `yarn start:prod`
+- Lint (auto-fix): `yarn lint`
+- Format: `yarn format`
+- Unit tests: `yarn test`
+- Watch unit tests: `yarn test:watch`
+- Single test file: `yarn jest path/to/file.spec.ts`
+- Single test by name: `yarn jest -t "test name"`
+- Coverage: `yarn test:cov`
+- E2E tests: `yarn test:e2e` (uses `test/jest-e2e.json`; specs live in `test/*.e2e-spec.ts`)
 
 ## Architecture notes
 
