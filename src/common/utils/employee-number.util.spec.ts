@@ -21,6 +21,18 @@ describe('employee-number.util', () => {
       );
     });
 
+    it('normalizes African language diacritics into base letters', () => {
+      expect(getOrgPrefix({ name: 'Ọ̀yọ́ Foods', slug: 'oyo-foods' })).toBe(
+        'OYO',
+      );
+      expect(getOrgPrefix({ name: 'Ọ̀ṣun Textiles' })).toBe('OSUN');
+    });
+
+    it('falls back to ORG when candidate tag is shorter than 2 characters', () => {
+      expect(getOrgPrefix({ slug: 'x' })).toBe('ORG');
+      expect(getOrgPrefix({ slug: 'ab' })).toBe('AB');
+    });
+
     it('falls back to name or ORG when slug is missing', () => {
       expect(getOrgPrefix({ slug: null, name: 'Paystack' })).toBe('PAYST');
       expect(getOrgPrefix(null)).toBe('ORG');
@@ -50,6 +62,19 @@ describe('employee-number.util', () => {
         { employeeNumber: null },
       ];
       expect(computeNextEmployeeNumber('UDU', existing)).toBe('UDU-EMP-0006');
+    });
+
+    it('ignores imported bare numeric IDs and continues from the highest EMP sequence', () => {
+      const existing = [
+        { employeeNumber: 'UDU-EMP-0003' },
+        { employeeNumber: '20240157' },
+      ];
+      expect(computeNextEmployeeNumber('UDU', existing)).toBe('UDU-EMP-0004');
+    });
+
+    it('increments from legacy EMP-0007 correctly', () => {
+      const existing = [{ employeeNumber: 'EMP-0007' }];
+      expect(computeNextEmployeeNumber('UDU', existing)).toBe('UDU-EMP-0008');
     });
   });
 });

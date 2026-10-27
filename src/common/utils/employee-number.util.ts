@@ -1,6 +1,7 @@
 /**
  * Derives a clean 2-5 character uppercase alphanumeric prefix for an organization.
- * Falls back to 'ORG' if neither slug nor name is available.
+ * Normalizes combining diacritics (e.g. Yoruba/Igbo Ọ̀yọ́ -> OYO, Ọ̀ṣun -> OSUN)
+ * and falls back to 'ORG' if the candidate is shorter than 2 characters or unavailable.
  */
 export function getOrgPrefix(
   org?: { name?: string | null; slug?: string | null } | null,
@@ -10,13 +11,23 @@ export function getOrgPrefix(
     org.slug.startsWith('acme-') &&
     typeof org?.name === 'string' &&
     !org.name.toLowerCase().startsWith('acme');
-  const raw = (isGenericAcmeSlug ? org?.name : org?.slug) || org?.name || 'ORG';
+  const raw = (
+    (isGenericAcmeSlug ? org?.name : org?.slug) ||
+    org?.name ||
+    'ORG'
+  )
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '');
+
   const firstWord = raw.split(/[-_\s]+/)[0];
   const cleaned = firstWord.replace(/[^a-zA-Z0-9]/g, '');
-  const tag = (cleaned.length >= 2 ? cleaned : raw.replace(/[^a-zA-Z0-9]/g, ''))
+  const candidate = (
+    cleaned.length >= 2 ? cleaned : raw.replace(/[^a-zA-Z0-9]/g, '')
+  )
     .slice(0, 5)
     .toUpperCase();
-  return tag || 'ORG';
+
+  return candidate.length >= 2 ? candidate : 'ORG';
 }
 
 /**
@@ -27,7 +38,9 @@ export function computeNextEmployeeNumber(
   prefix: string,
   existingEmployees: Array<{ employeeNumber: string | null }>,
 ): string {
-  const pattern = new RegExp(`^(?:${prefix}-)?(?:EMP-)?(\\d+)$`, 'i');
+  // prefix interpolation is safe because getOrgPrefix strictly yields [A-Z0-9].
+  // Requiring "EMP-" avoids falsely capturing imported bare-numeric HRIS IDs (e.g. "20240157").
+  const pattern = new RegExp(`^(?:${prefix}-)?EMP-(\\d+)$`, 'i');
   const numbers = (existingEmployees ?? [])
     .map((e) => {
       const match =

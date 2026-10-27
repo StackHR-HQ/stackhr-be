@@ -90,7 +90,7 @@ export class EmployeesService {
         );
       }
     } else {
-      const org = await this.prisma.organization?.findUnique?.({
+      const org = await this.prisma.organization.findUnique({
         where: { id: orgId },
         select: { slug: true, name: true },
       });

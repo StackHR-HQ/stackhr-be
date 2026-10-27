@@ -234,7 +234,7 @@ export class PeopleEmployeesService {
             );
           }
         } else {
-          const org = await client.organization?.findUnique?.({
+          const org = await client.organization.findUnique({
             where: { id: organizationId },
             select: { slug: true, name: true },
           });
