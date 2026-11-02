@@ -152,6 +152,9 @@ describe('PeopleEmployeesService', () => {
     });
 
     it('creates an employee that then appears in the organization directory', async () => {
+      fake.seed('organization', [
+        { id: 'org_a', name: 'Acme Corp', slug: 'acme' },
+      ]);
       fake.seed('department', [
         { id: 'dep_people', organizationId: 'org_a', name: 'People' },
       ]);
@@ -160,7 +163,7 @@ describe('PeopleEmployeesService', () => {
 
       expect(created).toEqual({
         id: expect.any(String) as unknown,
-        employeeNumber: 'EMP-0001',
+        employeeNumber: 'ACME-EMP-0001',
         fullName: 'Ada Okafor',
         email: 'ada@example.com',
         avatarInitials: 'AO',
