@@ -16,6 +16,7 @@ describe('StackhrAdminService', () => {
     email: 'admin@stackhr.app',
     userType: 'STACKHR_ADMIN',
     role: 'STACKHR_ADMIN',
+    organizationId: null,
   };
 
   beforeEach(async () => {

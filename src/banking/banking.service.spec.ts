@@ -55,6 +55,7 @@ describe('BankingService', () => {
     };
     expense: {
       create: jest.Mock;
+      findMany: jest.Mock;
     };
     auditEvent: {
       create: jest.Mock;
@@ -113,6 +114,7 @@ describe('BankingService', () => {
       },
       expense: {
         create: jest.fn(),
+        findMany: jest.fn(),
       },
       auditEvent: {
         create: jest.fn().mockResolvedValue({}),
