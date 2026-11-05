@@ -9,6 +9,7 @@ import type { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { USER_ROLES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import type { CreateOnboardingTemplateDto } from './dto/create-template.dto';
 
 // Matches the employee_names migration backfill: the last word is the family name.
 function splitFullName(fullName: string) {
@@ -316,6 +317,7 @@ export class OnboardingService {
           jobTitle: row.jobTitle,
           employmentType: row.employmentType,
           // Onboarding collects a monthly amount in major units.
+          salaryAmount: row.salary,
           annualSalaryMinor: BigInt(row.salary) * 1200n,
           startDate: row.startDate,
           createdAt: new Date(),
@@ -341,12 +343,45 @@ export class OnboardingService {
     );
     const persistedId = (key: string) => idByKey.get(key) ?? key;
     for (const [index, row] of rows.entries()) {
+      const empId = persistedId(draftKey(row.email));
       const managerKey = managerKeys[index];
       if (managerKey)
         await db.employee.update({
-          where: { id: persistedId(draftKey(row.email)) },
+          where: { id: empId },
           data: { managerId: persistedId(managerKey) },
         });
+
+      if ((db as any).compensationRecord?.create && row.salary > 0) {
+        await (db as any).compensationRecord.create({
+          data: {
+            organizationId,
+            employeeId: empId,
+            effectiveFrom: row.startDate,
+            basicSalary: row.salary,
+            housingAllowance: 0,
+            transportAllowance: 0,
+            otherAllowances: 0,
+            currency: 'NGN',
+            paymentFrequency: 'MONTHLY',
+          },
+        });
+      }
+      if ((db as any).compensationHistory?.create && row.salary > 0) {
+        await (db as any).compensationHistory.create({
+          data: {
+            organizationId,
+            employeeId: empId,
+            previousSalary: 0,
+            newSalary: row.salary,
+            annualSalaryMinor: BigInt(row.salary) * 1200n,
+            currency: 'NGN',
+            payFrequency: 'MONTHLY',
+            effectiveDate: row.startDate,
+            reason: 'Initial onboarding compensation',
+            changedByUserId: user.id,
+          },
+        });
+      }
     }
     const employees = await db.employee.findMany({
       where: {
@@ -359,8 +394,409 @@ export class OnboardingService {
     return employees.map((employee) => ({
       ...employee,
       salary: Math.trunc(Number(employee.annualSalaryMinor) / 1200),
+      salaryAmount:
+        (employee as any).salaryAmount ??
+        Math.trunc(Number(employee.annualSalaryMinor) / 1200),
       annualSalaryMinor: Number(employee.annualSalaryMinor),
     }));
+  }
+
+  async listTemplates(user: AuthenticatedUser) {
+    const organizationId = this.requireOrganization(user);
+    const [templates, defaults, items, departments] = await Promise.all([
+      this.prisma.onboardingTemplate.findMany({
+        where: { organizationId },
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      }),
+      this.prisma.onboardingTemplateDepartment.findMany({
+        where: { organizationId },
+      }),
+      this.prisma.onboardingChecklistItem.findMany({
+        where: { organizationId },
+        orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      }),
+      this.prisma.department.findMany({
+        where: { organizationId },
+      }),
+    ]);
+    const deptById = new Map(departments.map((d) => [d.id, d.name]));
+
+    const mapped = templates.map((template) => {
+      const deptIds = defaults
+        .filter((link) => link.templateId === template.id)
+        .map((link) => link.departmentId);
+      const deptNames = deptIds
+        .map((id) => deptById.get(id))
+        .filter((n): n is string => Boolean(n));
+      const templateItems = items
+        .filter((item) => item.templateId === template.id)
+        .map((item) => ({
+          id: item.id,
+          label: item.label,
+          title: item.label,
+          stage: item.stage,
+          required: true,
+        }));
+      return {
+        id: template.id,
+        name: template.name,
+        title: template.name,
+        department: deptNames[0] ?? 'General',
+        departmentIds: deptIds,
+        checklist: templateItems,
+        tasks: templateItems,
+      };
+    });
+
+    return { templates: mapped };
+  }
+
+  async saveTemplate(
+    user: AuthenticatedUser,
+    dto: CreateOnboardingTemplateDto,
+  ) {
+    const organizationId = this.requireOrganization(user);
+    const name = this.requiredString(dto.name ?? dto.title ?? '', 'title');
+    const rawTasks = dto.checklist ?? dto.tasks ?? [];
+
+    return this.prisma.$transaction(async (db) => {
+      const resolvedDepartmentIds = new Set<string>(dto.departmentIds ?? []);
+      if (dto.department && dto.department.trim()) {
+        const deptName = dto.department.trim();
+        let dept = await db.department.findFirst({
+          where: {
+            organizationId,
+            OR: [
+              { id: deptName },
+              { name: { equals: deptName, mode: 'insensitive' } },
+            ],
+          },
+        });
+        if (!dept) {
+          dept = await db.department.create({
+            data: {
+              organizationId,
+              name: deptName,
+            },
+          });
+        }
+        resolvedDepartmentIds.add(dept.id);
+      }
+
+      const template = await db.onboardingTemplate.create({
+        data: {
+          organizationId,
+          name,
+          revision: 1,
+        },
+      });
+
+      for (const departmentId of resolvedDepartmentIds) {
+        await db.onboardingTemplateDepartment.deleteMany({
+          where: { organizationId, departmentId },
+        });
+        await db.onboardingTemplateDepartment.create({
+          data: {
+            organizationId,
+            templateId: template.id,
+            departmentId,
+          },
+        });
+      }
+
+      const createdTasks: Array<{
+        id: string;
+        label: string;
+        title: string;
+        stage: string;
+        required: boolean;
+      }> = [];
+      for (const [index, item] of rawTasks.entries()) {
+        const label = this.requiredString(
+          item.label ?? item.title ?? '',
+          'tasks.title',
+        );
+        const stage =
+          typeof item.stage === 'string' && item.stage.trim()
+            ? item.stage.trim()
+            : 'Day one';
+        const created = await db.onboardingChecklistItem.create({
+          data: {
+            organizationId,
+            templateId: template.id,
+            label,
+            stage,
+            position: index,
+          },
+        });
+        createdTasks.push({
+          id: created.id,
+          label: created.label,
+          title: created.label,
+          stage: created.stage,
+          required: item.required ?? true,
+        });
+      }
+
+      return {
+        message: 'Onboarding template saved successfully',
+        template: {
+          id: template.id,
+          name: template.name,
+          title: template.name,
+          department: dto.department ?? 'General',
+          departmentIds: Array.from(resolvedDepartmentIds),
+          checklist: createdTasks,
+          tasks: createdTasks,
+        },
+      };
+    });
+  }
+
+  async listChecklists(user: AuthenticatedUser) {
+    const organizationId = this.requireOrganization(user);
+    const [employees, assignments, completions, templates, items] =
+      await Promise.all([
+        this.prisma.employee.findMany({
+          where: { organizationId },
+          orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
+        }),
+        this.prisma.employeeOnboarding.findMany({ where: { organizationId } }),
+        this.prisma.onboardingItemCompletion.findMany({
+          where: { organizationId },
+          orderBy: [{ completedAt: 'asc' }, { itemId: 'asc' }],
+        }),
+        this.prisma.onboardingTemplate.findMany({ where: { organizationId } }),
+        this.prisma.onboardingChecklistItem.findMany({
+          where: { organizationId },
+          orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        }),
+      ]);
+
+    const templateById = new Map(templates.map((t) => [t.id, t]));
+    const assignmentByEmployee = new Map(
+      assignments.map((a) => [a.employeeId, a]),
+    );
+
+    const checklists = employees
+      .filter((e) => assignmentByEmployee.has(e.id))
+      .map((emp) => {
+        const assignment = assignmentByEmployee.get(emp.id)!;
+        const tpl = templateById.get(assignment.templateId);
+        const tplItems = items.filter(
+          (i) => i.templateId === assignment.templateId,
+        );
+        const empCompletions = completions.filter(
+          (c) => c.employeeId === emp.id,
+        );
+        const completedSet = new Map(
+          empCompletions.map((c) => [c.itemId, c.completedAt]),
+        );
+
+        return {
+          employeeId: emp.id,
+          employeeName: emp.fullName,
+          department: emp.department ?? 'General',
+          jobTitle: emp.jobTitle,
+          status: emp.status,
+          templateId: assignment.templateId,
+          templateName: tpl?.name ?? null,
+          completedItemIds: Array.from(completedSet.keys()),
+          checklist: tplItems.map((i) => ({
+            id: i.id,
+            label: i.label,
+            title: i.label,
+            stage: i.stage,
+            completed: completedSet.has(i.id),
+            completedAt: completedSet.get(i.id)?.toISOString() ?? null,
+          })),
+        };
+      });
+
+    return { checklists };
+  }
+
+  async getEmployeeChecklist(user: AuthenticatedUser, employeeId: string) {
+    const organizationId = this.requireOrganization(user);
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: employeeId, organizationId },
+    });
+    if (!employee) {
+      throw new NotFoundException('Employee was not found');
+    }
+
+    let assignment = await this.prisma.employeeOnboarding.findFirst({
+      where: { employeeId, organizationId },
+    });
+
+    if (!assignment && employee.departmentId) {
+      const deptDefault =
+        await this.prisma.onboardingTemplateDepartment.findFirst({
+          where: { organizationId, departmentId: employee.departmentId },
+        });
+      if (deptDefault) {
+        assignment = await this.prisma.employeeOnboarding.upsert({
+          where: { employeeId },
+          create: {
+            employeeId,
+            organizationId,
+            templateId: deptDefault.templateId,
+            assignedAt: new Date(),
+          },
+          update: {},
+        });
+      }
+    }
+
+    if (!assignment) {
+      return {
+        employeeId: employee.id,
+        employeeName: employee.fullName,
+        department: employee.department ?? 'General',
+        templateId: null,
+        completedItemIds: [],
+        checklist: [],
+      };
+    }
+
+    const [items, completions] = await Promise.all([
+      this.prisma.onboardingChecklistItem.findMany({
+        where: { organizationId, templateId: assignment.templateId },
+        orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      }),
+      this.prisma.onboardingItemCompletion.findMany({
+        where: { organizationId, employeeId },
+        orderBy: [{ completedAt: 'asc' }, { itemId: 'asc' }],
+      }),
+    ]);
+
+    const completedMap = new Map(
+      completions.map((c) => [c.itemId, c.completedAt]),
+    );
+
+    return {
+      employeeId: employee.id,
+      employeeName: employee.fullName,
+      department: employee.department ?? 'General',
+      templateId: assignment.templateId,
+      completedItemIds: Array.from(completedMap.keys()),
+      checklist: items.map((item) => ({
+        id: item.id,
+        label: item.label,
+        title: item.label,
+        stage: item.stage,
+        completed: completedMap.has(item.id),
+        completedAt: completedMap.get(item.id)?.toISOString() ?? null,
+      })),
+    };
+  }
+
+  async assignChecklist(
+    user: AuthenticatedUser,
+    employeeId: string,
+    templateId: string,
+  ) {
+    const organizationId = this.requireOrganization(user);
+    const [employee, template] = await Promise.all([
+      this.prisma.employee.findFirst({
+        where: { id: employeeId, organizationId },
+      }),
+      this.prisma.onboardingTemplate.findFirst({
+        where: { id: templateId, organizationId },
+      }),
+    ]);
+    if (!employee) {
+      throw new NotFoundException(
+        'Employee was not found in this organization',
+      );
+    }
+    if (!template) {
+      throw new NotFoundException(
+        'Onboarding template was not found in this organization',
+      );
+    }
+
+    await this.prisma.employeeOnboarding.upsert({
+      where: { employeeId },
+      create: {
+        employeeId,
+        organizationId,
+        templateId,
+        assignedAt: new Date(),
+      },
+      update: {
+        templateId,
+      },
+    });
+
+    return this.getEmployeeChecklist(user, employeeId);
+  }
+
+  async updateChecklistTask(
+    user: AuthenticatedUser,
+    employeeId: string,
+    taskId: string,
+    completed: boolean,
+  ) {
+    const organizationId = this.requireOrganization(user);
+    const [employee, assignment] = await Promise.all([
+      this.prisma.employee.findFirst({
+        where: { id: employeeId, organizationId },
+      }),
+      this.prisma.employeeOnboarding.findFirst({
+        where: { employeeId, organizationId },
+      }),
+    ]);
+    if (!employee || !assignment) {
+      throw new NotFoundException(
+        'Employee onboarding checklist was not found',
+      );
+    }
+
+    const item = await this.prisma.onboardingChecklistItem.findFirst({
+      where: {
+        id: taskId,
+        organizationId,
+        templateId: assignment.templateId,
+      },
+    });
+    if (!item) {
+      throw new NotFoundException(
+        "Checklist task is not part of this employee's onboarding template",
+      );
+    }
+
+    const completedAt = new Date();
+    if (completed) {
+      await this.prisma.onboardingItemCompletion.upsert({
+        where: { employeeId_itemId: { employeeId, itemId: taskId } },
+        create: {
+          organizationId,
+          employeeId,
+          itemId: taskId,
+          completedByUserId: user.id,
+          completedAt,
+        },
+        update: {},
+      });
+    } else {
+      await this.prisma.onboardingItemCompletion.deleteMany({
+        where: { organizationId, employeeId, itemId: taskId },
+      });
+    }
+
+    return {
+      message: completed ? 'Task marked completed' : 'Task marked incomplete',
+      employeeId,
+      task: {
+        id: item.id,
+        label: item.label,
+        title: item.label,
+        stage: item.stage,
+        completed,
+        completedAt: completed ? completedAt.toISOString() : null,
+      },
+    };
   }
 
   private normalizeLogo(input: CompanyInfoInput): string | undefined {

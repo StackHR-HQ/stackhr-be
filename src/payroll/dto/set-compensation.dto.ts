@@ -49,4 +49,8 @@ export class SetCompensationDto {
   @IsOptional()
   @IsString({ message: 'paymentFrequency must be a string' })
   paymentFrequency?: string;
+
+  @IsOptional()
+  @IsString({ message: 'reason must be a string' })
+  reason?: string;
 }

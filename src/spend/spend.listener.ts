@@ -17,8 +17,10 @@ export class SpendListener {
   async handleApprovalDecided(event: ApprovalDecidedEvent): Promise<void> {
     if (
       event.type !== 'EXPENSE' &&
+      event.type !== 'REIMBURSEMENT' &&
       event.type !== 'SALARY_ADVANCE' &&
       event.subjectTable !== 'expense' &&
+      event.subjectTable !== 'reimbursement' &&
       event.subjectTable !== 'salary_advance'
     ) {
       return;
@@ -32,11 +34,16 @@ export class SpendListener {
       return;
     }
 
-    if (event.type === 'EXPENSE' || event.subjectTable === 'expense') {
+    if (
+      event.subjectTable === 'reimbursement' ||
+      event.type === 'REIMBURSEMENT'
+    ) {
+      await this.handleReimbursementApproval(event, subjectId);
+    } else if (event.subjectTable === 'expense' || event.type === 'EXPENSE') {
       await this.handleExpenseApproval(event, subjectId);
     } else if (
-      event.type === 'SALARY_ADVANCE' ||
-      event.subjectTable === 'salary_advance'
+      event.subjectTable === 'salary_advance' ||
+      event.type === 'SALARY_ADVANCE'
     ) {
       await this.handleSalaryAdvanceApproval(event, subjectId);
     }
@@ -76,7 +83,8 @@ export class SpendListener {
             expenseId: expense.id,
             amount: expense.amount,
             currency: expense.currency,
-            status: 'PENDING',
+            description: expense.description,
+            status: 'APPROVED',
           },
         }),
         this.prisma.auditEvent.create({
@@ -94,7 +102,7 @@ export class SpendListener {
       ]);
 
       this.logger.log(
-        `Expense claim ${expenseId} approved. Generated pending reimbursement.`,
+        `Expense claim ${expenseId} approved. Generated approved reimbursement ready for payout.`,
       );
     } else if (event.status === 'REJECTED') {
       await this.prisma.$transaction([
@@ -117,6 +125,77 @@ export class SpendListener {
       ]);
 
       this.logger.log(`Expense claim ${expenseId} marked as rejected.`);
+    }
+  }
+
+  private async handleReimbursementApproval(
+    event: ApprovalDecidedEvent,
+    reimbursementId: string,
+  ): Promise<void> {
+    const reimbursement = await this.prisma.reimbursement.findUnique({
+      where: { id: reimbursementId },
+    });
+
+    if (!reimbursement) {
+      this.logger.warn(`Reimbursement claim ${reimbursementId} not found`);
+      return;
+    }
+
+    if (
+      reimbursement.status === 'APPROVED' ||
+      reimbursement.status === 'REJECTED' ||
+      reimbursement.status === 'PAID'
+    ) {
+      this.logger.warn(
+        `Reimbursement claim ${reimbursementId} already has status "${reimbursement.status}". Skipping duplicate processing.`,
+      );
+      return;
+    }
+
+    if (event.status === 'APPROVED') {
+      await this.prisma.$transaction([
+        this.prisma.reimbursement.update({
+          where: { id: reimbursementId },
+          data: { status: 'APPROVED' },
+        }),
+        this.prisma.auditEvent.create({
+          data: {
+            organizationId: event.organizationId,
+            actorUserId: event.approverId,
+            action: 'REIMBURSEMENT_APPROVED',
+            targetType: 'reimbursement',
+            targetId: reimbursementId,
+            employeeId: reimbursement.employeeId,
+            description: `Reimbursement claim for ${reimbursement.currency} ${reimbursement.amount} was approved`,
+            createdAt: new Date(),
+          },
+        }),
+      ]);
+
+      this.logger.log(`Reimbursement claim ${reimbursementId} approved.`);
+    } else if (event.status === 'REJECTED') {
+      await this.prisma.$transaction([
+        this.prisma.reimbursement.update({
+          where: { id: reimbursementId },
+          data: { status: 'REJECTED' },
+        }),
+        this.prisma.auditEvent.create({
+          data: {
+            organizationId: event.organizationId,
+            actorUserId: event.approverId,
+            action: 'REIMBURSEMENT_REJECTED',
+            targetType: 'reimbursement',
+            targetId: reimbursementId,
+            employeeId: reimbursement.employeeId,
+            description: `Reimbursement claim for ${reimbursement.currency} ${reimbursement.amount} was rejected`,
+            createdAt: new Date(),
+          },
+        }),
+      ]);
+
+      this.logger.log(
+        `Reimbursement claim ${reimbursementId} marked as rejected.`,
+      );
     }
   }
 

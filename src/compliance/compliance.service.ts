@@ -318,9 +318,12 @@ export class ComplianceService {
           effectiveFrom: ruleSetData.effectiveFrom
             ? new Date(ruleSetData.effectiveFrom)
             : undefined,
-          effectiveTo: ruleSetData.effectiveTo
-            ? new Date(ruleSetData.effectiveTo)
-            : undefined,
+          effectiveTo:
+            ruleSetData.effectiveTo === null
+              ? null
+              : ruleSetData.effectiveTo
+                ? new Date(ruleSetData.effectiveTo)
+                : undefined,
         },
         include: {
           taxRules: {

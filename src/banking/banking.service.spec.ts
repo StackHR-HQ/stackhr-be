@@ -306,6 +306,7 @@ describe('BankingService', () => {
 
       expect(anchorClientMock.getAccountBalance).toHaveBeenCalledWith(
         'anchor-acc-1',
+        undefined,
       );
       expect(prismaMock.organizationDepositAccount.update).toHaveBeenCalledWith(
         {
@@ -839,6 +840,98 @@ describe('BankingService', () => {
         }),
       );
       expect(result.autoCreatedExpenseId).toBe('exp-auto-1');
+    });
+
+    it('should resolve Employee.id from User.email when EMPLOYEE lists cards or freezes own card', async () => {
+      prismaMock.employee.findFirst.mockResolvedValue({
+        id: 'emp-1',
+      });
+      prismaMock.corporateCard.findMany.mockResolvedValue([
+        { id: 'card-1', employeeId: 'emp-1' },
+      ]);
+
+      const cardsResult = await service.getCorporateCards(
+        'org-1',
+        'user-1',
+        'jane@acme.com',
+      );
+      expect(prismaMock.corporateCard.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: 'org-1', employeeId: 'emp-1' },
+        }),
+      );
+      expect(cardsResult.cards).toHaveLength(1);
+
+      prismaMock.corporateCard.findFirst.mockResolvedValue({
+        id: 'card-1',
+        employeeId: 'emp-1',
+        anchorCardId: 'crd_anchor_1',
+        status: 'ACTIVE',
+      });
+      prismaMock.corporateCard.update.mockResolvedValue({
+        id: 'card-1',
+        status: 'FROZEN',
+      });
+
+      const empUser = {
+        id: 'user-1',
+        email: 'jane@acme.com',
+        name: 'Jane Doe',
+        role: 'EMPLOYEE' as const,
+        userType: 'BUSINESS' as const,
+        organizationId: 'org-1',
+      };
+
+      const freezeRes = await service.toggleCardFreeze(
+        'org-1',
+        'card-1',
+        { action: 'FREEZE' },
+        empUser,
+      );
+      expect(freezeRes.card.status).toBe('FROZEN');
+
+      await expect(
+        service.toggleCardFreeze(
+          'org-1',
+          'card-1',
+          { action: 'UNFREEZE' },
+          empUser,
+        ),
+      ).rejects.toThrow('Only organization administrators can unfreeze');
+    });
+
+    it('should return card transactions and spending summary via getCardTransactions', async () => {
+      prismaMock.corporateCard.findFirst.mockResolvedValue({
+        id: 'card-1',
+        organizationId: 'org-1',
+        employeeId: 'emp-1',
+        maskedPan: '5399 **** **** 1234',
+        brand: 'MASTERCARD',
+        status: 'ACTIVE',
+        currency: 'NGN',
+        spendingLimitKobo: 50000000,
+        spendingInterval: 'MONTHLY',
+      });
+      prismaMock.expense.findMany = jest.fn().mockResolvedValue([
+        {
+          id: 'exp-1',
+          cardId: 'card-1',
+          employeeId: 'emp-1',
+          amount: 25000,
+          currency: 'NGN',
+          category: 'Corporate Card',
+          description: 'Corporate Card transaction at Uber Nigeria',
+          status: 'PENDING',
+          receiptUrl: null,
+          createdAt: new Date('2026-10-01T10:00:00.000Z'),
+        },
+      ]);
+
+      const txRes = await service.getCardTransactions('org-1', 'card-1');
+      expect(txRes.totalSpentKobo).toBe(2500000);
+      expect(txRes.remainingLimitKobo).toBe(47500000);
+      expect(txRes.transactions).toHaveLength(1);
+      expect(txRes.transactions[0].amountKobo).toBe(2500000);
     });
   });
 });

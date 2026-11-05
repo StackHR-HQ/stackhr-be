@@ -6,6 +6,7 @@ import {
   IsBoolean,
   IsNumber,
   IsArray,
+  ValidateIf,
   ValidateNested,
   Min,
 } from 'class-validator';
@@ -24,9 +25,10 @@ export class TaxRuleBandDto {
   @Min(0)
   lowerLimit: number;
 
-  @IsNumber()
   @IsOptional()
-  upperLimit?: number;
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsNumber()
+  upperLimit?: number | null;
 
   @IsNumber()
   @Min(0)
@@ -45,9 +47,10 @@ export class CreateTaxRuleSetDto {
   @IsDateString()
   effectiveFrom: string;
 
-  @IsDateString()
   @IsOptional()
-  effectiveTo?: string;
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsDateString()
+  effectiveTo?: string | null;
 
   @IsBoolean()
   @IsOptional()

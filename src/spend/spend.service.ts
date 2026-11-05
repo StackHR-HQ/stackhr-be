@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -16,6 +17,14 @@ import { CreateReimbursementDto } from './dto/create-reimbursement.dto';
 import { USER_ROLES } from '../auth/auth.constants';
 import { BankingService } from '../banking/banking.service';
 import { AnchorSingleTransferResult } from '../banking/anchor/anchor.types';
+import {
+  DOCUMENT_STORAGE,
+  type DocumentStorage,
+} from '../people/documents/document-storage';
+import {
+  validateDocumentFile,
+  type UploadedDocumentFile,
+} from '../people/documents/document-file-validation';
 
 function resolveExpenseDate(expense: any, explicitDate?: string): string {
   if (explicitDate) return explicitDate;
@@ -40,6 +49,9 @@ export class SpendService {
     private readonly prisma: PrismaService,
     private readonly approvalsService: ApprovalsService,
     @Optional() private readonly bankingService?: BankingService,
+    @Optional()
+    @Inject(DOCUMENT_STORAGE)
+    private readonly documentStorage?: DocumentStorage,
   ) {}
 
   private checkOrgContext(user: AuthenticatedUser): string {
@@ -104,6 +116,7 @@ export class SpendService {
     user: AuthenticatedUser,
     expenseId: string,
     dto: AttachReceiptDto,
+    file?: UploadedDocumentFile,
   ) {
     const orgId = this.checkOrgContext(user);
     const expense = await this.prisma.expense.findFirst({
@@ -119,13 +132,55 @@ export class SpendService {
       );
     }
 
+    let resolvedReceiptUrl = dto?.receiptUrl?.trim();
+
+    if (file) {
+      validateDocumentFile(file);
+      const storageKey = `organizations/${orgId}/expenses/${expenseId}/receipts/${randomUUID()}`;
+      if (this.documentStorage && process.env.S3_BUCKET) {
+        await this.documentStorage.put({
+          key: storageKey,
+          body: file.buffer,
+          contentType: file.mimetype,
+        });
+      }
+      if (this.prisma.document) {
+        const doc = await this.prisma.document.create({
+          data: {
+            organizationId: orgId,
+            scope: 'EMPLOYEE',
+            employeeId: expense.employeeId,
+            name: `Expense Receipt - ${file.originalname}`,
+            category: 'Compensation',
+            visibility: 'Employee and HR',
+            storageKey,
+            fileName: file.originalname,
+            mimeType: file.mimetype,
+            sizeBytes: file.buffer.length,
+            uploadedByUserId: user.id,
+            createdAt: new Date(),
+          },
+        });
+        resolvedReceiptUrl = `/v1/api/people/documents/${doc.id}/download`;
+      } else {
+        resolvedReceiptUrl = `https://storage.stackhr.app/${storageKey}/${encodeURIComponent(file.originalname)}`;
+      }
+    }
+
+    if (!resolvedReceiptUrl) {
+      throw new BadRequestException(
+        'Either a receipt file (multipart field "file") or a valid receiptUrl is required',
+      );
+    }
+
     const updatedExpense = await this.prisma.expense.update({
       where: { id: expenseId },
-      data: { receiptUrl: dto.receiptUrl },
+      data: { receiptUrl: resolvedReceiptUrl },
     });
 
     return {
-      message: 'Receipt URL attached to expense claim successfully',
+      message: 'Receipt attached to expense claim successfully',
+      receiptUrl: resolvedReceiptUrl,
       expense: updatedExpense,
     };
   }
@@ -430,14 +485,15 @@ export class SpendService {
   }
 
   async getReimbursements(user: AuthenticatedUser) {
-    this.checkOrgContext(user);
-    const employee = await this.prisma.employee.findFirst({
-      where: { email: user.email },
-    });
-
-    const where: Record<string, string> = {};
-    if (employee) {
-      where.employeeId = employee.id;
+    const orgId = this.checkOrgContext(user);
+    const where: Record<string, string> = { organizationId: orgId };
+    if (user.role === USER_ROLES.EMPLOYEE) {
+      const employee = await this.prisma.employee.findFirst({
+        where: { email: user.email, organizationId: orgId },
+      });
+      if (employee) {
+        where.employeeId = employee.id;
+      }
     }
 
     const reimbursements = await this.prisma.reimbursement.findMany({
@@ -451,7 +507,12 @@ export class SpendService {
       },
     });
 
-    return { reimbursements };
+    const formatted = reimbursements.map((r) => ({
+      ...r,
+      description: r.description ?? r.expense?.description ?? null,
+    }));
+
+    return { reimbursements: formatted };
   }
 
   async createReimbursement(
@@ -469,12 +530,13 @@ export class SpendService {
         expenseId: dto.expenseId ?? null,
         amount: dto.amount,
         currency: dto.currency ?? 'NGN',
+        description: dto.description,
         status: 'PENDING',
       },
     });
 
     const approvalResult = await this.approvalsService.submitRequest(user, {
-      type: 'EXPENSE',
+      type: 'REIMBURSEMENT',
       subjectTable: 'reimbursement',
       subjectId: reimbursement.id,
       amountSnapshot: dto.amount,
@@ -482,7 +544,10 @@ export class SpendService {
 
     return {
       message: 'Reimbursement claim submitted and routed for approval',
-      reimbursement,
+      reimbursement: {
+        ...reimbursement,
+        description: reimbursement.description ?? dto.description,
+      },
       approvalRequest: approvalResult.approvalRequest,
     };
   }
@@ -506,7 +571,15 @@ export class SpendService {
       );
     }
 
-    return { reimbursement };
+    return {
+      reimbursement: {
+        ...reimbursement,
+        description:
+          reimbursement.description ??
+          reimbursement.expense?.description ??
+          null,
+      },
+    };
   }
 
   async cancelReimbursement(user: AuthenticatedUser, id: string) {
@@ -572,15 +645,15 @@ export class SpendService {
       summary: {
         pending: {
           count: totalPending._count.id,
-          amountMinor: totalPending._sum.amount ?? 0,
+          amountMinor: (totalPending._sum.amount ?? 0) * 100,
         },
         approved: {
           count: totalApproved._count.id,
-          amountMinor: totalApproved._sum.amount ?? 0,
+          amountMinor: (totalApproved._sum.amount ?? 0) * 100,
         },
         paid: {
           count: totalPaid._count.id,
-          amountMinor: totalPaid._sum.amount ?? 0,
+          amountMinor: (totalPaid._sum.amount ?? 0) * 100,
         },
       },
     };

@@ -314,6 +314,18 @@ export class MeService {
     };
   }
 
+  async getCorporateCards(user: AuthenticatedUser) {
+    const employee = await this.getEmployeeForUser(user);
+    const cards = await this.prisma.corporateCard.findMany({
+      where: {
+        employeeId: employee.id,
+        organizationId: employee.organizationId,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return { cards };
+  }
+
   async updateProfile(user: AuthenticatedUser, dto: UpdateMeProfileDto) {
     const employee = await this.getEmployeeForUser(user);
 
@@ -461,5 +473,173 @@ export class MeService {
       orderBy: { createdAt: 'desc' },
     });
     return { activity };
+  }
+
+  async getOnboarding(user: AuthenticatedUser) {
+    const employee = await this.getEmployeeForUser(user);
+    const organizationId = employee.organizationId;
+
+    let assignment = await this.prisma.employeeOnboarding.findFirst({
+      where: { employeeId: employee.id, organizationId },
+    });
+
+    if (!assignment && employee.departmentId) {
+      const deptDefault =
+        await this.prisma.onboardingTemplateDepartment.findFirst({
+          where: { organizationId, departmentId: employee.departmentId },
+        });
+      if (deptDefault) {
+        assignment = await this.prisma.employeeOnboarding.upsert({
+          where: { employeeId: employee.id },
+          create: {
+            employeeId: employee.id,
+            organizationId,
+            templateId: deptDefault.templateId,
+            assignedAt: new Date(),
+          },
+          update: {},
+        });
+      }
+    }
+
+    if (!assignment) {
+      return {
+        onboarding: {
+          employeeId: employee.id,
+          employeeName: employee.fullName,
+          status: employee.status,
+          templateId: null,
+          templateName: null,
+          completedItemIds: [],
+          totalItems: 0,
+          completedCount: 0,
+          progressPercent: 0,
+          items: [],
+          checklist: [],
+        },
+      };
+    }
+
+    const [template, items, completions] = await Promise.all([
+      this.prisma.onboardingTemplate.findFirst({
+        where: { id: assignment.templateId, organizationId },
+      }),
+      this.prisma.onboardingChecklistItem.findMany({
+        where: { organizationId, templateId: assignment.templateId },
+        orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      }),
+      this.prisma.onboardingItemCompletion.findMany({
+        where: { organizationId, employeeId: employee.id },
+        orderBy: [{ completedAt: 'asc' }, { itemId: 'asc' }],
+      }),
+    ]);
+
+    const completedMap = new Map(
+      completions.map((c) => [c.itemId, c.completedAt]),
+    );
+    const mappedItems = items.map((item) => ({
+      id: item.id,
+      label: item.label,
+      title: item.label,
+      stage: item.stage,
+      position: item.position,
+      completed: completedMap.has(item.id),
+      completedAt: completedMap.get(item.id)?.toISOString() ?? null,
+    }));
+
+    const totalItems = mappedItems.length;
+    const completedCount = mappedItems.filter((i) => i.completed).length;
+    const progressPercent =
+      totalItems > 0 ? Math.round((completedCount / totalItems) * 100) : 0;
+
+    return {
+      onboarding: {
+        employeeId: employee.id,
+        employeeName: employee.fullName,
+        status: employee.status,
+        templateId: assignment.templateId,
+        templateName: template?.name ?? null,
+        completedItemIds: Array.from(completedMap.keys()),
+        totalItems,
+        completedCount,
+        progressPercent,
+        items: mappedItems,
+        checklist: mappedItems,
+      },
+    };
+  }
+
+  async updateOnboardingItem(
+    user: AuthenticatedUser,
+    itemId: string,
+    completed: boolean,
+  ) {
+    const employee = await this.getEmployeeForUser(user);
+    const organizationId = employee.organizationId;
+
+    const assignment = await this.prisma.employeeOnboarding.findFirst({
+      where: { employeeId: employee.id, organizationId },
+    });
+    if (!assignment) {
+      throw new NotFoundException(
+        'No onboarding checklist is assigned to your profile',
+      );
+    }
+
+    const item = await this.prisma.onboardingChecklistItem.findFirst({
+      where: {
+        id: itemId,
+        organizationId,
+        templateId: assignment.templateId,
+      },
+    });
+    if (!item) {
+      throw new NotFoundException(
+        'Checklist item was not found on your onboarding template',
+      );
+    }
+
+    const key = { employeeId_itemId: { employeeId: employee.id, itemId } };
+    const existing = await this.prisma.onboardingItemCompletion.findUnique({
+      where: key,
+    });
+
+    if (completed && !existing) {
+      await this.prisma.onboardingItemCompletion.upsert({
+        where: key,
+        create: {
+          organizationId,
+          employeeId: employee.id,
+          itemId,
+          completedByUserId: user.id,
+          completedAt: new Date(),
+        },
+        update: {},
+      });
+    } else if (!completed && existing) {
+      await this.prisma.onboardingItemCompletion.deleteMany({
+        where: { organizationId, employeeId: employee.id, itemId },
+      });
+    }
+
+    if (completed !== Boolean(existing)) {
+      await this.prisma.auditEvent.create({
+        data: {
+          organizationId,
+          actorUserId: user.id,
+          action: completed
+            ? 'onboarding_item.completed'
+            : 'onboarding_item.reopened',
+          targetType: 'onboarding_checklist_item',
+          targetId: item.id,
+          employeeId: employee.id,
+          description: `Onboarding task "${item.label}" ${completed ? 'completed' : 'marked incomplete'}`,
+          changes: { completed: { from: !completed, to: completed } },
+          createdAt: new Date(),
+        },
+      });
+    }
+
+    return this.getOnboarding(user);
   }
 }

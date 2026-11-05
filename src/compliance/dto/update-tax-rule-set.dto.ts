@@ -5,6 +5,7 @@ import {
   IsBoolean,
   IsNumber,
   IsArray,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -23,9 +24,10 @@ export class UpdateTaxRuleSetDto {
   @IsOptional()
   effectiveFrom?: string;
 
-  @IsDateString()
   @IsOptional()
-  effectiveTo?: string;
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsDateString()
+  effectiveTo?: string | null;
 
   @IsBoolean()
   @IsOptional()

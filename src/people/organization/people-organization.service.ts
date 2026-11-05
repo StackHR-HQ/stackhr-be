@@ -11,6 +11,7 @@ import {
   type TenantClient,
 } from '../tenant/tenant-prisma.service';
 import type { DepartmentDto } from './dto/department.dto';
+import type { CreateTeamDto, UpdateTeamDto } from './dto/team.dto';
 
 // Mirrors the database's normalized unique index so callers get a 409, not a 500.
 const normalizeDepartmentName = (name: string) =>
@@ -279,5 +280,292 @@ export class PeopleOrganizationService {
           .map((member) => member.employeeId),
       }));
     });
+  }
+
+  createTeam(user: AuthenticatedUser, input: CreateTeamDto) {
+    const organizationId = requirePeopleOrganization(user);
+    return this.tenant.run(organizationId, async (client) => {
+      const existingTeams = await client.team.findMany({
+        where: { organizationId },
+        select: { id: true, name: true },
+      });
+      if (
+        existingTeams.some(
+          (team) =>
+            normalizeDepartmentName(team.name) ===
+            normalizeDepartmentName(input.name),
+        )
+      ) {
+        throw new ConflictException({
+          code: 'CONFLICT',
+          message: 'A team with this name already exists',
+        });
+      }
+
+      const leadEmployeeId =
+        input.leadEmployeeId !== undefined
+          ? input.leadEmployeeId || null
+          : input.headEmployeeId !== undefined
+            ? input.headEmployeeId || null
+            : null;
+      const memberIds = Array.from(new Set(input.memberIds ?? []));
+
+      await this.assertValidTeamReferences(
+        client,
+        organizationId,
+        memberIds,
+        leadEmployeeId,
+        input.departmentId ?? null,
+      );
+
+      const team = await client.team.create({
+        data: {
+          organizationId,
+          name: input.name,
+          description: input.description ?? '',
+          departmentId: input.departmentId ?? null,
+          leadEmployeeId,
+          headEmployeeId: leadEmployeeId,
+        },
+      });
+
+      for (const employeeId of memberIds) {
+        await client.teamMember.create({
+          data: {
+            organizationId,
+            teamId: team.id,
+            employeeId,
+          },
+        });
+      }
+
+      await client.auditEvent.create({
+        data: {
+          organizationId,
+          actorUserId: user.id,
+          action: 'team.created',
+          targetType: 'team',
+          targetId: team.id,
+          employeeId: null,
+          description: `Team ${team.name} created`,
+          changes: {
+            changedFields: [
+              'name',
+              'description',
+              'leadEmployeeId',
+              'memberIds',
+            ],
+          },
+          createdAt: new Date(),
+        },
+      });
+
+      return {
+        id: team.id,
+        name: team.name,
+        description: team.description,
+        leadEmployeeId: team.leadEmployeeId ?? '',
+        memberIds: [...memberIds].sort(),
+      };
+    });
+  }
+
+  updateTeam(user: AuthenticatedUser, teamId: string, input: UpdateTeamDto) {
+    const organizationId = requirePeopleOrganization(user);
+    return this.tenant.run(organizationId, async (client) => {
+      const existing = await client.team.findFirst({
+        where: { id: teamId, organizationId },
+      });
+      if (!existing) {
+        throw new NotFoundException('Team was not found');
+      }
+
+      const nextName = input.name ?? existing.name;
+      const existingTeams = await client.team.findMany({
+        where: { organizationId },
+        select: { id: true, name: true },
+      });
+      if (
+        existingTeams.some(
+          (team) =>
+            team.id !== teamId &&
+            normalizeDepartmentName(team.name) ===
+              normalizeDepartmentName(nextName),
+        )
+      ) {
+        throw new ConflictException({
+          code: 'CONFLICT',
+          message: 'A team with this name already exists',
+        });
+      }
+
+      const currentMembers = await client.teamMember.findMany({
+        where: { organizationId, teamId },
+        orderBy: [{ employeeId: 'asc' }],
+      });
+      const currentMemberIds = currentMembers.map(
+        (member) => member.employeeId,
+      );
+      const nextMemberIds =
+        input.memberIds !== undefined
+          ? Array.from(new Set(input.memberIds))
+          : currentMemberIds;
+
+      const nextLeadEmployeeId =
+        input.leadEmployeeId !== undefined
+          ? input.leadEmployeeId || null
+          : input.headEmployeeId !== undefined
+            ? input.headEmployeeId || null
+            : existing.leadEmployeeId;
+
+      const nextDepartmentId =
+        input.departmentId !== undefined
+          ? input.departmentId || null
+          : existing.departmentId;
+
+      await this.assertValidTeamReferences(
+        client,
+        organizationId,
+        nextMemberIds,
+        nextLeadEmployeeId,
+        nextDepartmentId,
+      );
+
+      const updated = await client.team.update({
+        where: { id: teamId },
+        data: {
+          name: nextName,
+          description: input.description ?? existing.description,
+          departmentId: nextDepartmentId,
+          leadEmployeeId: nextLeadEmployeeId,
+          headEmployeeId: nextLeadEmployeeId,
+        },
+      });
+
+      if (input.memberIds !== undefined) {
+        await client.teamMember.deleteMany({
+          where: { organizationId, teamId },
+        });
+        for (const employeeId of nextMemberIds) {
+          await client.teamMember.create({
+            data: {
+              organizationId,
+              teamId,
+              employeeId,
+            },
+          });
+        }
+      }
+
+      await client.auditEvent.create({
+        data: {
+          organizationId,
+          actorUserId: user.id,
+          action: 'team.updated',
+          targetType: 'team',
+          targetId: updated.id,
+          employeeId: null,
+          description: `Team ${updated.name} updated`,
+          changes: {
+            changedFields: [
+              'name',
+              'description',
+              'leadEmployeeId',
+              'memberIds',
+            ],
+          },
+          createdAt: new Date(),
+        },
+      });
+
+      return {
+        id: updated.id,
+        name: updated.name,
+        description: updated.description,
+        leadEmployeeId: updated.leadEmployeeId ?? '',
+        memberIds: [...nextMemberIds].sort(),
+      };
+    });
+  }
+
+  deleteTeam(user: AuthenticatedUser, teamId: string) {
+    const organizationId = requirePeopleOrganization(user);
+    return this.tenant.run(organizationId, async (client) => {
+      const existing = await client.team.findFirst({
+        where: { id: teamId, organizationId },
+      });
+      if (!existing) {
+        throw new NotFoundException('Team was not found');
+      }
+
+      await client.teamMember.deleteMany({
+        where: { organizationId, teamId },
+      });
+      await client.team.delete({
+        where: { id: teamId },
+      });
+
+      await client.auditEvent.create({
+        data: {
+          organizationId,
+          actorUserId: user.id,
+          action: 'team.deleted',
+          targetType: 'team',
+          targetId: existing.id,
+          employeeId: null,
+          description: `Team ${existing.name} deleted`,
+          changes: { changedFields: [] },
+          createdAt: new Date(),
+        },
+      });
+    });
+  }
+
+  private async assertValidTeamReferences(
+    client: TenantClient,
+    organizationId: string,
+    memberIds: string[],
+    leadEmployeeId: string | null,
+    departmentId: string | null,
+  ): Promise<void> {
+    if (memberIds.length > 0) {
+      const members = await client.employee.findMany({
+        where: { organizationId, id: { in: memberIds } },
+        select: { id: true },
+      });
+      if (members.length !== memberIds.length) {
+        throw new UnprocessableEntityException({
+          code: 'VALIDATION_ERROR',
+          message: 'Every member must be an employee of this organization',
+          fields: { memberIds: 'Unknown employee' },
+        });
+      }
+    }
+    if (leadEmployeeId) {
+      const lead = await client.employee.findFirst({
+        where: { organizationId, id: leadEmployeeId },
+        select: { id: true },
+      });
+      if (!lead) {
+        throw new UnprocessableEntityException({
+          code: 'VALIDATION_ERROR',
+          message: 'The team lead must be an employee of this organization',
+          fields: { leadEmployeeId: 'Unknown employee' },
+        });
+      }
+    }
+    if (departmentId) {
+      const dept = await client.department.findFirst({
+        where: { organizationId, id: departmentId },
+        select: { id: true },
+      });
+      if (!dept) {
+        throw new UnprocessableEntityException({
+          code: 'VALIDATION_ERROR',
+          message: 'Department was not found in this organization',
+          fields: { departmentId: 'Unknown department' },
+        });
+      }
+    }
   }
 }

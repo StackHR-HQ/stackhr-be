@@ -615,6 +615,8 @@ model Expense {
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   employeeId     String
   employee       Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  cardId         String?
+  card           CorporateCard?  @relation(fields: [cardId], references: [id], onDelete: SetNull)
   category       String
   amount         Int
   currency       String          @default("NGN")
@@ -627,6 +629,7 @@ model Expense {
 
   @@index([organizationId, status])
   @@index([employeeId])
+  @@index([cardId])
   @@map("expense")
 }
 
@@ -640,6 +643,7 @@ model Reimbursement {
   expense        Expense?     @relation(fields: [expenseId], references: [id], onDelete: SetNull)
   amount         Int
   currency       String       @default("NGN")
+  description    String?
   status         String       @default("PENDING")
   paidAt         DateTime?
   createdAt      DateTime     @default(now())
@@ -693,24 +697,26 @@ model CompensationRecord {
 }
 
 model PayrollRun {
-  id             String        @id
-  organizationId String
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  periodMonth    Int
-  periodYear     Int
-  title          String
-  status         String        @default("DRAFT")
-  totalGross     Int           @default(0)
-  totalTax       Int           @default(0)
-  totalPension   Int           @default(0)
-  totalNet       Int           @default(0)
-  approvedAt     DateTime?
-  executedAt     DateTime?
-  reconciledAt   DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  items          PayrollItem[]
-  payslips       Payslip[]
+  id                     String        @id
+  organizationId         String
+  organization           Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  periodMonth            Int
+  periodYear             Int
+  title                  String
+  status                 String        @default("DRAFT")
+  totalGross             Int           @default(0)
+  totalTax               Int           @default(0)
+  totalPension           Int           @default(0)
+  totalNet               Int           @default(0)
+  approvedAt             DateTime?
+  executedAt             DateTime?
+  reconciledAt           DateTime?
+  bulkTransferJson       Json?
+  paymentExportBatchJson Json?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+  items                  PayrollItem[]
+  payslips               Payslip[]
   pensionRemittanceSchedule PensionRemittanceSchedule?
 
   @@unique([organizationId, periodYear, periodMonth])
@@ -964,6 +970,7 @@ model CorporateCard {
   status            String       @default("ACTIVE")
   spendingLimitKobo Int          @default(0)
   spendingInterval  String       @default("MONTHLY")
+  expenses          Expense[]
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 

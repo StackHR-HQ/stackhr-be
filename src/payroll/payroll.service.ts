@@ -85,9 +85,60 @@ export class PayrollService {
       },
     });
 
+    const newMonthlyGross =
+      dto.basicSalary +
+      (dto.housingAllowance ?? 0) +
+      (dto.transportAllowance ?? 0) +
+      (dto.otherAllowances ?? 0);
+    const newAnnualSalaryMinor = BigInt(newMonthlyGross) * 1200n;
+    const previousAnnualSalaryMinor = currentActive
+      ? BigInt(
+          (currentActive.basicSalary ?? 0) +
+            (currentActive.housingAllowance ?? 0) +
+            (currentActive.transportAllowance ?? 0) +
+            (currentActive.otherAllowances ?? 0),
+        ) * 1200n
+      : BigInt(employee.annualSalaryMinor ?? 0);
+
+    if (this.prisma.employee?.update) {
+      await this.prisma.employee
+        .update({
+          where: { id: dto.employeeId },
+          data: {
+            annualSalaryMinor: newAnnualSalaryMinor,
+            salaryAmount: newMonthlyGross,
+            currency: dto.currency ?? employee.currency ?? 'NGN',
+            payFrequency:
+              dto.paymentFrequency ?? employee.payFrequency ?? 'MONTHLY',
+          },
+        })
+        .catch(() => undefined);
+    }
+
+    let historyEntry: any = null;
+    if (this.prisma.compensationHistory?.create) {
+      historyEntry = await this.prisma.compensationHistory
+        .create({
+          data: {
+            organizationId: orgId,
+            employeeId: dto.employeeId,
+            effectiveDate: effectiveFromDate,
+            annualSalaryMinor: newAnnualSalaryMinor,
+            previousSalary: previousAnnualSalaryMinor,
+            newSalary: newAnnualSalaryMinor,
+            currency: dto.currency ?? 'NGN',
+            payFrequency: dto.paymentFrequency ?? 'MONTHLY',
+            reason: dto.reason ?? null,
+            changedByUserId: user.id,
+          },
+        })
+        .catch(() => null);
+    }
+
     return {
       message: 'Compensation record set successfully',
       compensationRecord: newRecord,
+      ...(historyEntry ? { compensationHistory: historyEntry } : {}),
     };
   }
 
@@ -576,14 +627,6 @@ export class PayrollService {
     }
 
     const executedAt = new Date();
-    const updatedRun = await this.prisma.payrollRun.update({
-      where: { id: runId },
-      data: {
-        status: 'EXECUTED',
-        executedAt,
-      },
-    });
-
     // Generate bank transfer payout file export payload (ADR-004)
     const paymentExportBatch = {
       runId: run.id,
@@ -597,6 +640,16 @@ export class PayrollService {
         currency: 'NGN',
       })),
     };
+
+    const updatedRun = await this.prisma.payrollRun.update({
+      where: { id: runId },
+      data: {
+        status: 'EXECUTED',
+        executedAt,
+        bulkTransferJson: bulkTransfer ?? null,
+        paymentExportBatchJson: paymentExportBatch as any,
+      },
+    });
 
     if (this.prisma.auditEvent) {
       await this.prisma.auditEvent
@@ -872,6 +925,8 @@ export class PayrollService {
 
     const payDay = org?.payDate ?? 25;
     const formatted = this.formatPayrollRun(run, payDay);
+    const bulkTransfer = (run as any).bulkTransferJson ?? null;
+    const paymentExportBatch = (run as any).paymentExportBatchJson ?? null;
 
     return {
       payrollRun: {
@@ -880,7 +935,11 @@ export class PayrollService {
         rejectionReason: approval?.rejectionReason ?? null,
         complianceWarnings,
         auditTrail,
+        bulkTransfer,
+        paymentExportBatch,
       },
+      bulkTransfer,
+      paymentExportBatch,
     };
   }
 

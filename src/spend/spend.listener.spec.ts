@@ -18,7 +18,9 @@ describe('SpendListener', () => {
         update: jest.fn(),
       },
       reimbursement: {
+        findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
       auditEvent: {
         create: jest.fn(),
@@ -86,10 +88,70 @@ describe('SpendListener', () => {
           expenseId: 'exp-123',
           amount: 15000,
           currency: 'NGN',
-          status: 'PENDING',
+          status: 'APPROVED',
         }),
       }),
     );
+  });
+
+  it('should update reimbursement status to APPROVED when reimbursement approval is approved', async () => {
+    const event: ApprovalDecidedEvent = {
+      approvalRequestId: 'app-rmb-1',
+      organizationId: 'org-1',
+      type: 'REIMBURSEMENT',
+      requesterId: 'user-1',
+      approverId: 'user-2',
+      subjectTable: 'reimbursement',
+      subjectId: 'rmb-123',
+      status: 'APPROVED',
+      rejectionReason: null,
+    };
+
+    prisma.reimbursement.findUnique.mockResolvedValue({
+      id: 'rmb-123',
+      organizationId: 'org-1',
+      employeeId: 'emp-1',
+      amount: 20000,
+      currency: 'NGN',
+      status: 'PENDING',
+    });
+
+    await listener.handleApprovalDecided(event);
+
+    expect(prisma.reimbursement.update).toHaveBeenCalledWith({
+      where: { id: 'rmb-123' },
+      data: { status: 'APPROVED' },
+    });
+  });
+
+  it('should update reimbursement status to REJECTED when reimbursement approval is rejected', async () => {
+    const event: ApprovalDecidedEvent = {
+      approvalRequestId: 'app-rmb-2',
+      organizationId: 'org-1',
+      type: 'REIMBURSEMENT',
+      requesterId: 'user-1',
+      approverId: 'user-2',
+      subjectTable: 'reimbursement',
+      subjectId: 'rmb-456',
+      status: 'REJECTED',
+      rejectionReason: 'Duplicate claim',
+    };
+
+    prisma.reimbursement.findUnique.mockResolvedValue({
+      id: 'rmb-456',
+      organizationId: 'org-1',
+      employeeId: 'emp-1',
+      amount: 10000,
+      currency: 'NGN',
+      status: 'PENDING',
+    });
+
+    await listener.handleApprovalDecided(event);
+
+    expect(prisma.reimbursement.update).toHaveBeenCalledWith({
+      where: { id: 'rmb-456' },
+      data: { status: 'REJECTED' },
+    });
   });
 
   it('should update expense status to REJECTED when approval is rejected', async () => {
