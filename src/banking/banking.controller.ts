@@ -86,10 +86,17 @@ export class BankingController {
     if (!user.organizationId) {
       throw new BadRequestException('Organization context is required');
     }
-    const isEmployeeOnly = user.role === USER_ROLES.EMPLOYEE;
+    const isAdmin = ADMIN_ROLES.includes(user.role);
+    if (isAdmin) {
+      return this.bankingService.getCorporateCards(
+        user.organizationId,
+        undefined,
+      );
+    }
     return this.bankingService.getCorporateCards(
       user.organizationId,
-      isEmployeeOnly ? user.id : undefined,
+      user.id,
+      user.email,
     );
   }
 
@@ -101,12 +108,37 @@ export class BankingController {
     if (!user.organizationId) {
       throw new BadRequestException('Organization context is required');
     }
-    return this.bankingService.getCorporateCardDetails(user.organizationId, id);
+    const isAdmin = ADMIN_ROLES.includes(user.role);
+    if (isAdmin) {
+      return this.bankingService.getCorporateCardDetails(
+        user.organizationId,
+        id,
+      );
+    }
+    return this.bankingService.getCorporateCardDetails(
+      user.organizationId,
+      id,
+      user,
+    );
+  }
+
+  @Get('cards/:id/transactions')
+  async getCardTransactions(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    if (!user.organizationId) {
+      throw new BadRequestException('Organization context is required');
+    }
+    const isAdmin = ADMIN_ROLES.includes(user.role);
+    return this.bankingService.getCardTransactions(
+      user.organizationId,
+      id,
+      isAdmin ? undefined : user,
+    );
   }
 
   @Patch('cards/:id/freeze')
-  @UseGuards(RolesGuard)
-  @RequireRoles(...ADMIN_ROLES)
   async toggleCardFreeze(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
@@ -115,7 +147,16 @@ export class BankingController {
     if (!user.organizationId) {
       throw new BadRequestException('Organization context is required');
     }
-    return this.bankingService.toggleCardFreeze(user.organizationId, id, dto);
+    const isAdmin = ADMIN_ROLES.includes(user.role);
+    if (isAdmin) {
+      return this.bankingService.toggleCardFreeze(user.organizationId, id, dto);
+    }
+    return this.bankingService.toggleCardFreeze(
+      user.organizationId,
+      id,
+      dto,
+      user,
+    );
   }
 
   @Patch('cards/:id/limit')

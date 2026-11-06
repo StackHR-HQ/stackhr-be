@@ -261,12 +261,16 @@ export class AnchorClient {
 
   async getAccountBalance(
     anchorAccountId: string,
+    currentLocalBalanceKobo?: number,
   ): Promise<AccountBalanceResult> {
     if (this.isMockMode()) {
       this.logger.debug(
         `ANCHOR_API_KEY missing or in test mode; simulating balance inquiry for "${anchorAccountId}"`,
       );
-      const mock = createMockBalanceResponse(anchorAccountId);
+      const mock = createMockBalanceResponse(
+        anchorAccountId,
+        currentLocalBalanceKobo,
+      );
       return {
         availableBalanceKobo: mock.data.attributes.availableBalance,
         ledgerBalanceKobo: mock.data.attributes.ledgerBalance,

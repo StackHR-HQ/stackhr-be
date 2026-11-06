@@ -3,6 +3,7 @@ import {
   BadRequestException,
   Controller,
   Get,
+  Param,
   Patch,
   Post,
   Req,
@@ -21,6 +22,11 @@ import type { CompanyInfoInput, EmployeeInput } from './onboarding.service';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { AddEmployeeDto } from './dto/add-employee.dto';
 import { ImportEmployeesDto } from './dto/import-employees.dto';
+import {
+  AssignChecklistDto,
+  CreateOnboardingTemplateDto,
+  UpdateChecklistTaskDto,
+} from './dto/create-template.dto';
 
 const BUSINESS_ADMIN_ROLES = [
   USER_ROLES.BUSINESS_OWNER,
@@ -90,6 +96,98 @@ export class OnboardingController {
     @Body() dto: ImportEmployeesDto,
   ) {
     return this.onboardingService.importEmployees(user, dto.csv);
+  }
+
+  @Get('templates')
+  @RequireRoles(...BUSINESS_ADMIN_ROLES)
+  listTemplates(@CurrentUser() user: AuthenticatedUser) {
+    return this.onboardingService.listTemplates(user);
+  }
+
+  @Post('templates')
+  @RequireRoles(...BUSINESS_ADMIN_ROLES)
+  saveTemplate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateOnboardingTemplateDto,
+  ) {
+    return this.onboardingService.saveTemplate(user, dto);
+  }
+
+  @Get('checklists')
+  @RequireRoles(...BUSINESS_ADMIN_ROLES)
+  listChecklists(@CurrentUser() user: AuthenticatedUser) {
+    return this.onboardingService.listChecklists(user);
+  }
+
+  @Get('checklists/:employeeId')
+  @RequireRoles(...BUSINESS_ADMIN_ROLES)
+  getEmployeeChecklist(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('employeeId') employeeId: string,
+  ) {
+    return this.onboardingService.getEmployeeChecklist(user, employeeId);
+  }
+
+  @Post('checklists')
+  @RequireRoles(...BUSINESS_ADMIN_ROLES)
+  assignChecklist(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AssignChecklistDto,
+  ) {
+    if (!dto.employeeId) {
+      throw new BadRequestException('employeeId is required');
+    }
+    return this.onboardingService.assignChecklist(
+      user,
+      dto.employeeId,
+      dto.templateId,
+    );
+  }
+
+  @Post('checklists/:employeeId/assign')
+  @RequireRoles(...BUSINESS_ADMIN_ROLES)
+  assignChecklistForEmployee(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('employeeId') employeeId: string,
+    @Body() dto: AssignChecklistDto,
+  ) {
+    return this.onboardingService.assignChecklist(
+      user,
+      employeeId,
+      dto.templateId,
+    );
+  }
+
+  @Patch('checklists/:employeeId/tasks/:taskId')
+  @RequireRoles(...BUSINESS_ADMIN_ROLES)
+  updateChecklistTask(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('employeeId') employeeId: string,
+    @Param('taskId') taskId: string,
+    @Body() dto: UpdateChecklistTaskDto,
+  ) {
+    return this.onboardingService.updateChecklistTask(
+      user,
+      employeeId,
+      taskId,
+      dto.completed,
+    );
+  }
+
+  @Patch('checklists/:employeeId/items/:itemId')
+  @RequireRoles(...BUSINESS_ADMIN_ROLES)
+  updateChecklistItem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('employeeId') employeeId: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: UpdateChecklistTaskDto,
+  ) {
+    return this.onboardingService.updateChecklistTask(
+      user,
+      employeeId,
+      itemId,
+      dto.completed,
+    );
   }
 
   private objectInput(value: unknown, field: string): Record<string, unknown> {

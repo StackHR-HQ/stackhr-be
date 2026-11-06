@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { StackhrAdminController } from './stackhr-admin.controller';
+import { StackhrAdminService } from './stackhr-admin.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { OutboxService } from '../common/outbox/outbox.service';
@@ -10,6 +11,11 @@ describe('StackhrAdminController', () => {
     getDeadLetterEvents: jest.Mock;
     getDlqCount: jest.Mock;
     replayDeadLetterEvent: jest.Mock;
+  };
+  let mockAdminService: {
+    getDashboard: jest.Mock;
+    listBusinesses: jest.Mock;
+    getSystemHealth: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -25,12 +31,24 @@ describe('StackhrAdminController', () => {
       replayDeadLetterEvent: jest.fn().mockResolvedValue({ id: 'replayed-1' }),
     };
 
+    mockAdminService = {
+      getDashboard: jest
+        .fn()
+        .mockResolvedValue({ metrics: { totalBusinesses: 3 } }),
+      listBusinesses: jest.fn().mockResolvedValue({ total: 3, businesses: [] }),
+      getSystemHealth: jest.fn().mockResolvedValue({ status: 'healthy' }),
+    };
+
     const builder = Test.createTestingModule({
       controllers: [StackhrAdminController],
       providers: [
         {
           provide: OutboxService,
           useValue: mockOutboxService,
+        },
+        {
+          provide: StackhrAdminService,
+          useValue: mockAdminService,
         },
       ],
     });
@@ -62,5 +80,20 @@ describe('StackhrAdminController', () => {
     expect(mockOutboxService.replayDeadLetterEvent).toHaveBeenCalledWith(
       'dlq-1',
     );
+  });
+
+  it('delegates dashboard, businesses, and system health to StackhrAdminService', async () => {
+    await expect(controller.getDashboard()).resolves.toEqual({
+      metrics: { totalBusinesses: 3 },
+    });
+    await expect(
+      controller.listBusinesses('active', 'acme', '1', '20'),
+    ).resolves.toEqual({
+      total: 3,
+      businesses: [],
+    });
+    await expect(controller.getSystemHealth()).resolves.toEqual({
+      status: 'healthy',
+    });
   });
 });

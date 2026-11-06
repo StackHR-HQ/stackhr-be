@@ -15,6 +15,7 @@ describe('BankingController', () => {
     issueCorporateCard: jest.Mock;
     getCorporateCards: jest.Mock;
     getCorporateCardDetails: jest.Mock;
+    getCardTransactions: jest.Mock;
     toggleCardFreeze: jest.Mock;
     updateCardSpendingLimit: jest.Mock;
   };
@@ -37,6 +38,7 @@ describe('BankingController', () => {
       issueCorporateCard: jest.fn(),
       getCorporateCards: jest.fn(),
       getCorporateCardDetails: jest.fn(),
+      getCardTransactions: jest.fn(),
       toggleCardFreeze: jest.fn(),
       updateCardSpendingLimit: jest.fn(),
     };

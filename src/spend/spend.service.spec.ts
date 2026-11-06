@@ -49,7 +49,7 @@ describe('SpendService', () => {
         updateMany: jest.fn(),
       },
       employee: {
-        findFirst: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue({ id: 'emp-123' }),
       },
     };
 
@@ -132,6 +132,41 @@ describe('SpendService', () => {
       expect(result.expense.receiptUrl).toBe('https://example.com/receipt.pdf');
     });
 
+    it('should accept a multipart file upload and attach a receipt URL', async () => {
+      prismaMock.expense.findFirst.mockResolvedValue({
+        id: 'exp-1',
+        organizationId: 'org-123',
+        employeeId: 'emp-1',
+      });
+      prismaMock.document = {
+        create: jest.fn().mockResolvedValue({ id: 'doc-receipt-1' }),
+      };
+      prismaMock.expense.update.mockResolvedValue({
+        id: 'exp-1',
+        receiptUrl: '/v1/api/people/documents/doc-receipt-1/download',
+      });
+
+      const pdfBuffer = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]);
+      const result = await service.attachReceipt(
+        mockUser,
+        'exp-1',
+        {},
+        {
+          originalname: 'receipt.pdf',
+          mimetype: 'application/pdf',
+          size: pdfBuffer.length,
+          buffer: pdfBuffer,
+        },
+      );
+
+      expect(result.receiptUrl).toBe(
+        '/v1/api/people/documents/doc-receipt-1/download',
+      );
+      expect(result.expense.receiptUrl).toBe(
+        '/v1/api/people/documents/doc-receipt-1/download',
+      );
+    });
+
     it('should throw NotFoundException if expense claim is not found', async () => {
       prismaMock.expense.findFirst.mockResolvedValue(null);
 
@@ -211,11 +246,12 @@ describe('SpendService', () => {
   });
 
   describe('createReimbursement', () => {
-    it('should create a reimbursement request and route for approval', async () => {
+    it('should create a reimbursement request with description and route for REIMBURSEMENT approval', async () => {
       prismaMock.employee.findFirst.mockResolvedValue({ id: 'emp-1' });
       prismaMock.reimbursement.create.mockResolvedValue({
         id: 'rmb-1',
         amount: 15000,
+        description: 'Office supplies reimbursement',
         status: 'PENDING',
       });
       approvalsServiceMock.submitRequest.mockResolvedValue({
@@ -228,15 +264,43 @@ describe('SpendService', () => {
       });
 
       expect(result.reimbursement.id).toBe('rmb-1');
+      expect(result.reimbursement.description).toBe(
+        'Office supplies reimbursement',
+      );
+      expect(prismaMock.reimbursement.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            amount: 15000,
+            description: 'Office supplies reimbursement',
+          }),
+        }),
+      );
       expect(approvalsServiceMock.submitRequest).toHaveBeenCalledWith(
         mockUser,
         expect.objectContaining({
-          type: 'EXPENSE',
+          type: 'REIMBURSEMENT',
           subjectTable: 'reimbursement',
           subjectId: 'rmb-1',
           amountSnapshot: 15000,
         }),
       );
+    });
+  });
+
+  describe('getReimbursementsSummary', () => {
+    it('should return summary with amountMinor converted from Naira to kobo (* 100)', async () => {
+      prismaMock.reimbursement.aggregate
+        .mockResolvedValueOnce({ _count: { id: 2 }, _sum: { amount: 1500 } })
+        .mockResolvedValueOnce({ _count: { id: 1 }, _sum: { amount: 5000 } })
+        .mockResolvedValueOnce({ _count: { id: 3 }, _sum: { amount: 20000 } });
+
+      const result = await service.getReimbursementsSummary(mockUser);
+
+      expect(result.summary).toEqual({
+        pending: { count: 2, amountMinor: 150000 },
+        approved: { count: 1, amountMinor: 500000 },
+        paid: { count: 3, amountMinor: 2000000 },
+      });
     });
   });
 
@@ -259,10 +323,11 @@ describe('SpendService', () => {
   });
 
   describe('cancelReimbursement', () => {
-    it('should cancel pending reimbursement', async () => {
+    it('should cancel pending reimbursement for owner', async () => {
       prismaMock.reimbursement.findFirst.mockResolvedValue({
         id: 'rmb-1',
         status: 'PENDING',
+        employeeId: 'emp-123',
       });
       prismaMock.approvalRequest.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.reimbursement.update.mockResolvedValue({
@@ -272,6 +337,18 @@ describe('SpendService', () => {
 
       const result = await service.cancelReimbursement(mockUser, 'rmb-1');
       expect(result.reimbursement.status).toBe('CANCELLED');
+    });
+
+    it('should throw ForbiddenException if employee attempts to cancel someone elses claim', async () => {
+      prismaMock.reimbursement.findFirst.mockResolvedValue({
+        id: 'rmb-1',
+        status: 'PENDING',
+        employeeId: 'emp-other',
+      });
+
+      await expect(
+        service.cancelReimbursement(mockUser, 'rmb-1'),
+      ).rejects.toThrow('You can only cancel your own reimbursement claim');
     });
   });
 
@@ -371,6 +448,7 @@ describe('SpendService', () => {
       prismaMock.expense.findFirst.mockResolvedValue({
         id: 'exp-1',
         status: 'PENDING',
+        employeeId: 'emp-123',
       });
       prismaMock.approvalRequest.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.expense.update.mockResolvedValue({
@@ -388,6 +466,7 @@ describe('SpendService', () => {
       prismaMock.salaryAdvance.findFirst.mockResolvedValue({
         id: 'adv-1',
         status: 'PENDING',
+        employeeId: 'emp-123',
       });
       prismaMock.approvalRequest.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.salaryAdvance.update.mockResolvedValue({

@@ -247,6 +247,13 @@ export class PeopleEmployeesService {
           employeeNumber = computeNextEmployeeNumber(prefix, existingEmployees);
         }
 
+        const pfaCode = input.pfaCode ?? compensation.pfaCode ?? null;
+        const pensionProvider =
+          input.pensionProvider ?? compensation.pensionProvider ?? null;
+        const pensionRsaNumber =
+          input.pensionRsaNumber ?? compensation.pensionRsaNumber ?? null;
+        const tin = input.tin ?? compensation.tin ?? null;
+
         const employee = await client.employee.create({
           data: {
             organizationId,
@@ -265,8 +272,15 @@ export class PeopleEmployeesService {
             startDate: new Date(`${employment.startDate}T00:00:00.000Z`),
             workLocation: employment.workLocation ?? '',
             annualSalaryMinor: BigInt(compensation.annualSalaryMinor),
+            salaryAmount: Math.trunc(
+              Number(compensation.annualSalaryMinor) / 1200,
+            ),
             currency: compensation.currency,
             payFrequency: compensation.payFrequency,
+            ...(pfaCode !== null ? { pfaCode } : {}),
+            ...(pensionProvider !== null ? { pensionProvider } : {}),
+            ...(pensionRsaNumber !== null ? { pensionRsaNumber } : {}),
+            ...(tin !== null ? { tin } : {}),
             status: 'PENDING_INVITATION',
           },
         });
@@ -277,6 +291,8 @@ export class PeopleEmployeesService {
             organizationId,
             employeeId: employee.id,
             annualSalaryMinor: employee.annualSalaryMinor,
+            previousSalary: 0n,
+            newSalary: employee.annualSalaryMinor,
             currency: employee.currency,
             payFrequency: employee.payFrequency,
             effectiveDate: employee.startDate,
@@ -463,6 +479,24 @@ export class PeopleEmployeesService {
         }
       }
 
+      const pfaCode =
+        input.pfaCode ??
+        input.compensation?.pfaCode ??
+        personal?.pfaCode ??
+        undefined;
+      const pensionProvider =
+        input.pensionProvider ??
+        input.compensation?.pensionProvider ??
+        personal?.pensionProvider ??
+        undefined;
+      const pensionRsaNumber =
+        input.pensionRsaNumber ??
+        input.compensation?.pensionRsaNumber ??
+        personal?.pensionRsaNumber ??
+        undefined;
+      const tin =
+        input.tin ?? input.compensation?.tin ?? personal?.tin ?? undefined;
+
       const employee = await client.employee.update({
         where: { id: employeeId },
         data: {
@@ -501,9 +535,25 @@ export class PeopleEmployeesService {
           ...(input.payment
             ? {
                 bankName: input.payment.bankName,
-                bankAccountLast4: input.payment.accountLast4,
+                ...(input.payment.accountLast4 !== undefined
+                  ? { bankAccountLast4: input.payment.accountLast4 }
+                  : input.payment.accountNumber
+                    ? {
+                        bankAccountLast4: input.payment.accountNumber.slice(-4),
+                      }
+                    : {}),
+                ...(input.payment.accountNumber !== undefined
+                  ? { accountNumber: input.payment.accountNumber }
+                  : {}),
+                ...(input.payment.accountName !== undefined
+                  ? { accountName: input.payment.accountName }
+                  : {}),
               }
             : {}),
+          ...(pfaCode !== undefined ? { pfaCode } : {}),
+          ...(pensionProvider !== undefined ? { pensionProvider } : {}),
+          ...(pensionRsaNumber !== undefined ? { pensionRsaNumber } : {}),
+          ...(tin !== undefined ? { tin } : {}),
           ...(employment?.employeeNumber !== undefined
             ? { employeeNumber: employment.employeeNumber }
             : {}),
@@ -531,9 +581,12 @@ export class PeopleEmployeesService {
           ...(employment?.status !== undefined
             ? { status: employment.status }
             : {}),
-          ...(input.compensation
+          ...(input.compensation?.annualSalaryMinor !== undefined
             ? {
                 annualSalaryMinor: BigInt(input.compensation.annualSalaryMinor),
+                salaryAmount: Math.trunc(
+                  Number(input.compensation.annualSalaryMinor) / 1200,
+                ),
                 currency:
                   input.compensation.currency ?? existing.currency ?? 'NGN',
                 payFrequency:
@@ -545,7 +598,7 @@ export class PeopleEmployeesService {
         },
       });
 
-      if (input.compensation) {
+      if (input.compensation?.annualSalaryMinor !== undefined) {
         const currency =
           input.compensation.currency ?? existing.currency ?? 'NGN';
         const payFrequency =
@@ -553,12 +606,17 @@ export class PeopleEmployeesService {
         const effectiveDate = input.compensation.effectiveDate
           ? new Date(`${input.compensation.effectiveDate}T00:00:00.000Z`)
           : new Date();
+        const newSalaryMinor = BigInt(input.compensation.annualSalaryMinor);
+        const previousSalaryMinor = BigInt(existing.annualSalaryMinor ?? 0);
 
         await client.compensationHistory.create({
           data: {
             organizationId,
             employeeId,
-            annualSalaryMinor: BigInt(input.compensation.annualSalaryMinor),
+            annualSalaryMinor: newSalaryMinor,
+            previousSalary: previousSalaryMinor,
+            newSalary: newSalaryMinor,
+            reason: input.compensation.reason ?? null,
             currency,
             payFrequency,
             effectiveDate,
@@ -597,7 +655,10 @@ export class PeopleEmployeesService {
       const changedSections = (
         ['personal', 'employment', 'compensation', 'payment'] as const
       ).filter((section) => input[section] !== undefined);
-      if (changedSections.length) {
+      const topLevelChanged = (
+        ['pfaCode', 'pensionProvider', 'pensionRsaNumber', 'tin'] as const
+      ).filter((field) => input[field] !== undefined);
+      if (changedSections.length || topLevelChanged.length) {
         // Section and field names only: salary and personal values stay out of history.
         await client.auditEvent.create({
           data: {
@@ -607,13 +668,16 @@ export class PeopleEmployeesService {
             targetType: 'employee',
             targetId: employeeId,
             employeeId,
-            description: `${employee.fullName}: ${changedSections.join(' and ')} updated`,
+            description: `${employee.fullName}: ${[...changedSections, ...(topLevelChanged.length ? ['pension'] : [])].join(' and ')} updated`,
             changes: {
-              changedFields: changedSections.flatMap((section) =>
-                Object.keys(input[section] ?? {}).map(
-                  (field) => `${section}.${field}`,
+              changedFields: [
+                ...changedSections.flatMap((section) =>
+                  Object.keys(input[section] ?? {}).map(
+                    (field) => `${section}.${field}`,
+                  ),
                 ),
-              ),
+                ...topLevelChanged,
+              ],
             },
             createdAt: new Date(),
           },
@@ -776,6 +840,10 @@ export class PeopleEmployeesService {
         ...toEmployeeSummary(employee),
         employeeNumber: employee.employeeNumber ?? null,
         workLocation: employee.workLocation,
+        pfaCode: employee.pfaCode ?? null,
+        pensionProvider: employee.pensionProvider ?? null,
+        pensionRsaNumber: employee.pensionRsaNumber ?? null,
+        tin: employee.tin ?? null,
         personalInfo: {
           dateOfBirth: employee.dateOfBirth
             ? toDateOnly(employee.dateOfBirth)
@@ -789,6 +857,10 @@ export class PeopleEmployeesService {
           emergencyContactPhone: employee.emergencyContactPhone ?? '',
           emergencyContactRelationship:
             employee.emergencyContactRelationship ?? '',
+          pfaCode: employee.pfaCode ?? null,
+          pensionProvider: employee.pensionProvider ?? null,
+          pensionRsaNumber: employee.pensionRsaNumber ?? null,
+          tin: employee.tin ?? null,
         },
         compensation: {
           // Existing contract: monthly amount in major units.
@@ -798,6 +870,12 @@ export class PeopleEmployeesService {
           payFrequency: toPayFrequency(employee.payFrequency ?? 'MONTHLY'),
           bankName: employee.bankName ?? '',
           bankAccountLast4: employee.bankAccountLast4 ?? '',
+          accountNumber: employee.accountNumber ?? null,
+          accountName: employee.accountName ?? null,
+          pfaCode: employee.pfaCode ?? null,
+          pensionProvider: employee.pensionProvider ?? null,
+          pensionRsaNumber: employee.pensionRsaNumber ?? null,
+          tin: employee.tin ?? null,
         },
         leaveBalance: balances
           .sort(

@@ -325,8 +325,9 @@ export class ApprovalsService {
             subjectSummary = {
               amount: reimb.amount,
               currency: reimb.currency ?? 'NGN',
-              category: reimb.expense?.category,
-              description: reimb.expense?.description,
+              category: reimb.expense?.category ?? 'Reimbursement',
+              description:
+                reimb.description ?? reimb.expense?.description ?? null,
             };
           }
           break;

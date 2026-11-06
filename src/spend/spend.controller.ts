@@ -5,13 +5,18 @@ import {
   Param,
   Patch,
   Post,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser, RequireRoles } from '../auth/auth.decorators';
 import { RolesGuard } from '../auth/roles.guard';
 import { USER_ROLES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { MAX_DOCUMENT_BYTES } from '../people/documents/document-file-validation';
 import { SpendService } from './spend.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateSalaryAdvanceDto } from './dto/create-salary-advance.dto';
@@ -37,12 +42,19 @@ export class SpendController {
   }
 
   @Post('expenses/:id/receipt')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_DOCUMENT_BYTES, files: 1 },
+    }),
+  )
   attachReceipt(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') expenseId: string,
     @Body() dto: AttachReceiptDto,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.spendService.attachReceipt(user, expenseId, dto);
+    return this.spendService.attachReceipt(user, expenseId, dto, file);
   }
 
   @Get('expenses')

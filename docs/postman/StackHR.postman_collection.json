@@ -580,13 +580,40 @@
                 "login"
               ]
             },
-            "description": "Authenticate platform administrator account.",
+            "description": "Authenticate a StackHR platform admin (STACKHR_ADMIN or STACKHR_SUPPORT). Sets HttpOnly session cookie (stackhr_session) AND returns the bearer token in data.token.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"admin@stackhr.app\",\n  \"password\": \"AdminPassword123!\"\n}"
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK - Admin Logged In",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"sys-admin-1\",\n      \"name\": \"StackHR Super Admin\",\n      \"email\": \"admin@stackhr.app\",\n      \"userType\": \"STACKHR\",\n      \"role\": \"STACKHR_ADMIN\"\n    },\n    \"token\": \"c4f9e2b1a8d7...\"\n  }\n}"
+            },
+            {
+              "name": "401 Unauthorized",
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Invalid email or password\",\n  \"data\": {\n    \"message\": \"Invalid email or password\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Forgot Password (Public)",
@@ -796,7 +823,7 @@
           },
           "response": [
             {
-              "name": "Success (200 OK)",
+              "name": "200 OK - Current User",
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
@@ -806,9 +833,10 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"user\": {\n    \"id\": \"usr-123\",\n    \"name\": \"Jane Doe\",\n    \"email\": \"jane@company.com\",\n    \"role\": \"BUSINESS_ADMIN\",\n    \"userType\": \"BUSINESS\",\n    \"organizationId\": \"org-123\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"user\": {\n      \"id\": \"usr-123\",\n      \"name\": \"Chukwuemeka Asogwa\",\n      \"email\": \"admin@stackhr.app\",\n      \"userType\": \"STACKHR\",\n      \"role\": \"STACKHR_ADMIN\",\n      \"organizationId\": null\n    }\n  }\n}"
             }
-          ]
+          ],
+          "description": "Returns the authenticated user profile (works for both BUSINESS and STACKHR platform-admin tokens). Wrapped in standard { success, message, data: { user } } envelope."
         },
         {
           "name": "Logout",
@@ -980,13 +1008,27 @@
                 "import"
               ]
             },
-            "description": "Bulk import employee records from raw CSV payload.",
+            "description": "Bulk import employees from CSV during onboarding. Note: salary column is MONTHLY salary in whole Naira (NGN), e.g. 450000 = ₦450,000/month (stored internally as annualSalaryMinor = salary * 1200 kobo).",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"csv\": \"fullName,email,department,jobTitle,employmentType,salary,startDate\\nJohn Doe,john@acme.com,Engineering,Software Engineer,FULL_TIME,500000,2026-01-01\"\n}"
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created - CSV Imported",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employees\": [\n      {\n        \"id\": \"emp-101\",\n        \"organizationId\": \"org-123\",\n        \"fullName\": \"Ada Obi\",\n        \"email\": \"ada@acme.com\",\n        \"department\": \"Engineering\",\n        \"jobTitle\": \"Developer\",\n        \"employmentType\": \"FULL_TIME\",\n        \"salary\": 450000,\n        \"salaryAmount\": 450000,\n        \"annualSalaryMinor\": 540000000,\n        \"startDate\": \"2026-08-22T00:00:00.000Z\"\n      }\n    ],\n    \"onboarding\": {\n      \"organizationId\": \"org-123\",\n      \"companyInfoComplete\": true,\n      \"employeeCount\": 1,\n      \"employeesComplete\": true,\n      \"complete\": true,\n      \"nextStep\": \"DASHBOARD\"\n    }\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get Onboarding Status",
@@ -1012,7 +1054,7 @@
           },
           "response": [
             {
-              "name": "Success (200 OK)",
+              "name": "200 OK - Onboarding Status",
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
@@ -1022,7 +1064,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"status\": \"IN_PROGRESS\",\n  \"companyInfoCompleted\": true,\n  \"employeesAdded\": 3,\n  \"payrollConfigured\": false,\n  \"isComplete\": false\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"organizationId\": \"org-123\",\n    \"companyInfoComplete\": true,\n    \"employeeCount\": 12,\n    \"employeesComplete\": true,\n    \"complete\": true,\n    \"nextStep\": \"DASHBOARD\"\n  }\n}"
             }
           ]
         },
@@ -2660,8 +2702,21 @@
               }
             ],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"receiptUrl\": \"https://storage.stackhr.app/receipts/exp-123.pdf\"\n}"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "description": "Receipt file (PDF, PNG, JPEG, WEBP, DOC/DOCX, XLS/XLSX, CSV; max 10 MB)",
+                  "src": ""
+                },
+                {
+                  "key": "receiptUrl",
+                  "type": "text",
+                  "value": "https://storage.stackhr.app/receipts/exp-123.pdf",
+                  "description": "Optional fallback URL if not uploading a file directly"
+                }
+              ]
             },
             "url": {
               "raw": "{{baseUrl}}/spend/expenses/exp-123/receipt",
@@ -2675,11 +2730,11 @@
                 "receipt"
               ]
             },
-            "description": "Attach proof of receipt/attachment URL to an existing expense claim."
+            "description": "Attach proof of receipt to an existing expense claim. Accepts either a multipart/form-data file upload (field: \"file\", allowed types: PDF, PNG, JPG, DOC, DOCX; max size: 10 MB) or a JSON body with \"receiptUrl\"."
           },
           "response": [
             {
-              "name": "Success",
+              "name": "200 OK - Receipt Attached",
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
@@ -2689,7 +2744,20 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Receipt URL attached to expense claim successfully\",\n    \"expense\": {\n      \"id\": \"exp-123\",\n      \"receiptUrl\": \"https://storage.stackhr.app/receipts/exp-123.pdf\"\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"expense\": {\n      \"id\": \"exp-123\",\n      \"category\": \"Travel\",\n      \"amount\": \"15000\",\n      \"currency\": \"NGN\",\n      \"receiptUrl\": \"/v1/api/people/documents/doc-999/download\",\n      \"status\": \"PENDING\"\n    }\n  }\n}"
+            },
+            {
+              "name": "415 Unsupported Media Type",
+              "status": "Unsupported Media Type",
+              "code": 415,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Unsupported file type. Allowed: PDF, PNG, JPEG, WEBP, DOC/DOCX, XLS/XLSX, CSV (max 10 MB).\",\n  \"error\": {\n    \"message\": \"Unsupported file type. Allowed: PDF, PNG, JPEG, WEBP, DOC/DOCX, XLS/XLSX, CSV (max 10 MB).\"\n  }\n}"
             }
           ]
         },
@@ -2810,7 +2878,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"message\": \"Reimbursement claim submitted and routed for approval\",\n  \"reimbursement\": {\n    \"id\": \"rmb-1\",\n    \"amount\": 15000,\n    \"currency\": \"NGN\",\n    \"status\": \"PENDING\"\n  },\n  \"approvalRequest\": {\n    \"id\": \"appr-1\",\n    \"status\": \"PENDING\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Reimbursement claim submitted and routed for approval\",\n    \"reimbursement\": {\n      \"id\": \"rmb-1\",\n      \"amount\": 15000,\n      \"currency\": \"NGN\",\n      \"description\": \"Taxi fare for client meeting\",\n      \"status\": \"PENDING\"\n    },\n    \"approvalRequest\": {\n      \"id\": \"appr-1\",\n      \"type\": \"REIMBURSEMENT\",\n      \"subjectTable\": \"reimbursement\",\n      \"status\": \"PENDING\"\n    }\n  }\n}"
             },
             {
               "name": "Error (400 Bad Request / 404 Not Found)",
@@ -2962,7 +3030,7 @@
                 "summary"
               ]
             },
-            "description": "Get summary metrics for reimbursements (pending, approved, paid totals)."
+            "description": "Get summary metrics for reimbursements (pending, approved, paid totals). All amountMinor values are returned in kobo (1/100th of NGN)."
           },
           "response": [
             {
@@ -2976,7 +3044,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"summary\": {\n    \"pending\": {\n      \"count\": 3,\n      \"amountMinor\": 45000\n    },\n    \"approved\": {\n      \"count\": 5,\n      \"amountMinor\": 120000\n    },\n    \"paid\": {\n      \"count\": 12,\n      \"amountMinor\": 350000\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"summary\": {\n      \"pending\": {\n        \"count\": 3,\n        \"amountMinor\": 4500000\n      },\n      \"approved\": {\n        \"count\": 5,\n        \"amountMinor\": 12000000\n      },\n      \"paid\": {\n        \"count\": 12,\n        \"amountMinor\": 35000000\n      }\n    }\n  }\n}"
             }
           ]
         },
@@ -3021,7 +3089,6 @@
               ],
               "body": "{\n  \"reimbursement\": {\n    \"id\": \"rmb-1\",\n    \"status\": \"PAID\",\n    \"paidAt\": \"2026-10-05T12:00:00.000Z\"\n  },\n  \"transfer\": {\n    \"id\": \"trf_anc_789123\",\n    \"reference\": \"rem_rmb-1_1\",\n    \"status\": \"SUCCESSFUL\",\n    \"amountKobo\": 5000000,\n    \"currency\": \"NGN\",\n    \"feeKobo\": 1075\n  }\n}"
             },
-
             {
               "name": "Error (400 Bad Request / 404 Not Found)",
               "status": "Bad Request",
@@ -3233,7 +3300,6 @@
               ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Salary advance marked as disbursed successfully\",\n    \"salaryAdvance\": {\n      \"id\": \"adv-123\",\n      \"status\": \"DISBURSED\",\n      \"disbursedAt\": \"2026-10-07T12:00:00.000Z\"\n    },\n    \"transfer\": {\n      \"id\": \"trf_anc_456789\",\n      \"reference\": \"adv_adv-123_1\",\n      \"status\": \"SUCCESSFUL\",\n      \"amountKobo\": 10000000,\n      \"currency\": \"NGN\",\n      \"feeKobo\": 1075\n    }\n  }\n}"
             },
-
             {
               "name": "Bad Request - Not Approved",
               "status": "Bad Request",
@@ -3270,7 +3336,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"employeeId\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"basicSalary\": 30000000,\n  \"housingAllowance\": 10000000,\n  \"transportAllowance\": 5000000,\n  \"otherAllowances\": 2000000,\n  \"currency\": \"NGN\",\n  \"paymentFrequency\": \"MONTHLY\"\n}"
+              "raw": "{\n  \"employeeId\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"basicSalary\": 30000000,\n  \"housingAllowance\": 10000000,\n  \"transportAllowance\": 5000000,\n  \"otherAllowances\": 2000000,\n  \"currency\": \"NGN\",\n  \"paymentFrequency\": \"MONTHLY\",\n  \"reason\": \"Annual merit review\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/payroll/compensation",
@@ -3282,7 +3348,7 @@
                 "compensation"
               ]
             },
-            "description": "Set/update versioned effective-dated compensation record for an employee. Automatically closes previous active record."
+            "description": "Set/update versioned effective-dated compensation record for an employee. Automatically closes previous active record and writes a CompensationHistory entry."
           },
           "response": [
             {
@@ -3296,7 +3362,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Compensation record set successfully\",\n    \"compensationRecord\": {\n      \"id\": \"comp-123\",\n      \"employeeId\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"basicSalary\": 30000000,\n      \"housingAllowance\": 10000000,\n      \"transportAllowance\": 5000000,\n      \"otherAllowances\": 2000000,\n      \"effectiveFrom\": \"2026-09-09T13:00:00.000Z\",\n      \"effectiveTo\": null\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Compensation record set successfully\",\n    \"compensationRecord\": {\n      \"id\": \"comp-123\",\n      \"employeeId\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"basicSalary\": 30000000,\n      \"housingAllowance\": 10000000,\n      \"transportAllowance\": 5000000,\n      \"otherAllowances\": 2000000,\n      \"effectiveFrom\": \"2026-09-09T13:00:00.000Z\",\n      \"effectiveTo\": null\n    },\n    \"compensationHistory\": {\n      \"id\": \"hist-123\",\n      \"employeeId\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"previousSalary\": 450000000,\n      \"newSalary\": 564000000,\n      \"annualSalaryMinor\": 564000000,\n      \"reason\": \"Annual merit review\"\n    }\n  }\n}"
             }
           ]
         },
@@ -3701,11 +3767,11 @@
                 "run-123"
               ]
             },
-            "description": "Get detailed payroll run including line items and generated payslips."
+            "description": "Get detailed payroll run including line items, generated payslips, and persisted bulkTransfer / paymentExportBatch results once executed."
           },
           "response": [
             {
-              "name": "Success",
+              "name": "200 OK - Payroll Run Detail",
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
@@ -3715,7 +3781,20 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"payrollRun\": {\n      \"id\": \"run-123\",\n      \"periodMonth\": 9,\n      \"periodYear\": 2026,\n      \"payDate\": \"2026-09-25\",\n      \"currency\": \"NGN\",\n      \"payrollEngineVersion\": \"2026.1\",\n      \"taxRuleSetId\": \"TRS-NTA-2026\",\n      \"createdBy\": \"Admin User\",\n      \"status\": \"DRAFT\",\n      \"complianceWarnings\": [],\n      \"auditTrail\": [],\n      \"items\": [],\n      \"payslips\": []\n    }\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"run\": {\n      \"id\": \"run-123\",\n      \"periodMonth\": 11,\n      \"periodYear\": 2026,\n      \"status\": \"PAID\",\n      \"totalGross\": \"4500000\",\n      \"totalNet\": \"3850000\",\n      \"totalDeductions\": \"650000\",\n      \"executedAt\": \"2026-11-04T15:00:00.000Z\",\n      \"lineItems\": [],\n      \"payslips\": []\n    },\n    \"bulkTransfer\": {\n      \"batchId\": \"anc_batch_123\",\n      \"status\": \"PROCESSING\",\n      \"totalTransfers\": 12,\n      \"totalAmountKobo\": 385000000\n    },\n    \"paymentExportBatch\": [\n      {\n        \"employeeId\": \"emp-123\",\n        \"employeeName\": \"Ada Lovelace\",\n        \"bankCode\": \"058\",\n        \"accountNumberLast4\": \"1234\",\n        \"amountMajor\": 450000,\n        \"reference\": \"PAY-2026-11-emp-123\"\n      }\n    ]\n  }\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Payroll run not found\",\n  \"error\": {\n    \"message\": \"Payroll run not found\"\n  }\n}"
             }
           ]
         },
@@ -4262,6 +4341,169 @@
               "body": "{\n  \"activity\": [\n    {\n      \"id\": \"evt-10\",\n      \"action\": \"PROFILE_UPDATED\",\n      \"createdAt\": \"2026-10-02T14:30:00.000Z\"\n    }\n  ]\n}"
             }
           ]
+        },
+        {
+          "name": "Get My Onboarding Checklist",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/onboarding",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "onboarding"
+              ]
+            },
+            "description": "Retrieve the logged-in employee onboarding checklist and completion progress."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"onboarding\": {\n      \"employeeId\": \"emp-100\",\n      \"employeeName\": \"Jane Doe\",\n      \"status\": \"ONBOARDING\",\n      \"templateId\": \"tpl-1\",\n      \"templateName\": \"Engineering Onboarding\",\n      \"completedItemIds\": [\n        \"item-1\"\n      ],\n      \"totalItems\": 2,\n      \"completedCount\": 1,\n      \"progressPercent\": 50,\n      \"items\": [\n        {\n          \"id\": \"item-1\",\n          \"label\": \"Sign NDA\",\n          \"title\": \"Sign NDA\",\n          \"stage\": \"Before day one\",\n          \"position\": 0,\n          \"completed\": true,\n          \"completedAt\": \"2026-10-01T10:00:00.000Z\"\n        },\n        {\n          \"id\": \"item-2\",\n          \"label\": \"Setup workstation\",\n          \"title\": \"Setup workstation\",\n          \"stage\": \"Day one\",\n          \"position\": 1,\n          \"completed\": false,\n          \"completedAt\": null\n        }\n      ]\n    }\n  }\n}"
+            },
+            {
+              "name": "404 Not Found / 403 Forbidden",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Resource not found or access denied\",\n  \"error\": {\n    \"message\": \"Resource not found or access denied\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Toggle My Onboarding Checklist Item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/onboarding/items/:itemId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "onboarding",
+                "items",
+                ":itemId"
+              ]
+            },
+            "description": "Allow the logged-in employee to tick/untick an item on their own onboarding checklist.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completed\": true\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"onboarding\": {\n      \"employeeId\": \"emp-100\",\n      \"completedCount\": 2,\n      \"totalItems\": 2,\n      \"progressPercent\": 100\n    }\n  }\n}"
+            },
+            {
+              "name": "404 Not Found / 403 Forbidden",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Resource not found or access denied\",\n  \"error\": {\n    \"message\": \"Resource not found or access denied\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get My Corporate Cards",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/cards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "cards"
+              ]
+            },
+            "description": "Retrieve corporate cards assigned to the logged-in employee."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"cards\": [\n      {\n        \"id\": \"card-1\",\n        \"cardName\": \"Jane Doe\",\n        \"maskedPan\": \"5399 **** **** 1234\",\n        \"brand\": \"MASTERCARD\",\n        \"status\": \"ACTIVE\",\n        \"spendingLimitKobo\": 50000000,\n        \"spendingInterval\": \"MONTHLY\"\n      }\n    ]\n  }\n}"
+            },
+            {
+              "name": "404 Not Found / 403 Forbidden",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Resource not found or access denied\",\n  \"error\": {\n    \"message\": \"Resource not found or access denied\"\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -4456,7 +4698,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"country\": \"NG\",\n  \"name\": \"Nigeria Tax Act 2027 Amendment\",\n  \"effectiveFrom\": \"2027-01-01T00:00:00.000Z\",\n  \"isDefault\": true,\n  \"rentReliefPercentage\": 0.20,\n  \"rentReliefCap\": 500000,\n  \"pensionEmployeeRate\": 0.08,\n  \"pensionEmployerRate\": 0.10,\n  \"pensionBasisFields\": \"BASIC,HOUSING,TRANSPORT\",\n  \"nhfRate\": 0.025,\n  \"nhfBasisField\": \"BASIC\",\n  \"taxFreeThreshold\": 800000,\n  \"taxRules\": [\n    {\n      \"bandOrder\": 1,\n      \"bandName\": \"First ₦800,000\",\n      \"lowerLimit\": 0,\n      \"upperLimit\": 800000,\n      \"taxRate\": 0.0\n    },\n    {\n      \"bandOrder\": 2,\n      \"bandName\": \"Next ₦2,200,000\",\n      \"lowerLimit\": 800000,\n      \"upperLimit\": 3000000,\n      \"taxRate\": 0.15\n    }\n  ]\n}"
+              "raw": "{\n  \"country\": \"NG\",\n  \"name\": \"Nigeria Tax Act 2026\",\n  \"effectiveFrom\": \"2026-01-01T00:00:00.000Z\",\n  \"effectiveTo\": null,\n  \"isDefault\": true,\n  \"rentReliefPercentage\": 0.2,\n  \"rentReliefCap\": 500000,\n  \"pensionEmployeeRate\": 0.08,\n  \"pensionEmployerRate\": 0.1,\n  \"nhfRate\": 0.025,\n  \"bands\": [\n    {\n      \"bandOrder\": 1,\n      \"lowerLimit\": 0,\n      \"upperLimit\": 800000,\n      \"rate\": 0,\n      \"label\": \"First NGN 800,000 (Tax Exempt)\"\n    },\n    {\n      \"bandOrder\": 2,\n      \"lowerLimit\": 800000,\n      \"upperLimit\": 3000000,\n      \"rate\": 0.15,\n      \"label\": \"Next NGN 2,200,000\"\n    },\n    {\n      \"bandOrder\": 3,\n      \"lowerLimit\": 3000000,\n      \"upperLimit\": null,\n      \"rate\": 0.25,\n      \"label\": \"Above NGN 3,000,000\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/stackhr-admin/compliance/rule-sets",
@@ -4469,7 +4711,7 @@
                 "rule-sets"
               ]
             },
-            "description": "Create a new versioned tax rule set with progressive tax bands. Requires StackHR Admin role."
+            "description": "Create a versioned tax rule set with progressive tax bands. Top band supports upperLimit: null (\"and above\"), and effectiveTo is nullable/omittable. Roles: STACKHR_ADMIN."
           },
           "response": [
             {
@@ -4790,7 +5032,7 @@
               },
               "response": [
                 {
-                  "name": "Success (200 OK)",
+                  "name": "200 OK - Employee Profile",
                   "status": "OK",
                   "code": 200,
                   "_postman_previewlanguage": "json",
@@ -4800,7 +5042,20 @@
                       "value": "application/json"
                     }
                   ],
-                  "body": "{\n  \"profile\": {\n    \"id\": \"emp_ada\",\n    \"fullName\": \"Ada Lovelace\",\n    \"firstName\": \"Ada\",\n    \"lastName\": \"Lovelace\",\n    \"email\": \"ada@example.com\",\n    \"jobTitle\": \"Lead Engineer\",\n    \"department\": \"Engineering\",\n    \"departmentId\": \"dept_123\",\n    \"employmentType\": \"Full-Time\",\n    \"employmentStatus\": \"active\",\n    \"startDate\": \"2026-03-01\",\n    \"managerId\": \"emp_456\",\n    \"workLocation\": \"Lagos\",\n    \"personal\": {\n      \"phone\": \"+2348012345678\"\n    },\n    \"compensation\": {\n      \"annualSalaryMinor\": 600000000,\n      \"currency\": \"NGN\",\n      \"payFrequency\": \"MONTHLY\",\n      \"bankName\": \"GTBank\",\n      \"bankAccountLast4\": \"6789\"\n    }\n  }\n}"
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"emp-123\",\n    \"employeeId\": \"UDU-EMP-0001\",\n    \"fullName\": \"Ada Lovelace\",\n    \"email\": \"ada@acme.com\",\n    \"status\": \"ACTIVE\",\n    \"jobTitle\": \"Lead Engineer\",\n    \"employmentType\": \"FULL_TIME\",\n    \"pfaCode\": \"0025\",\n    \"pensionProvider\": \"Stanbic IBTC Pension Managers\",\n    \"pensionRsaNumber\": \"PEN100234567890\",\n    \"tin\": \"12345678-0001\",\n    \"personal\": {\n      \"firstName\": \"Ada\",\n      \"lastName\": \"Lovelace\",\n      \"phone\": \"+2348012345678\"\n    },\n    \"employment\": {\n      \"jobTitle\": \"Lead Engineer\",\n      \"department\": \"Engineering\",\n      \"employmentType\": \"FULL_TIME\",\n      \"status\": \"ACTIVE\"\n    },\n    \"financial\": {\n      \"bankName\": \"GTBank\",\n      \"bankCode\": \"058\",\n      \"bankAccountLast4\": \"1234\",\n      \"pfaCode\": \"0025\",\n      \"pensionProvider\": \"Stanbic IBTC Pension Managers\",\n      \"pensionRsaNumber\": \"PEN100234567890\",\n      \"tin\": \"12345678-0001\"\n    }\n  }\n}"
+                },
+                {
+                  "name": "404 Not Found",
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Employee not found\",\n  \"error\": {\n    \"message\": \"Employee not found\"\n  }\n}"
                 }
               ]
             },
@@ -4832,7 +5087,7 @@
                 "description": "Update employee profile details using nested personal, employment (departmentId, employmentType, startDate, status, jobTitle), compensation, and payment sections.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"personal\": {\n    \"firstName\": \"Ada\",\n    \"lastName\": \"Lovelace\",\n    \"phone\": \"+2348012345678\"\n  },\n  \"employment\": {\n    \"jobTitle\": \"Lead Engineer\",\n    \"departmentId\": \"dept_123\",\n    \"employmentType\": \"FULL_TIME\",\n    \"startDate\": \"2026-03-01\",\n    \"status\": \"ACTIVE\",\n    \"managerId\": \"emp_456\",\n    \"workLocation\": \"Lagos\"\n  },\n  \"compensation\": {\n    \"annualSalaryMinor\": 600000000,\n    \"currency\": \"NGN\",\n    \"payFrequency\": \"MONTHLY\",\n    \"effectiveDate\": \"2026-11-01\"\n  },\n  \"payment\": {\n    \"bankName\": \"GTBank\",\n    \"accountNumber\": \"0123456789\"\n  }\n}"
+                  "raw": "{\n  \"personal\": {\n    \"firstName\": \"Ada\",\n    \"lastName\": \"Lovelace\",\n    \"phone\": \"+2348012345678\"\n  },\n  \"employment\": {\n    \"jobTitle\": \"Lead Engineer\",\n    \"departmentId\": \"dept_123\",\n    \"employmentType\": \"FULL_TIME\",\n    \"status\": \"ACTIVE\"\n  },\n  \"financial\": {\n    \"bankName\": \"GTBank\",\n    \"bankCode\": \"058\",\n    \"accountNumber\": \"0123456789\",\n    \"pfaCode\": \"0025\",\n    \"pensionProvider\": \"Stanbic IBTC Pension Managers\",\n    \"pensionRsaNumber\": \"PEN100234567890\",\n    \"tin\": \"12345678-0001\"\n  },\n  \"pfaCode\": \"0025\",\n  \"pensionRsaNumber\": \"PEN100234567890\"\n}"
                 }
               },
               "response": [
@@ -5041,6 +5296,54 @@
                 }
               },
               "response": []
+            },
+            {
+              "name": "Get Leave Request Detail (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "description": "Get comprehensive details of a specific leave request including timeline, leave type, and employee info. Roles: OWNER, ADMIN, HR_ADMIN.",
+                "url": {
+                  "raw": "{{baseUrl}}/people/leave/requests/:requestId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "leave",
+                    "requests",
+                    ":requestId"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK - Leave Request Details",
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"request\": {\n      \"id\": \"lr-123\",\n      \"employeeId\": \"emp-123\",\n      \"employeeName\": \"Ada Lovelace\",\n      \"avatarInitials\": \"AL\",\n      \"type\": \"Annual Leave\",\n      \"startDate\": \"2026-12-20\",\n      \"endDate\": \"2026-12-31\",\n      \"days\": 10,\n      \"status\": \"pending\",\n      \"reason\": \"Year-end family vacation\",\n      \"createdAt\": \"2026-11-05T12:00:00.000Z\",\n      \"leaveType\": {\n        \"id\": \"lt-1\",\n        \"name\": \"Annual Leave\",\n        \"paid\": true\n      },\n      \"employee\": {\n        \"id\": \"emp-123\",\n        \"fullName\": \"Ada Lovelace\",\n        \"email\": \"ada@acme.com\",\n        \"department\": \"Engineering\",\n        \"jobTitle\": \"Lead Engineer\"\n      }\n    }\n  }\n}"
+                },
+                {
+                  "name": "404 Not Found",
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Leave request was not found\",\n  \"error\": {\n    \"message\": \"Leave request was not found\"\n  }\n}"
+                }
+              ]
             }
           ]
         },
@@ -5122,7 +5425,7 @@
                     "documents"
                   ]
                 },
-                "description": "Upload document file (multipart/form-data).",
+                "description": "Upload an organization or employee document (multipart/form-data). Allowed categories: Policy, Contract, Identification, Compliance, Compensation, Other. Allowed file types: PDF, DOCX, DOC, JPG, PNG (max 10 MB).",
                 "body": {
                   "mode": "formdata",
                   "formdata": [
@@ -5137,7 +5440,7 @@
                     },
                     {
                       "key": "category",
-                      "value": "EMPLOYMENT"
+                      "value": "Contract"
                     },
                     {
                       "key": "scope",
@@ -5146,7 +5449,34 @@
                   ]
                 }
               },
-              "response": []
+              "response": [
+                {
+                  "name": "201 Created - Document Uploaded",
+                  "status": "Created",
+                  "code": 201,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"document\": {\n      \"id\": \"doc-123\",\n      \"name\": \"Offer Letter\",\n      \"fileName\": \"offer-letter.pdf\",\n      \"category\": \"Contract\",\n      \"scope\": \"COMPANY\",\n      \"mimeType\": \"application/pdf\",\n      \"sizeBytes\": 145200,\n      \"createdAt\": \"2026-11-05T00:00:00.000Z\"\n    }\n  }\n}"
+                },
+                {
+                  "name": "415 Unsupported Media Type (.txt rejected)",
+                  "status": "Unsupported Media Type",
+                  "code": 415,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Unsupported file type \\\"text/plain\\\". Allowed types: PDF, PNG, JPEG, WEBP, DOC, DOCX, XLS, XLSX, CSV.\",\n  \"error\": {\n    \"message\": \"Unsupported file type \\\"text/plain\\\". Allowed types: PDF, PNG, JPEG, WEBP, DOC, DOCX, XLS, XLSX, CSV.\"\n  }\n}"
+                }
+              ]
             },
             {
               "name": "Download Document",
@@ -5336,6 +5666,171 @@
                 "description": "List teams and team leads."
               },
               "response": []
+            },
+            {
+              "name": "Create Team",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/teams",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "teams"
+                  ]
+                },
+                "description": "Create a new team in the organization. Roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Core Platform\",\n  \"description\": \"Backend & infrastructure engineering\",\n  \"leadEmployeeId\": \"emp-123\",\n  \"memberIds\": [\n    \"emp-123\",\n    \"emp-456\"\n  ]\n}"
+                }
+              },
+              "response": [
+                {
+                  "name": "201 Created",
+                  "status": "Created",
+                  "code": 201,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"team-1\",\n    \"name\": \"Core Platform\",\n    \"description\": \"Backend & infrastructure engineering\",\n    \"leadEmployeeId\": \"emp-123\",\n    \"memberIds\": [\n      \"emp-123\",\n      \"emp-456\"\n    ]\n  }\n}"
+                },
+                {
+                  "name": "409 Conflict",
+                  "status": "Conflict",
+                  "code": 409,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"A team with this name already exists\",\n  \"data\": {\n    \"message\": \"A team with this name already exists\"\n  }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Update Team",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/teams/:teamId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "teams",
+                    ":teamId"
+                  ]
+                },
+                "description": "Update a team name, description, lead, or members. Roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Platform Engineering\",\n  \"leadEmployeeId\": \"emp-456\",\n  \"memberIds\": [\n    \"emp-123\",\n    \"emp-456\"\n  ]\n}"
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"team-1\",\n    \"name\": \"Platform Engineering\",\n    \"description\": \"Backend & infrastructure engineering\",\n    \"leadEmployeeId\": \"emp-456\",\n    \"memberIds\": [\n      \"emp-123\",\n      \"emp-456\"\n    ]\n  }\n}"
+                },
+                {
+                  "name": "404 Not Found / 403 Forbidden",
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Resource not found or access denied\",\n  \"error\": {\n    \"message\": \"Resource not found or access denied\"\n  }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Delete Team",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/teams/:teamId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "teams",
+                    ":teamId"
+                  ]
+                },
+                "description": "Delete a team by ID. Roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+              },
+              "response": [
+                {
+                  "name": "204 No Content",
+                  "status": "No Content",
+                  "code": 204,
+                  "header": [],
+                  "body": ""
+                },
+                {
+                  "name": "404 Not Found / 403 Forbidden",
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Resource not found or access denied\",\n  \"error\": {\n    \"message\": \"Resource not found or access denied\"\n  }\n}"
+                }
+              ]
             }
           ]
         },
@@ -5442,6 +5937,171 @@
                 }
               },
               "response": []
+            },
+            {
+              "name": "Create People Onboarding Template",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{sessionToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/people/onboarding/templates",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "onboarding",
+                    "templates"
+                  ]
+                },
+                "description": "Create an onboarding checklist template under /people/onboarding/templates.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Engineering Onboarding\",\n  \"departmentIds\": [\n    \"dep-eng\"\n  ],\n  \"checklist\": [\n    {\n      \"label\": \"Sign NDA & Contract\",\n      \"stage\": \"Before day one\"\n    },\n    {\n      \"label\": \"Setup MacBook & GitHub access\",\n      \"stage\": \"Day one\"\n    }\n  ]\n}"
+                }
+              },
+              "response": [
+                {
+                  "name": "201 Created",
+                  "status": "Created",
+                  "code": 201,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"tpl-1\",\n    \"name\": \"Engineering Onboarding\",\n    \"departmentIds\": [\n      \"dep-eng\"\n    ],\n    \"checklist\": [\n      {\n        \"id\": \"item-1\",\n        \"label\": \"Sign NDA & Contract\",\n        \"stage\": \"Before day one\"\n      },\n      {\n        \"id\": \"item-2\",\n        \"label\": \"Setup MacBook & GitHub access\",\n        \"stage\": \"Day one\"\n      }\n    ]\n  }\n}"
+                },
+                {
+                  "name": "404 Not Found / 403 Forbidden",
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Resource not found or access denied\",\n  \"error\": {\n    \"message\": \"Resource not found or access denied\"\n  }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Update People Onboarding Template",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "description": "Update an existing onboarding checklist template. Roles: OWNER, ADMIN.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Engineering Onboarding v2\",\n  \"department\": \"Engineering\",\n  \"tasks\": [\n    {\n      \"title\": \"Complete tax & pension profile\",\n      \"description\": \"Fill TIN, PFA and RSA\",\n      \"category\": \"Compliance\",\n      \"dueDays\": 3,\n      \"required\": true\n    }\n  ]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/people/onboarding/templates/:templateId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "onboarding",
+                    "templates",
+                    ":templateId"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"template\": {\n      \"id\": \"tpl-123\",\n      \"name\": \"Engineering Onboarding v2\",\n      \"department\": \"Engineering\",\n      \"tasks\": []\n    }\n  }\n}"
+                },
+                {
+                  "name": "404 Not Found",
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Onboarding template not found\",\n  \"error\": {\n    \"message\": \"Onboarding template not found\"\n  }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Delete People Onboarding Template",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "description": "Delete an onboarding checklist template. Roles: OWNER, ADMIN.",
+                "url": {
+                  "raw": "{{baseUrl}}/people/onboarding/templates/:templateId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "onboarding",
+                    "templates",
+                    ":templateId"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"deleted\": true,\n    \"id\": \"tpl-123\"\n  }\n}"
+                },
+                {
+                  "name": "404 Not Found",
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Onboarding template not found\",\n  \"error\": {\n    \"message\": \"Onboarding template not found\"\n  }\n}"
+                }
+              ]
             }
           ]
         }
@@ -6295,6 +6955,54 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employer_code\": \"EMP001\",\n    \"submitted_count\": 10,\n    \"submitted_amount\": \"1250000.00\",\n    \"paid_count\": 8,\n    \"paid_amount\": \"1000000.00\",\n    \"disbursed_count\": 5,\n    \"disbursed_amount\": \"625000.00\"\n  }\n}"
             }
           ]
+        },
+        {
+          "name": "Cancel Remittance Schedule",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Cancel an unpaid/un-disbursed pension remittance schedule, freeing the linked payroll run to be re-filed. Roles: OWNER, ADMIN, HR_ADMIN.",
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "cancel"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK - Schedule Cancelled",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Remittance schedule cancelled successfully\",\n    \"schedule\": {\n      \"id\": \"sch-123\",\n      \"status\": \"CANCELLED\"\n    }\n  }\n}"
+            },
+            {
+              "name": "400 Bad Request",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Cannot cancel a remittance schedule with status PAID\",\n  \"error\": {\n    \"message\": \"Cannot cancel a remittance schedule with status PAID\"\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -6686,7 +7394,7 @@
           ]
         },
         {
-          "name": "Toggle Card Freeze (Admin)",
+          "name": "Toggle Card Freeze (Admin or Cardholder Self-Freeze)",
           "request": {
             "method": "PATCH",
             "header": [
@@ -6715,7 +7423,7 @@
                 "freeze"
               ]
             },
-            "description": "Freezes or unfreezes a corporate card (FREEZE or UNFREEZE)."
+            "description": "Freeze or unfreeze a corporate card. Employees/Managers can freeze (freeze: true) their own card; only OWNER/ADMIN can unfreeze (freeze: false) or freeze another employee's card."
           },
           "response": [
             {
@@ -6730,6 +7438,19 @@
                 }
               ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Corporate card frozen successfully\",\n  \"data\": {\n    \"card\": {\n      \"id\": \"crd_stack_0192\",\n      \"status\": \"FROZEN\"\n    }\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Employee attempting to unfreeze)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Only organization administrators can unfreeze a corporate card\",\n  \"error\": {\n    \"message\": \"Only organization administrators can unfreeze a corporate card\"\n  }\n}"
             }
           ]
         },
@@ -6778,6 +7499,1942 @@
                 }
               ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Card spending limit updated successfully\",\n  \"data\": {\n    \"card\": {\n      \"id\": \"crd_stack_0192\",\n      \"spendingLimitKobo\": 75000000,\n      \"spendingInterval\": \"MONTHLY\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Corporate Card Transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/banking/cards/:id/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "banking",
+                "cards",
+                ":id",
+                "transactions"
+              ]
+            },
+            "description": "Retrieve transactions and spending summary for a corporate card. Accessible to admins and the cardholder employee."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"cardId\": \"card-1\",\n    \"maskedPan\": \"5399 **** **** 1234\",\n    \"brand\": \"MASTERCARD\",\n    \"status\": \"ACTIVE\",\n    \"currency\": \"NGN\",\n    \"spendingLimitKobo\": 50000000,\n    \"spendingInterval\": \"MONTHLY\",\n    \"totalSpentKobo\": 2500000,\n    \"remainingLimitKobo\": 47500000,\n    \"transactions\": [\n      {\n        \"id\": \"exp-1\",\n        \"cardId\": \"card-1\",\n        \"employeeId\": \"emp-1\",\n        \"amount\": 25000,\n        \"amountKobo\": 2500000,\n        \"currency\": \"NGN\",\n        \"category\": \"Corporate Card\",\n        \"description\": \"Corporate Card transaction at Uber Nigeria\",\n        \"status\": \"PENDING\",\n        \"createdAt\": \"2026-10-01T10:00:00.000Z\"\n      }\n    ]\n  }\n}"
+            },
+            {
+              "name": "404 Not Found / 403 Forbidden",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Resource not found or access denied\",\n  \"error\": {\n    \"message\": \"Resource not found or access denied\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "StackHR Platform Admin",
+      "description": "Cross-tenant platform administration endpoints for stackhr-admin portal (requires STACKHR_ADMIN or STACKHR_SUPPORT role).",
+      "item": [
+        {
+          "name": "Admin Dashboard Metrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "dashboard"
+              ]
+            },
+            "description": "Platform-wide metrics, business status counts, revenue estimate, recent activity, and system alerts."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"metrics\": {\n      \"totalBusinesses\": 14,\n      \"businessByStatus\": {\n        \"active\": 10,\n        \"trial\": 2,\n        \"suspended\": 1,\n        \"pending_verification\": 1,\n        \"inactive\": 0\n      },\n      \"totalEmployees\": 245,\n      \"activeEmployees\": 230,\n      \"totalPayrollRuns\": 48,\n      \"completedPayrollRuns\": 45,\n      \"totalPayrollNetMajor\": 142500000,\n      \"totalDepositBalanceKobo\": 8500000000,\n      \"estimatedMonthlyRevenueMajor\": 1452500,\n      \"waitlistCount\": 120,\n      \"dlqDepth\": 0\n    },\n    \"recentActivity\": [],\n    \"alerts\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Businesses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/businesses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "businesses"
+              ]
+            },
+            "description": "List all tenant businesses with optional status and search filters."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 50,\n    \"businesses\": [\n      {\n        \"id\": \"org-1\",\n        \"name\": \"Acme Corp\",\n        \"slug\": \"acme-corp\",\n        \"status\": \"active\",\n        \"kybStatus\": \"VERIFIED\",\n        \"employeeCount\": 25\n      }\n    ]\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Export Businesses CSV",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/businesses/export",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "businesses",
+                "export"
+              ]
+            },
+            "description": "Export tenant businesses as CSV and JSON."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"count\": 1,\n    \"csv\": \"id,name,slug,status...\",\n    \"businesses\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Business Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/businesses/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "businesses",
+                ":id"
+              ]
+            },
+            "description": "Get detailed profile, counts, deposit account, and recent runs for a business."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"business\": {\n      \"id\": \"org-1\",\n      \"name\": \"Acme Corp\",\n      \"status\": \"active\"\n    }\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Suspend Business",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/businesses/:id/suspend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "businesses",
+                ":id",
+                "suspend"
+              ]
+            },
+            "description": "Suspend a tenant business and revoke active sessions.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Compliance review required\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Business status updated to suspended\",\n    \"business\": {\n      \"id\": \"org-1\",\n      \"status\": \"suspended\"\n    }\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Reactivate Business",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/businesses/:id/reactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "businesses",
+                ":id",
+                "reactivate"
+              ]
+            },
+            "description": "Reactivate a suspended tenant business.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"KYB compliance verified\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Business status updated to active\",\n    \"business\": {\n      \"id\": \"org-1\",\n      \"status\": \"active\"\n    }\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Cross-Business Employees",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/employees",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "employees"
+              ]
+            },
+            "description": "List employees across all businesses with filters (organizationId, status, search)."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 50,\n    \"employees\": [\n      {\n        \"id\": \"emp-1\",\n        \"fullName\": \"Ada Okafor\",\n        \"organizationId\": \"org-1\"\n      }\n    ]\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Cross-Business Employee Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/employees/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "employees",
+                ":id"
+              ]
+            },
+            "description": "Get full employee details across any business."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employee\": {\n      \"id\": \"emp-1\",\n      \"fullName\": \"Ada Okafor\"\n    }\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Cross-Business Payroll Runs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/payroll/runs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "payroll",
+                "runs"
+              ]
+            },
+            "description": "List payroll runs across all organizations with status/period filters."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 50,\n    \"runs\": [\n      {\n        \"id\": \"run-1\",\n        \"title\": \"October 2026 Payroll\",\n        \"status\": \"RECONCILED\"\n      }\n    ]\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Cross-Business Payroll Run Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/payroll/runs/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "payroll",
+                "runs",
+                ":id"
+              ]
+            },
+            "description": "Get full payroll run detail including items and payment batch."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"run\": {\n      \"id\": \"run-1\",\n      \"status\": \"RECONCILED\"\n    }\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Payroll Exceptions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/payroll/exceptions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "payroll",
+                "exceptions"
+              ]
+            },
+            "description": "List payroll shortfalls, failed runs, and employees missing payout bank details."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"exceptions\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Platform Finance Overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/finance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "finance"
+              ]
+            },
+            "description": "Cross-business deposit accounts, payment batches, single transfers, corporate cards, failed transactions, and reconciliation."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"summary\": {\n      \"totalDepositAccounts\": 1,\n      \"totalBalanceKobo\": 1500000000\n    },\n    \"depositAccounts\": [],\n    \"paymentBatches\": [],\n    \"transfers\": [],\n    \"reconciliation\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Subscriptions & Billing",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/subscriptions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "subscriptions"
+              ]
+            },
+            "description": "List organization subscriptions, plans, and invoices."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 1,\n    \"plans\": [],\n    \"subscriptions\": [],\n    \"invoices\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Business Subscription",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/subscriptions/:organizationId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "subscriptions",
+                ":organizationId"
+              ]
+            },
+            "description": "Update a business subscription plan, billing cycle, or status.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"GROWTH\",\n  \"status\": \"active\",\n  \"billingCycle\": \"MONTHLY\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Subscription updated successfully\"\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List KYB Verification Queue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/compliance/kyb",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "compliance",
+                "kyb"
+              ]
+            },
+            "description": "List organizations in the KYB/KYC compliance verification queue with uploaded documents."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 1,\n    \"verifications\": [\n      {\n        \"organizationId\": \"org-1\",\n        \"organizationName\": \"Acme Corp\",\n        \"kybStatus\": \"PENDING\",\n        \"verificationDocuments\": []\n      }\n    ]\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Approve or Reject KYB Verification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/compliance/kyb/:organizationId/decide",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "compliance",
+                "kyb",
+                ":organizationId",
+                "decide"
+              ]
+            },
+            "description": "Approve (VERIFIED) or reject (REJECTED) an organization KYB submission.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"APPROVED\",\n  \"notes\": \"CAC and TIN documents verified\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"KYB verification marked VERIFIED\"\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Platform & Business Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "users"
+              ]
+            },
+            "description": "List users across the platform with role, userType, and ban status filters."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 1,\n    \"users\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Platform Admin User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "users"
+              ]
+            },
+            "description": "Create a new STACKHR_ADMIN or STACKHR_SUPPORT user.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Support Lead\",\n  \"email\": \"support@stackhr.app\",\n  \"role\": \"STACKHR_SUPPORT\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Platform admin user created successfully\"\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update or Ban User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/users/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "users",
+                ":id"
+              ]
+            },
+            "description": "Update user role or ban/unban a user.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"banned\": true,\n  \"banReason\": \"Security policy violation\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"User updated successfully\"\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Roles & Permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "roles"
+              ]
+            },
+            "description": "List platform and business roles and permission scopes."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"roles\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Active Sessions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "sessions"
+              ]
+            },
+            "description": "List recent and active login sessions across the platform."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 1,\n    \"sessions\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Revoke User Session",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/sessions/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "sessions",
+                ":id"
+              ]
+            },
+            "description": "Revoke a specific session by ID."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Session revoked successfully\"\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Platform Audit Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/audit-logs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "audit-logs"
+              ]
+            },
+            "description": "List platform-wide audit events with filtering."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 0,\n    \"events\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Audit Log Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/audit-logs/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "audit-logs",
+                ":id"
+              ]
+            },
+            "description": "Get detail of a specific audit log event."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"event\": {\n      \"id\": \"aud-1\",\n      \"action\": \"business.suspended\"\n    }\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Support Tickets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/support/tickets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "support",
+                "tickets"
+              ]
+            },
+            "description": "List cross-business support tickets."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 0,\n    \"tickets\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Support Ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/support/tickets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "support",
+                "tickets"
+              ]
+            },
+            "description": "Create a support ticket for an organization.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"org-1\",\n  \"subject\": \"Payroll reconciliation inquiry\",\n  \"description\": \"Need assistance verifying NIP payout\",\n  \"priority\": \"HIGH\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"ticket\": {\n      \"id\": \"tkt-1\",\n      \"status\": \"OPEN\"\n    }\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Support Ticket",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/support/tickets/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "support",
+                "tickets",
+                ":id"
+              ]
+            },
+            "description": "Update support ticket status, priority, or resolution note.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"RESOLVED\",\n  \"resolutionNote\": \"Verified settlement with Anchor\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"ticket\": {\n      \"id\": \"tkt-1\",\n      \"status\": \"RESOLVED\"\n    }\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List System Notifications & Announcements",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "notifications"
+              ]
+            },
+            "description": "List system-wide notifications and announcements."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 0,\n    \"notifications\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Broadcast Platform Announcement",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/notifications/announcements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "notifications",
+                "announcements"
+              ]
+            },
+            "description": "Broadcast a platform announcement.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Scheduled Maintenance\",\n  \"message\": \"PenCentral gateway maintenance at 02:00 WAT\",\n  \"severity\": \"INFO\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Announcement broadcast successfully\"\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Cross-Business Documents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "documents"
+              ]
+            },
+            "description": "List uploaded documents across all businesses."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 0,\n    \"documents\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Platform System Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/system-health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "system-health"
+              ]
+            },
+            "description": "Detailed system health: DB latency, memory, background outbox queues, circuit breakers, and recent failures."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"status\": \"healthy\",\n    \"database\": {\n      \"status\": \"up\",\n      \"responseTimeMs\": 4\n    },\n    \"backgroundJobs\": {\n      \"outboxPending\": 0,\n      \"dlqDepth\": 0\n    },\n    \"circuitBreakers\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Business Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Update a business status (active, suspended, pending_verification, trial, inactive). Roles: STACKHR_ADMIN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\",\n  \"reason\": \"KYB verified and activated\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/businesses/:id/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "businesses",
+                ":id",
+                "status"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"org-123\",\n    \"status\": \"active\"\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Subscription Plans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "List available StackHR subscription plans and pricing tiers. Roles: STACKHR_ADMIN, STACKHR_SUPPORT.",
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/subscriptions/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "subscriptions",
+                "plans"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"plans\": [\n      {\n        \"id\": \"growth\",\n        \"name\": \"Growth\",\n        \"baseMonthlyFeeMajor\": 25000,\n        \"pricePerEmployeeMajor\": 2000\n      }\n    ]\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Business KYB Verification Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Get KYB verification details and uploaded compliance documents for a specific business. Roles: STACKHR_ADMIN, STACKHR_SUPPORT.",
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/compliance/kyb/:organizationId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "compliance",
+                "kyb",
+                ":organizationId"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"verification\": {\n      \"organizationId\": \"org-123\",\n      \"kybStatus\": \"PENDING\",\n      \"documents\": []\n    }\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Support Ticket Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Get details of a single support ticket. Roles: STACKHR_ADMIN, STACKHR_SUPPORT.",
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/support/tickets/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "support",
+                "tickets",
+                ":id"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"ticket\": {\n      \"id\": \"tkt-123\",\n      \"subject\": \"Payroll question\",\n      \"status\": \"OPEN\",\n      \"priority\": \"MEDIUM\"\n    }\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin Token)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
             }
           ]
         }

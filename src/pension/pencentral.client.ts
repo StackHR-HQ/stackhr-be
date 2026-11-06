@@ -1,9 +1,8 @@
 import {
   Injectable,
   Logger,
+  BadGatewayException,
   BadRequestException,
-  UnauthorizedException,
-  ForbiddenException,
   NotFoundException,
   ConflictException,
   UnprocessableEntityException,
@@ -63,6 +62,257 @@ export class PenCentralClient {
     return `Bearer ${key}`;
   }
 
+  private isSandboxMockEnabled(): boolean {
+    const mode = process.env.PENCENTRAL_MOCK_MODE;
+    if (mode === 'true') return true;
+    if (mode === 'false') return false;
+    const key = this.apiKey ?? process.env.PENCENTRAL_API_KEY;
+    return !key && process.env.NODE_ENV !== 'test';
+  }
+
+  private handleMockRequest<T>(
+    endpoint: string,
+    method: string,
+    body?: any,
+  ): T {
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+    if (endpoint === '/partner-api/v1/whoami') {
+      return {
+        partner_id: 'partner_mock_stackhr',
+        partner_name: 'StackHR Sandbox Partner',
+        partner_status: 'active',
+        credential_id: 'cred_mock_sandbox',
+        credential_scopes: [
+          'employers:read',
+          'employers:write',
+          'schedules:write',
+          'payments:write',
+        ],
+        credential_environment: 'Sandbox',
+        credential_expires_at: null,
+      } as unknown as T;
+    }
+
+    if (
+      endpoint === '/partner-api/v1/employers/validations' &&
+      method === 'POST'
+    ) {
+      const code = String(body?.employer_code ?? 'PR0000126311').toUpperCase();
+      return {
+        validation_id: `ev_mock_${code}`,
+        employer_code: code,
+        employer_name:
+          code === 'PR0000126311'
+            ? 'UNDERDOG PRODUCTIONS LIMITED'
+            : `STACKHR SANDBOX EMPLOYER (${code})`,
+        valid: true,
+        expires_at: expiresAt,
+      } as unknown as T;
+    }
+
+    if (endpoint === '/partner-api/v1/employers' && method === 'POST') {
+      const valId = String(body?.validation_id ?? '');
+      const code = valId.startsWith('ev_mock_')
+        ? valId.replace('ev_mock_', '')
+        : 'PR0000126311';
+      return {
+        id: `grant_mock_${code}`,
+        employer_code: code,
+        employer_name:
+          code === 'PR0000126311'
+            ? 'UNDERDOG PRODUCTIONS LIMITED'
+            : `STACKHR SANDBOX EMPLOYER (${code})`,
+        status: 'active',
+        attached_at: now,
+      } as unknown as T;
+    }
+
+    if (endpoint === '/partner-api/v1/employers' && method === 'GET') {
+      return [
+        {
+          id: 'grant_mock_PR0000126311',
+          employer_code: 'PR0000126311',
+          employer_name: 'UNDERDOG PRODUCTIONS LIMITED',
+          status: 'active',
+          attached_at: now,
+        },
+      ] as unknown as T;
+    }
+
+    if (
+      endpoint.startsWith('/partner-api/v1/employers/') &&
+      method === 'DELETE'
+    ) {
+      return undefined as unknown as T;
+    }
+
+    if (
+      endpoint === '/partner-api/v1/schedule-validations' &&
+      method === 'POST'
+    ) {
+      const rows = Array.isArray(body?.rows) ? body.rows : [];
+      const total = rows
+        .reduce((sum: number, r: any) => sum + Number(r.declared_total ?? 0), 0)
+        .toFixed(2);
+      return {
+        validation_id: `val_mock_${randomUUID().slice(0, 8)}`,
+        status: 'success',
+        employer_code: body?.employer_code ?? 'PR0000126311',
+        total_rows: rows.length,
+        valid_rows: rows.length,
+        invalid_rows: 0,
+        pending_rows: 0,
+        declared_total: total,
+        computed_total: total,
+        created_at: now,
+        completed_at: now,
+      } as unknown as T;
+    }
+
+    if (
+      endpoint.includes('/schedule-validations/') &&
+      endpoint.includes('/errors')
+    ) {
+      return {
+        validation_id: 'val_mock',
+        total_errors: 0,
+        errors: [],
+      } as unknown as T;
+    }
+
+    if (endpoint.startsWith('/partner-api/v1/schedule-validations/')) {
+      const valId = endpoint.split('/').pop() ?? 'val_mock';
+      return {
+        validation_id: valId,
+        status: 'success',
+        employer_code: 'PR0000126311',
+        total_rows: 1,
+        valid_rows: 1,
+        invalid_rows: 0,
+        pending_rows: 0,
+        declared_total: '10000.00',
+        computed_total: '10000.00',
+        created_at: now,
+        completed_at: now,
+      } as unknown as T;
+    }
+
+    if (endpoint === '/partner-api/v1/schedules' && method === 'POST') {
+      return {
+        schedule_id: `sch_mock_${randomUUID().slice(0, 8)}`,
+        status: 'submitted',
+        payment_status: 'unpaid',
+        employer_code: 'PR0000126311',
+        validation_id: body?.validation_id ?? 'val_mock',
+        no_of_rows: 1,
+        no_of_pfas: 1,
+        total_employee_contribution: '5000.00',
+        total_employer_contribution: '5000.00',
+        total_employee_voluntary: '0.00',
+        total_employer_voluntary: '0.00',
+        total_other_contribution: '0.00',
+        total_contribution: '10000.00',
+        created_at: now,
+      } as unknown as T;
+    }
+
+    if (endpoint.endsWith('/payments') && method === 'POST') {
+      const scheduleId = endpoint.split('/')[4] ?? 'sch_mock';
+      return {
+        payment_id: `pay_mock_${randomUUID().slice(0, 8)}`,
+        schedule_id: scheduleId,
+        status: 'pending',
+        provider: 'MONNIFY_SANDBOX',
+        contribution_amount: '10000.00',
+        fee_amount: '100.00',
+        total_amount: '10100.00',
+        currency: 'NGN',
+        account_number: '9988776655',
+        account_name: 'PENCENTRAL / UNDERDOG PRODUCTIONS',
+        bank_name: 'MONIEPOINT MFB',
+        expires_at: expiresAt,
+        created_at: now,
+      } as unknown as T;
+    }
+
+    if (endpoint.includes('/payments/') && endpoint.endsWith('/receipt')) {
+      const paymentId = endpoint.split('/')[4] ?? 'pay_mock';
+      return {
+        receipt_id: `rcp_mock_${paymentId}`,
+        payment_id: paymentId,
+        schedule_id: 'sch_mock',
+        partner_id: 'partner_mock_stackhr',
+        status: 'issued',
+        issued_at: now,
+        created_at: now,
+      } as unknown as T;
+    }
+
+    if (endpoint.startsWith('/partner-api/v1/payments/')) {
+      const paymentId = endpoint.split('/')[4] ?? 'pay_mock';
+      return {
+        payment_id: paymentId,
+        schedule_id: 'sch_mock',
+        status: 'succeeded',
+        provider: 'MONNIFY_SANDBOX',
+        contribution_amount: '10000.00',
+        fee_amount: '100.00',
+        total_amount: '10100.00',
+        currency: 'NGN',
+        account_number: '9988776655',
+        account_name: 'PENCENTRAL / UNDERDOG PRODUCTIONS',
+        bank_name: 'MONIEPOINT MFB',
+        expires_at: expiresAt,
+        created_at: now,
+      } as unknown as T;
+    }
+
+    if (endpoint.endsWith('/disbursements')) {
+      const scheduleId = endpoint.split('/')[4] ?? 'sch_mock';
+      return {
+        schedule_id: scheduleId,
+        status: 'completed',
+        pfas: [
+          {
+            pfa_code: '0023',
+            pfa_name: 'Stanbic IBTC Pension Managers Limited',
+            amount: '10000.00',
+            credited_amount: '10000.00',
+            status: 'completed',
+            completed_at: now,
+          },
+        ],
+      } as unknown as T;
+    }
+
+    if (endpoint.startsWith('/partner-api/v1/dashboard')) {
+      return {
+        employer_code: 'PR0000126311',
+        schedule_count: 1,
+        unsubmitted_count: 0,
+        submitted_count: 1,
+        cancelled_count: 0,
+        total_remittance: '10000.00',
+      } as unknown as T;
+    }
+
+    if (endpoint.startsWith('/partner-api/v1/reports/compliance')) {
+      return {
+        employer_code: 'PR0000126311',
+        submitted_count: 1,
+        submitted_amount: '10000.00',
+        paid_count: 1,
+        paid_amount: '10000.00',
+        disbursed_count: 1,
+        disbursed_amount: '10000.00',
+      } as unknown as T;
+    }
+
+    return {} as unknown as T;
+  }
+
   private async request<T>(
     endpoint: string,
     options: {
@@ -71,8 +321,15 @@ export class PenCentralClient {
       idempotencyKey?: string;
     } = {},
   ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
     const method = options.method ?? 'GET';
+    if (this.isSandboxMockEnabled()) {
+      this.logger.debug(
+        `PenCentral running in sandbox mock mode for ${method} ${endpoint}`,
+      );
+      return this.handleMockRequest<T>(endpoint, method, options.body);
+    }
+
+    const url = `${this.baseUrl}${endpoint}`;
     const headers: Record<string, string> = {
       Authorization: this.getAuthHeader(),
       'Content-Type': 'application/json',
@@ -151,9 +408,13 @@ export class PenCentralClient {
         case 400:
           throw new BadRequestException(msg);
         case 401:
-          throw new UnauthorizedException(msg);
         case 403:
-          throw new ForbiddenException(msg);
+          if (process.env.PENCENTRAL_MOCK_MODE === 'true') {
+            return this.handleMockRequest<T>(endpoint, method, options.body);
+          }
+          throw new BadGatewayException(
+            `PenCentral upstream partner authentication failed (${response.status}): ${msg}`,
+          );
         case 404:
           throw new NotFoundException(msg);
         case 409:

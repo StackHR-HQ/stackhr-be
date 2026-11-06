@@ -71,6 +71,7 @@ describe('SpendController', () => {
       mockUser,
       'exp-123',
       dto,
+      undefined,
     );
     expect(result.message).toBe('Attached');
   });
