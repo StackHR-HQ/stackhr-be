@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -264,6 +265,33 @@ export class SpendService {
     };
   }
 
+  private async ensureCanCancelRecord(
+    user: AuthenticatedUser,
+    orgId: string,
+    recordEmployeeId: string,
+    recordType: string,
+  ) {
+    const isAdmin =
+      user.role === USER_ROLES.BUSINESS_OWNER ||
+      user.role === USER_ROLES.BUSINESS_ADMIN ||
+      user.role === USER_ROLES.HR_ADMIN ||
+      user.userType === 'STACKHR_ADMIN';
+
+    if (isAdmin) {
+      return;
+    }
+
+    const employee = await this.prisma.employee.findFirst({
+      where: { email: user.email, organizationId: orgId },
+    });
+
+    if (!employee || employee.id !== recordEmployeeId) {
+      throw new ForbiddenException(
+        `You can only cancel your own ${recordType}`,
+      );
+    }
+  }
+
   async cancelExpense(user: AuthenticatedUser, id: string) {
     const orgId = this.checkOrgContext(user);
     const expense = await this.prisma.expense.findFirst({
@@ -273,6 +301,13 @@ export class SpendService {
     if (!expense) {
       throw new NotFoundException(`Expense claim with ID "${id}" not found`);
     }
+
+    await this.ensureCanCancelRecord(
+      user,
+      orgId,
+      expense.employeeId,
+      'expense claim',
+    );
 
     if (expense.status === 'CANCELLED') {
       throw new BadRequestException('Expense claim is already cancelled');
@@ -316,6 +351,13 @@ export class SpendService {
     if (!advance) {
       throw new NotFoundException(`Salary advance with ID "${id}" not found`);
     }
+
+    await this.ensureCanCancelRecord(
+      user,
+      orgId,
+      advance.employeeId,
+      'salary advance',
+    );
 
     if (advance.status === 'CANCELLED') {
       throw new BadRequestException('Salary advance is already cancelled');
@@ -426,9 +468,10 @@ export class SpendService {
       const employee = await this.prisma.employee.findFirst({
         where: { email: user.email, organizationId: orgId },
       });
-      if (employee) {
-        where.employeeId = employee.id;
+      if (!employee) {
+        return { expenses: [] };
       }
+      where.employeeId = employee.id;
     }
 
     const expenses = await this.prisma.expense.findMany({
@@ -458,9 +501,10 @@ export class SpendService {
       const employee = await this.prisma.employee.findFirst({
         where: { email: user.email, organizationId: orgId },
       });
-      if (employee) {
-        where.employeeId = employee.id;
+      if (!employee) {
+        return { advances: [], salaryAdvances: [] };
       }
+      where.employeeId = employee.id;
     }
 
     const advances = await this.prisma.salaryAdvance.findMany({
@@ -491,9 +535,10 @@ export class SpendService {
       const employee = await this.prisma.employee.findFirst({
         where: { email: user.email, organizationId: orgId },
       });
-      if (employee) {
-        where.employeeId = employee.id;
+      if (!employee) {
+        return { reimbursements: [] };
       }
+      where.employeeId = employee.id;
     }
 
     const reimbursements = await this.prisma.reimbursement.findMany({
@@ -594,6 +639,13 @@ export class SpendService {
         'Reimbursement claim with ID ' + id + ' not found',
       );
     }
+
+    await this.ensureCanCancelRecord(
+      user,
+      orgId,
+      reimbursement.employeeId,
+      'reimbursement claim',
+    );
 
     if (reimbursement.status === 'CANCELLED') {
       throw new BadRequestException('Reimbursement claim is already cancelled');

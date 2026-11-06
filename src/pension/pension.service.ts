@@ -330,9 +330,20 @@ export class PensionService {
     }
 
     if (payrollRun.pensionRemittanceSchedule) {
-      throw new ConflictException(
-        `A pension remittance schedule already exists for payroll run ${payrollRunId}`,
-      );
+      const existing = payrollRun.pensionRemittanceSchedule;
+      const canReplace =
+        existing.status === 'CANCELLED' ||
+        existing.status === 'VALIDATION_FAILED';
+
+      if (!canReplace) {
+        throw new ConflictException(
+          `A pension remittance schedule already exists for payroll run ${payrollRunId} (status: ${existing.status})`,
+        );
+      }
+
+      await this.prisma.pensionRemittanceSchedule.delete({
+        where: { id: existing.id },
+      });
     }
 
     // Must be at least APPROVED or EXECUTED
@@ -432,6 +443,40 @@ export class PensionService {
     return {
       message: 'Draft pension remittance schedule created successfully',
       schedule,
+    };
+  }
+
+  async cancelSchedule(user: AuthenticatedUser, scheduleId: string) {
+    const orgId = this.checkOrgContext(user);
+
+    const schedule = await this.prisma.pensionRemittanceSchedule.findFirst({
+      where: { id: scheduleId, organizationId: orgId },
+    });
+
+    if (!schedule) {
+      throw new NotFoundException(
+        `Remittance schedule ${scheduleId} not found`,
+      );
+    }
+
+    if (schedule.status === 'CANCELLED') {
+      throw new BadRequestException('Remittance schedule is already cancelled');
+    }
+
+    if (schedule.status === 'PAID' || schedule.status === 'DISBURSED') {
+      throw new BadRequestException(
+        `Cannot cancel a remittance schedule with status ${schedule.status}`,
+      );
+    }
+
+    const updated = await this.prisma.pensionRemittanceSchedule.update({
+      where: { id: scheduleId },
+      data: { status: 'CANCELLED' },
+    });
+
+    return {
+      message: 'Remittance schedule cancelled successfully',
+      schedule: updated,
     };
   }
 

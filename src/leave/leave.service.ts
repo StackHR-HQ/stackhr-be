@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -316,9 +317,12 @@ export class LeaveService {
   }
 
   async getLeaveRequestDetails(user: AuthenticatedUser, id: string) {
-    this.checkOrgContext(user);
+    const orgId = this.checkOrgContext(user);
     const leaveRequest = await this.prisma.leaveRequest.findFirst({
-      where: { id },
+      where: {
+        id,
+        leaveType: { organizationId: orgId },
+      },
       include: {
         leaveType: true,
         employee: {
@@ -335,6 +339,22 @@ export class LeaveService {
 
     if (!leaveRequest) {
       throw new NotFoundException(`Leave request with ID "${id}" not found`);
+    }
+
+    const isAdminOrManager =
+      user.role === 'BUSINESS_OWNER' ||
+      user.role === 'BUSINESS_ADMIN' ||
+      user.role === 'HR_ADMIN' ||
+      user.role === 'MANAGER' ||
+      user.userType === 'STACKHR_ADMIN';
+
+    if (
+      !isAdminOrManager &&
+      leaveRequest.employee?.email.toLowerCase() !== user.email.toLowerCase()
+    ) {
+      throw new ForbiddenException(
+        'You do not have permission to view this leave request',
+      );
     }
 
     return { leaveRequest };

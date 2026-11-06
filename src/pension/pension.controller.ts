@@ -108,6 +108,15 @@ export class PensionController {
     return this.pensionService.getSchedule(user, id);
   }
 
+  @Patch('schedules/:id/cancel')
+  @RequireRoles(...PENSION_ADMIN_ROLES)
+  cancelSchedule(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.pensionService.cancelSchedule(user, id);
+  }
+
   @Post('schedules/:id/validate')
   @RequireRoles(...PENSION_ADMIN_ROLES)
   validateSchedule(

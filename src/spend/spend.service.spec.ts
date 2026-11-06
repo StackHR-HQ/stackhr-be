@@ -49,7 +49,7 @@ describe('SpendService', () => {
         updateMany: jest.fn(),
       },
       employee: {
-        findFirst: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue({ id: 'emp-123' }),
       },
     };
 
@@ -323,10 +323,11 @@ describe('SpendService', () => {
   });
 
   describe('cancelReimbursement', () => {
-    it('should cancel pending reimbursement', async () => {
+    it('should cancel pending reimbursement for owner', async () => {
       prismaMock.reimbursement.findFirst.mockResolvedValue({
         id: 'rmb-1',
         status: 'PENDING',
+        employeeId: 'emp-123',
       });
       prismaMock.approvalRequest.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.reimbursement.update.mockResolvedValue({
@@ -336,6 +337,18 @@ describe('SpendService', () => {
 
       const result = await service.cancelReimbursement(mockUser, 'rmb-1');
       expect(result.reimbursement.status).toBe('CANCELLED');
+    });
+
+    it('should throw ForbiddenException if employee attempts to cancel someone elses claim', async () => {
+      prismaMock.reimbursement.findFirst.mockResolvedValue({
+        id: 'rmb-1',
+        status: 'PENDING',
+        employeeId: 'emp-other',
+      });
+
+      await expect(
+        service.cancelReimbursement(mockUser, 'rmb-1'),
+      ).rejects.toThrow('You can only cancel your own reimbursement claim');
     });
   });
 
@@ -435,6 +448,7 @@ describe('SpendService', () => {
       prismaMock.expense.findFirst.mockResolvedValue({
         id: 'exp-1',
         status: 'PENDING',
+        employeeId: 'emp-123',
       });
       prismaMock.approvalRequest.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.expense.update.mockResolvedValue({
@@ -452,6 +466,7 @@ describe('SpendService', () => {
       prismaMock.salaryAdvance.findFirst.mockResolvedValue({
         id: 'adv-1',
         status: 'PENDING',
+        employeeId: 'emp-123',
       });
       prismaMock.approvalRequest.updateMany.mockResolvedValue({ count: 1 });
       prismaMock.salaryAdvance.update.mockResolvedValue({

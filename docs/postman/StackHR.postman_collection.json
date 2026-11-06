@@ -5296,6 +5296,54 @@
                 }
               },
               "response": []
+            },
+            {
+              "name": "Get Leave Request Detail (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "description": "Get comprehensive details of a specific leave request including timeline, leave type, and employee info. Roles: OWNER, ADMIN, HR_ADMIN.",
+                "url": {
+                  "raw": "{{baseUrl}}/people/leave/requests/:requestId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "people",
+                    "leave",
+                    "requests",
+                    ":requestId"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK - Leave Request Details",
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"request\": {\n      \"id\": \"lr-123\",\n      \"employeeId\": \"emp-123\",\n      \"employeeName\": \"Ada Lovelace\",\n      \"avatarInitials\": \"AL\",\n      \"type\": \"Annual Leave\",\n      \"startDate\": \"2026-12-20\",\n      \"endDate\": \"2026-12-31\",\n      \"days\": 10,\n      \"status\": \"pending\",\n      \"reason\": \"Year-end family vacation\",\n      \"createdAt\": \"2026-11-05T12:00:00.000Z\",\n      \"leaveType\": {\n        \"id\": \"lt-1\",\n        \"name\": \"Annual Leave\",\n        \"paid\": true\n      },\n      \"employee\": {\n        \"id\": \"emp-123\",\n        \"fullName\": \"Ada Lovelace\",\n        \"email\": \"ada@acme.com\",\n        \"department\": \"Engineering\",\n        \"jobTitle\": \"Lead Engineer\"\n      }\n    }\n  }\n}"
+                },
+                {
+                  "name": "404 Not Found",
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "body": "{\n  \"success\": false,\n  \"message\": \"Leave request was not found\",\n  \"error\": {\n    \"message\": \"Leave request was not found\"\n  }\n}"
+                }
+              ]
             }
           ]
         },
@@ -6905,6 +6953,54 @@
                 }
               ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"employer_code\": \"EMP001\",\n    \"submitted_count\": 10,\n    \"submitted_amount\": \"1250000.00\",\n    \"paid_count\": 8,\n    \"paid_amount\": \"1000000.00\",\n    \"disbursed_count\": 5,\n    \"disbursed_amount\": \"625000.00\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Cancel Remittance Schedule",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Cancel an unpaid/un-disbursed pension remittance schedule, freeing the linked payroll run to be re-filed. Roles: OWNER, ADMIN, HR_ADMIN.",
+            "url": {
+              "raw": "{{baseUrl}}/pension/schedules/{{scheduleId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "schedules",
+                "{{scheduleId}}",
+                "cancel"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK - Schedule Cancelled",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Remittance schedule cancelled successfully\",\n    \"schedule\": {\n      \"id\": \"sch-123\",\n      \"status\": \"CANCELLED\"\n    }\n  }\n}"
+            },
+            {
+              "name": "400 Bad Request",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Cannot cancel a remittance schedule with status PAID\",\n  \"error\": {\n    \"message\": \"Cannot cancel a remittance schedule with status PAID\"\n  }\n}"
             }
           ]
         }
