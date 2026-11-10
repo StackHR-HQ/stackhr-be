@@ -210,6 +210,31 @@ describe('StackhrAdminService', () => {
     expect(runs.total).toBe(1);
   });
 
+  it('masks employee account numbers in getPayrollRunById', async () => {
+    prismaMock.payrollRun.findUnique.mockResolvedValue({
+      id: 'run-1',
+      organizationId: 'org-1',
+      title: 'September 2026 Payroll',
+      status: 'EXECUTED',
+      items: [
+        {
+          id: 'item-1',
+          employee: {
+            id: 'emp-1',
+            fullName: 'Ada Okafor',
+            accountNumber: '0123456789',
+          },
+        },
+      ],
+      payslips: [],
+      pensionRemittanceSchedule: null,
+    });
+
+    const result = await service.getPayrollRunById('run-1');
+    expect(result.run.items[0].employee?.accountNumber).toBe('******6789');
+    expect(result.run.items[0].employee?.accountNumberLast4).toBe('6789');
+  });
+
   it('lists and decides KYB verification', async () => {
     const kyb = await service.listKybVerifications();
     expect(kyb.verifications).toHaveLength(1);

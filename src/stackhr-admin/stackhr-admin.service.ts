@@ -813,6 +813,18 @@ export class StackhrAdminService {
     return {
       run: {
         ...run,
+        items: run.items.map((item) => ({
+          ...item,
+          employee: item.employee
+            ? {
+                ...item.employee,
+                accountNumber: maskAccountNumber(item.employee.accountNumber),
+                accountNumberLast4: item.employee.accountNumber
+                  ? item.employee.accountNumber.trim().slice(-4)
+                  : null,
+              }
+            : null,
+        })),
         bulkTransfer: (run as any).bulkTransferJson ?? null,
         paymentExportBatch: (run as any).paymentExportBatchJson ?? null,
       },
