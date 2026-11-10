@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { USER_ROLES } from '../auth/auth.constants';
@@ -351,13 +352,15 @@ export class OnboardingService {
           data: { managerId: persistedId(managerKey) },
         });
 
-      if ((db as any).compensationRecord?.create && row.salary > 0) {
-        await (db as any).compensationRecord.create({
+      if (row.salary > 0) {
+        const salaryKobo = Math.round(row.salary * 100);
+        await db.compensationRecord.create({
           data: {
+            id: randomUUID(),
             organizationId,
             employeeId: empId,
             effectiveFrom: row.startDate,
-            basicSalary: row.salary,
+            basicSalary: salaryKobo,
             housingAllowance: 0,
             transportAllowance: 0,
             otherAllowances: 0,
@@ -365,14 +368,14 @@ export class OnboardingService {
             paymentFrequency: 'MONTHLY',
           },
         });
-      }
-      if ((db as any).compensationHistory?.create && row.salary > 0) {
-        await (db as any).compensationHistory.create({
+
+        await db.compensationHistory.create({
           data: {
+            id: randomUUID(),
             organizationId,
             employeeId: empId,
-            previousSalary: 0,
-            newSalary: row.salary,
+            previousSalary: 0n,
+            newSalary: BigInt(salaryKobo),
             annualSalaryMinor: BigInt(row.salary) * 1200n,
             currency: 'NGN',
             payFrequency: 'MONTHLY',

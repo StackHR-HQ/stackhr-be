@@ -63,11 +63,18 @@ export class PenCentralClient {
   }
 
   private isSandboxMockEnabled(): boolean {
-    const mode = process.env.PENCENTRAL_MOCK_MODE;
-    if (mode === 'true') return true;
-    if (mode === 'false') return false;
-    const key = this.apiKey ?? process.env.PENCENTRAL_API_KEY;
-    return !key && process.env.NODE_ENV !== 'test';
+    if (process.env.PENCENTRAL_MOCK_MODE !== 'true') {
+      return false;
+    }
+    if (
+      process.env.NODE_ENV === 'production' ||
+      process.env.PENCENTRAL_ENVIRONMENT !== 'sandbox'
+    ) {
+      throw new Error(
+        'PenCentral mock mode is not allowed outside sandbox environment',
+      );
+    }
+    return true;
   }
 
   private handleMockRequest<T>(
@@ -409,9 +416,9 @@ export class PenCentralClient {
           throw new BadRequestException(msg);
         case 401:
         case 403:
-          if (process.env.PENCENTRAL_MOCK_MODE === 'true') {
-            return this.handleMockRequest<T>(endpoint, method, options.body);
-          }
+          this.logger.error(
+            `PenCentral upstream partner authentication failed (${response.status}): ${msg}`,
+          );
           throw new BadGatewayException(
             `PenCentral upstream partner authentication failed (${response.status}): ${msg}`,
           );

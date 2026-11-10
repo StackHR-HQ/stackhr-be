@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type { AuthenticatedUser } from '../../auth/auth.types';
 import { requirePeopleOrganization } from '../common/people-access';
 import { avatarInitials, toDateOnly } from '../common/people-mappers';
@@ -199,24 +200,58 @@ export class PeopleOnboardingService {
 
       const rawItems = input.checklist ?? input.tasks;
       if (rawItems !== undefined) {
-        await client.onboardingChecklistItem.deleteMany({
+        const existingItems = await client.onboardingChecklistItem.findMany({
           where: { organizationId, templateId },
         });
+        const existingMap = new Map(
+          existingItems.map((item) => [item.id, item]),
+        );
+        const incomingIds = new Set<string>();
+
         for (const [index, item] of rawItems.entries()) {
           const label = requireId(item.label ?? item.title, 'label');
           const stage =
             typeof item.stage === 'string' && item.stage.trim()
               ? item.stage.trim()
               : 'Day one';
-          await client.onboardingChecklistItem.create({
-            data: {
-              organizationId,
-              templateId,
-              label,
-              stage,
-              position: index,
-            },
+          const itemId = typeof item.id === 'string' ? item.id.trim() : null;
+
+          if (itemId && existingMap.has(itemId)) {
+            incomingIds.add(itemId);
+            await client.onboardingChecklistItem.update({
+              where: { id: itemId },
+              data: {
+                label,
+                stage,
+                position: index,
+              },
+            });
+          } else {
+            const created = await client.onboardingChecklistItem.create({
+              data: {
+                id: randomUUID(),
+                organizationId,
+                templateId,
+                label,
+                stage,
+                position: index,
+              },
+            });
+            incomingIds.add(created.id);
+          }
+        }
+
+        // Diff-based cleanup: only delete items that have zero employee completions
+        const toRemove = existingItems.filter((it) => !incomingIds.has(it.id));
+        for (const item of toRemove) {
+          const completionsCount = await client.onboardingItemCompletion.count({
+            where: { organizationId, itemId: item.id },
           });
+          if (completionsCount === 0) {
+            await client.onboardingChecklistItem.delete({
+              where: { id: item.id },
+            });
+          }
         }
       }
 

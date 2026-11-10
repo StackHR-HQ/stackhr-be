@@ -23,6 +23,7 @@ import {
   UpdatePensionConfigDto,
   ValidateEmployerCodeDto,
 } from './dto/pension.dto';
+import { randomUUID } from 'crypto';
 
 const MONTH_NAMES = [
   'January',
@@ -341,6 +342,32 @@ export class PensionService {
         );
       }
 
+      // Snapshot the previous schedule in audit before replacing it,
+      // so there is a local trail if PenCentral ever issued funding accounts.
+      await this.prisma.auditEvent.create({
+        data: {
+          id: randomUUID(),
+          organizationId: orgId,
+          targetType: 'PensionRemittanceSchedule',
+          targetId: existing.id,
+          action: 'pension_schedule.replaced',
+          actorUserId: user.id,
+          description: `Replaced pension schedule ${existing.id} (status: ${existing.status}) for payroll run ${existing.payrollRunId}`,
+          changes: {
+            previous: {
+              id: existing.id,
+              status: existing.status,
+              payrollRunId: existing.payrollRunId,
+              totalAmount: existing.totalAmount,
+              periodMonth: existing.periodMonth,
+              periodYear: existing.periodYear,
+              createdAt: existing.createdAt,
+            },
+            reason: 'Replaced by new schedule generation',
+          },
+        },
+      });
+
       await this.prisma.pensionRemittanceSchedule.delete({
         where: { id: existing.id },
       });
@@ -463,15 +490,40 @@ export class PensionService {
       throw new BadRequestException('Remittance schedule is already cancelled');
     }
 
-    if (schedule.status === 'PAID' || schedule.status === 'DISBURSED') {
-      throw new BadRequestException(
-        `Cannot cancel a remittance schedule with status ${schedule.status}`,
+    // Only allow cancellation of pre-submission states.
+    // Once submitted to PenCentral or in payment-pending, the upstream provider
+    // may have already issued virtual funding accounts. Cancelling locally would
+    // risk double remittance with no local audit trail of the first payment.
+    const cancellableStatuses: string[] = [
+      PENSION_SCHEDULE_STATUS.DRAFT,
+      PENSION_SCHEDULE_STATUS.VALIDATING,
+      PENSION_SCHEDULE_STATUS.VALIDATION_FAILED,
+      PENSION_SCHEDULE_STATUS.VALIDATED,
+    ];
+
+    if (!cancellableStatuses.includes(schedule.status)) {
+      throw new ConflictException(
+        `Cannot cancel schedule once submitted to PenCentral or while payment is pending (current status: ${schedule.status}). Please contact support.`,
       );
     }
 
     const updated = await this.prisma.pensionRemittanceSchedule.update({
       where: { id: scheduleId },
       data: { status: 'CANCELLED' },
+    });
+
+    // Record audit event for cancellation
+    await this.prisma.auditEvent.create({
+      data: {
+        id: randomUUID(),
+        organizationId: orgId,
+        targetType: 'PensionRemittanceSchedule',
+        targetId: scheduleId,
+        action: 'pension_schedule.cancelled',
+        actorUserId: user.id,
+        description: `Cancelled pension schedule ${scheduleId} (previous status: ${schedule.status})`,
+        changes: { previousStatus: schedule.status, newStatus: 'CANCELLED' },
+      },
     });
 
     return {

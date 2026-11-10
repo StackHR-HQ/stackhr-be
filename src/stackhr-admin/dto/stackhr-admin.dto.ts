@@ -2,11 +2,13 @@ import {
   IsBoolean,
   IsEmail,
   IsEnum,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
 } from 'class-validator';
+import { USER_ROLES } from '../../auth/auth.constants';
 
 export class SuspendBusinessDto {
   @IsOptional()
@@ -53,7 +55,14 @@ export class DecideKybDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
+  @MaxLength(500)
+  notes?: string;
+}
+
+export class KybActionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
   notes?: string;
 }
 
@@ -79,7 +88,9 @@ export class UpdateAdminUserDto {
   name?: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn([USER_ROLES.STACKHR_ADMIN, USER_ROLES.STACKHR_SUPPORT], {
+    message: 'role must be either STACKHR_ADMIN or STACKHR_SUPPORT',
+  })
   role?: string;
 
   @IsOptional()

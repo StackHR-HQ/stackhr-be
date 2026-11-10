@@ -22,6 +22,7 @@ import {
   CreateAnnouncementDto,
   CreateSupportTicketDto,
   DecideKybDto,
+  KybActionDto,
   ReactivateBusinessDto,
   SuspendBusinessDto,
   UpdateAdminUserDto,
@@ -235,7 +236,7 @@ export class StackhrAdminController {
   approveKybVerification(
     @CurrentUser() user: AuthenticatedUser,
     @Param('organizationId') organizationId: string,
-    @Body() dto: Partial<DecideKybDto>,
+    @Body() dto: KybActionDto,
   ) {
     return this.adminService!.decideKybVerification(user, organizationId, {
       decision: 'APPROVED',
@@ -248,7 +249,7 @@ export class StackhrAdminController {
   rejectKybVerification(
     @CurrentUser() user: AuthenticatedUser,
     @Param('organizationId') organizationId: string,
-    @Body() dto: Partial<DecideKybDto>,
+    @Body() dto: KybActionDto,
   ) {
     return this.adminService!.decideKybVerification(user, organizationId, {
       decision: 'REJECTED',
@@ -278,14 +279,21 @@ export class StackhrAdminController {
 
   @Post('users')
   @RequireRoles(USER_ROLES.STACKHR_ADMIN)
-  createAdminUser(@Body() dto: CreateAdminUserDto) {
-    return this.adminService!.createAdminUser(dto);
+  createAdminUser(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateAdminUserDto,
+  ) {
+    return this.adminService!.createAdminUser(user, dto);
   }
 
   @Patch('users/:id')
   @RequireRoles(USER_ROLES.STACKHR_ADMIN)
-  updateUser(@Param('id') id: string, @Body() dto: UpdateAdminUserDto) {
-    return this.adminService!.updateUser(id, dto);
+  updateUser(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateAdminUserDto,
+  ) {
+    return this.adminService!.updateUser(user, id, dto);
   }
 
   @Get(['roles', 'permissions'])
@@ -300,8 +308,11 @@ export class StackhrAdminController {
 
   @Delete('sessions/:id')
   @RequireRoles(USER_ROLES.STACKHR_ADMIN)
-  revokeSession(@Param('id') id: string) {
-    return this.adminService!.revokeSession(id);
+  revokeSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.adminService!.revokeSession(user, id);
   }
 
   @Get('audit-logs')

@@ -9,8 +9,9 @@ export class ToggleCardFreezeDto {
     }
     return value;
   })
+  @IsOptional()
   @IsEnum(['FREEZE', 'UNFREEZE'])
-  action!: 'FREEZE' | 'UNFREEZE';
+  action?: 'FREEZE' | 'UNFREEZE';
 
   @IsOptional()
   @IsBoolean()

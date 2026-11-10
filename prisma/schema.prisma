@@ -675,7 +675,7 @@ model SalaryAdvance {
 }
 
 model CompensationRecord {
-  id                 String       @id
+  id                 String       @id @default(dbgenerated("(uuidv7())::text"))
   organizationId     String
   organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   employeeId         String

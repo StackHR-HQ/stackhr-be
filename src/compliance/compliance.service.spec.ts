@@ -183,6 +183,84 @@ describe('ComplianceService', () => {
     });
   });
 
+  describe('createRuleSet band validation', () => {
+    it('should reject non-contiguous bands', async () => {
+      await expect(
+        service.createRuleSet({
+          name: 'Invalid Contiguity',
+          effectiveFrom: '2026-01-01',
+          taxRules: [
+            {
+              bandOrder: 1,
+              bandName: 'Band 1',
+              lowerLimit: 0,
+              upperLimit: 800000,
+              taxRate: 0,
+            },
+            {
+              bandOrder: 2,
+              bandName: 'Band 2',
+              lowerLimit: 1000000, // Gap!
+              upperLimit: null,
+              taxRate: 0.15,
+            },
+          ],
+        }),
+      ).rejects.toThrow(
+        'Tax bands must be contiguous without gaps or overlaps',
+      );
+    });
+
+    it('should reject null upper limit on non-highest band', async () => {
+      await expect(
+        service.createRuleSet({
+          name: 'Null on intermediate band',
+          effectiveFrom: '2026-01-01',
+          taxRules: [
+            {
+              bandOrder: 1,
+              bandName: 'Band 1',
+              lowerLimit: 0,
+              upperLimit: null,
+              taxRate: 0,
+            },
+            {
+              bandOrder: 2,
+              bandName: 'Band 2',
+              lowerLimit: 800000,
+              upperLimit: 2000000,
+              taxRate: 0.15,
+            },
+          ],
+        }),
+      ).rejects.toThrow('Only the highest tax band');
+    });
+
+    it('should accept valid contiguous bands with null upper limit only on the last band', async () => {
+      const result = await service.createRuleSet({
+        name: 'Valid Bands',
+        effectiveFrom: '2026-01-01',
+        taxRules: [
+          {
+            bandOrder: 1,
+            bandName: 'Band 1',
+            lowerLimit: 0,
+            upperLimit: 800000,
+            taxRate: 0,
+          },
+          {
+            bandOrder: 2,
+            bandName: 'Band 2',
+            lowerLimit: 800000,
+            upperLimit: null,
+            taxRate: 0.15,
+          },
+        ],
+      });
+      expect(result).toBeDefined();
+    });
+  });
+
   describe('getAlerts', () => {
     it('should return compliance alerts for organization', async () => {
       (prisma.employee.findMany as jest.Mock)

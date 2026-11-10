@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -8,6 +9,8 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
 import { OutboxService } from '../common/outbox/outbox.service';
 import { ResilientHttpClient } from '../common/resilience/resilient-client';
+import { AuthService } from '../auth/auth.service';
+import { USER_ROLES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type {
   CreateAdminUserDto,
@@ -130,12 +133,46 @@ function deriveKybStatus(org: {
   return 'PENDING';
 }
 
+function sanitizeCsvCell(
+  value: string | number | boolean | null | undefined,
+): string {
+  if (value === null || value === undefined) return '""';
+  let str = String(value);
+  // Neutralize CSV formula injection (=, +, -, @, \t, \r)
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
+  return `"${str.replace(/"/g, '""')}"`;
+}
+
+function maskAccountNumber(acc?: string | null): string | null {
+  if (!acc) return null;
+  const trimmed = acc.trim();
+  if (trimmed.length <= 4) return trimmed;
+  return `******${trimmed.slice(-4)}`;
+}
+
+function maskTaxId(tin?: string | null): string | null {
+  if (!tin) return null;
+  const trimmed = tin.trim();
+  if (trimmed.length <= 4) return trimmed;
+  return `***${trimmed.slice(-4)}`;
+}
+
+function maskRsaPin(rsa?: string | null): string | null {
+  if (!rsa) return null;
+  const trimmed = rsa.trim();
+  if (trimmed.length <= 4) return trimmed;
+  return `***${trimmed.slice(-4)}`;
+}
+
 @Injectable()
 export class StackhrAdminService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly outboxService?: OutboxService,
     @Optional() private readonly resilientClient?: ResilientHttpClient,
+    @Optional() private readonly authService?: AuthService,
   ) {}
 
   async getDashboard() {
@@ -394,17 +431,17 @@ export class StackhrAdminService {
       'id,name,slug,status,kybStatus,industry,companySize,employeeCount,payrollRunCount,ownerEmail,createdAt';
     const rows = businesses.map((b) =>
       [
-        b.id,
-        `"${(b.name ?? '').replace(/"/g, '""')}"`,
-        b.slug,
-        b.status,
-        b.kybStatus,
-        `"${(b.industry ?? '').replace(/"/g, '""')}"`,
-        b.companySize ?? '',
-        b.employeeCount,
-        b.payrollRunCount,
-        b.owner?.email ?? '',
-        b.createdAt.toISOString(),
+        sanitizeCsvCell(b.id),
+        sanitizeCsvCell(b.name),
+        sanitizeCsvCell(b.slug),
+        sanitizeCsvCell(b.status),
+        sanitizeCsvCell(b.kybStatus),
+        sanitizeCsvCell(b.industry),
+        sanitizeCsvCell(b.companySize),
+        sanitizeCsvCell(b.employeeCount),
+        sanitizeCsvCell(b.payrollRunCount),
+        sanitizeCsvCell(b.owner?.email),
+        sanitizeCsvCell(b.createdAt.toISOString()),
       ].join(','),
     );
     return {
@@ -554,10 +591,14 @@ export class StackhrAdminService {
     });
 
     if (dto.status === 'suspended') {
-      await this.prisma.session.updateMany({
-        where: { activeOrganizationId: id, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
+      if (this.authService) {
+        await this.authService.revokeSessionsForOrganization(id);
+      } else {
+        await this.prisma.session.updateMany({
+          where: { activeOrganizationId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
     }
 
     await this.prisma.auditEvent.create({
@@ -674,6 +715,13 @@ export class StackhrAdminService {
 
     const safeEmployee: Record<string, any> = { ...emp };
     delete safeEmployee.invitationToken;
+    safeEmployee.accountNumber = maskAccountNumber(emp.accountNumber);
+    safeEmployee.accountNumberLast4 = emp.accountNumber
+      ? emp.accountNumber.trim().slice(-4)
+      : null;
+    safeEmployee.tin = maskTaxId(emp.tin);
+    safeEmployee.taxId = safeEmployee.tin;
+    safeEmployee.pensionRsaNumber = maskRsaPin(emp.pensionRsaNumber);
 
     return {
       employee: {
@@ -937,6 +985,8 @@ export class StackhrAdminService {
     }));
 
     return {
+      isPlaceholder: true,
+      source: 'synthesized',
       summary: {
         totalDepositAccounts: depositAccounts.length,
         totalBalanceKobo: depositAccounts.reduce(
@@ -1007,6 +1057,7 @@ export class StackhrAdminService {
           meta.subscription?.currentPeriodEnd ??
           new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         createdAt: org.createdAt,
+        isPlaceholder: true,
       };
     });
 
@@ -1017,8 +1068,10 @@ export class StackhrAdminService {
       : subscriptions;
 
     return {
+      isPlaceholder: true,
+      source: 'placeholder',
       total: filtered.length,
-      plans: PLATFORM_PLANS,
+      plans: PLATFORM_PLANS.map((p) => ({ ...p, isPlaceholder: true })),
       subscriptions: filtered,
       invoices: filtered.map((sub) => ({
         id: `inv_${sub.organizationId}_${new Date().getUTCFullYear()}_${new Date().getUTCMonth() + 1}`,
@@ -1029,12 +1082,17 @@ export class StackhrAdminService {
         currency: sub.currency,
         status: sub.status === 'past_due' ? 'PAST_DUE' : 'PAID',
         issuedAt: sub.createdAt,
+        isPlaceholder: true,
       })),
     };
   }
 
   getSubscriptionPlans() {
-    return { plans: PLATFORM_PLANS };
+    return {
+      isPlaceholder: true,
+      source: 'placeholder',
+      plans: PLATFORM_PLANS.map((p) => ({ ...p, isPlaceholder: true })),
+    };
   }
 
   async updateSubscription(
@@ -1283,7 +1341,40 @@ export class StackhrAdminService {
     };
   }
 
-  async createAdminUser(dto: CreateAdminUserDto) {
+  private async recordPlatformAudit(
+    actor: AuthenticatedUser | undefined,
+    action: string,
+    targetType: string,
+    targetId: string,
+    description: string,
+    changes?: Record<string, any>,
+  ) {
+    try {
+      const firstOrg = await this.prisma.organization.findFirst({
+        select: { id: true },
+      });
+      if (!firstOrg) return;
+
+      await this.prisma.auditEvent.create({
+        data: {
+          organizationId: firstOrg.id,
+          actorUserId: actor?.id ?? 'system',
+          action,
+          targetType,
+          targetId,
+          description,
+          changes: changes ?? {},
+        },
+      });
+    } catch {
+      // audit logging is secondary
+    }
+  }
+
+  async createAdminUser(
+    actor: AuthenticatedUser | undefined,
+    dto: CreateAdminUserDto,
+  ) {
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -1303,6 +1394,15 @@ export class StackhrAdminService {
       },
     });
 
+    await this.recordPlatformAudit(
+      actor,
+      'admin_user.created',
+      'user',
+      user.id,
+      `Created platform admin user "${user.email}" with role ${user.role}`,
+      { email: user.email, role: user.role, name: user.name },
+    );
+
     return {
       message: 'Platform admin user created successfully',
       user: {
@@ -1317,10 +1417,40 @@ export class StackhrAdminService {
     };
   }
 
-  async updateUser(id: string, dto: UpdateAdminUserDto) {
+  async updateUser(
+    actor: AuthenticatedUser | undefined,
+    id: string,
+    dto: UpdateAdminUserDto,
+  ) {
     const existing = await this.prisma.user.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException(`User "${id}" was not found`);
+    }
+
+    if (dto.role !== undefined && existing.userType !== 'STACKHR_ADMIN') {
+      throw new BadRequestException(
+        'Platform administrator roles can only be assigned to platform administrator accounts',
+      );
+    }
+
+    if (
+      existing.role === USER_ROLES.STACKHR_ADMIN &&
+      (dto.banned === true ||
+        (dto.role !== undefined && dto.role !== USER_ROLES.STACKHR_ADMIN))
+    ) {
+      const activeAdminCount = await this.prisma.user.count({
+        where: {
+          userType: 'STACKHR_ADMIN',
+          role: USER_ROLES.STACKHR_ADMIN,
+          banned: false,
+          NOT: { id },
+        },
+      });
+      if (activeAdminCount === 0) {
+        throw new BadRequestException(
+          'Cannot demote or ban the last remaining active platform administrator',
+        );
+      }
     }
 
     const updated = await this.prisma.user.update({
@@ -1334,11 +1464,29 @@ export class StackhrAdminService {
     });
 
     if (dto.banned === true) {
-      await this.prisma.session.updateMany({
-        where: { userId: id, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
+      if (this.authService) {
+        await this.authService.revokeSessionsForUser(id);
+      } else {
+        await this.prisma.session.updateMany({
+          where: { userId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
     }
+
+    await this.recordPlatformAudit(
+      actor,
+      'admin_user.updated',
+      'user',
+      id,
+      `Updated user "${existing.email}"`,
+      {
+        previousRole: existing.role,
+        newRole: updated.role,
+        banned: updated.banned,
+        banReason: updated.banReason,
+      },
+    );
 
     return {
       message: 'User updated successfully',
@@ -1445,15 +1593,30 @@ export class StackhrAdminService {
     };
   }
 
-  async revokeSession(id: string) {
+  async revokeSession(actor: AuthenticatedUser | undefined, id: string) {
     const session = await this.prisma.session.findUnique({ where: { id } });
     if (!session) {
       throw new NotFoundException(`Session "${id}" was not found`);
     }
-    await this.prisma.session.update({
-      where: { id },
-      data: { revokedAt: new Date() },
-    });
+
+    if (this.authService) {
+      await this.authService.revokeSessionById(id);
+    } else {
+      await this.prisma.session.update({
+        where: { id },
+        data: { revokedAt: new Date() },
+      });
+    }
+
+    await this.recordPlatformAudit(
+      actor,
+      'session.revoked',
+      'session',
+      id,
+      `Revoked session "${id}" for user "${session.userId}"`,
+      { sessionId: id, userId: session.userId },
+    );
+
     return { message: 'Session revoked successfully', sessionId: id };
   }
 

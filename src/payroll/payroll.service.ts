@@ -54,91 +54,91 @@ export class PayrollService {
       ? new Date(dto.effectiveFrom)
       : new Date();
 
-    const currentActive = await this.prisma.compensationRecord.findFirst({
-      where: {
-        employeeId: dto.employeeId,
-        organizationId: orgId,
-        effectiveTo: null,
-      },
-    });
-
-    if (currentActive) {
-      await this.prisma.compensationRecord.update({
-        where: { id: currentActive.id },
-        data: { effectiveTo: effectiveFromDate },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const currentActive = await tx.compensationRecord.findFirst({
+        where: {
+          employeeId: dto.employeeId,
+          organizationId: orgId,
+          effectiveTo: null,
+        },
       });
-    }
 
-    const newRecord = await this.prisma.compensationRecord.create({
-      data: {
-        id: randomUUID(),
-        organizationId: orgId,
-        employeeId: dto.employeeId,
-        effectiveFrom: effectiveFromDate,
-        effectiveTo: null,
-        basicSalary: dto.basicSalary,
-        housingAllowance: dto.housingAllowance ?? 0,
-        transportAllowance: dto.transportAllowance ?? 0,
-        otherAllowances: dto.otherAllowances ?? 0,
-        currency: dto.currency ?? 'NGN',
-        paymentFrequency: dto.paymentFrequency ?? 'MONTHLY',
-      },
+      if (currentActive) {
+        await tx.compensationRecord.update({
+          where: { id: currentActive.id },
+          data: { effectiveTo: effectiveFromDate },
+        });
+      }
+
+      const newRecord = await tx.compensationRecord.create({
+        data: {
+          id: randomUUID(),
+          organizationId: orgId,
+          employeeId: dto.employeeId,
+          effectiveFrom: effectiveFromDate,
+          effectiveTo: null,
+          basicSalary: dto.basicSalary,
+          housingAllowance: dto.housingAllowance ?? 0,
+          transportAllowance: dto.transportAllowance ?? 0,
+          otherAllowances: dto.otherAllowances ?? 0,
+          currency: dto.currency ?? 'NGN',
+          paymentFrequency: dto.paymentFrequency ?? 'MONTHLY',
+        },
+      });
+
+      const newMonthlyGrossKobo =
+        dto.basicSalary +
+        (dto.housingAllowance ?? 0) +
+        (dto.transportAllowance ?? 0) +
+        (dto.otherAllowances ?? 0);
+      const newAnnualSalaryMinor = BigInt(newMonthlyGrossKobo) * 12n;
+      const previousAnnualSalaryMinor = currentActive
+        ? BigInt(
+            (currentActive.basicSalary ?? 0) +
+              (currentActive.housingAllowance ?? 0) +
+              (currentActive.transportAllowance ?? 0) +
+              (currentActive.otherAllowances ?? 0),
+          ) * 12n
+        : BigInt(employee.annualSalaryMinor ?? 0);
+
+      const salaryAmountNaira = Math.round(newMonthlyGrossKobo / 100);
+
+      await tx.employee.update({
+        where: { id: dto.employeeId },
+        data: {
+          annualSalaryMinor: newAnnualSalaryMinor,
+          salaryAmount: salaryAmountNaira,
+          currency: dto.currency ?? employee.currency ?? 'NGN',
+          payFrequency:
+            dto.paymentFrequency ?? employee.payFrequency ?? 'MONTHLY',
+        },
+      });
+
+      const historyEntry = await tx.compensationHistory.create({
+        data: {
+          id: randomUUID(),
+          organizationId: orgId,
+          employeeId: dto.employeeId,
+          effectiveDate: effectiveFromDate,
+          annualSalaryMinor: newAnnualSalaryMinor,
+          previousSalary: previousAnnualSalaryMinor,
+          newSalary: newAnnualSalaryMinor,
+          currency: dto.currency ?? 'NGN',
+          payFrequency: dto.paymentFrequency ?? 'MONTHLY',
+          reason: dto.reason ?? null,
+          changedByUserId: user.id,
+        },
+      });
+
+      return { newRecord, historyEntry };
     });
-
-    const newMonthlyGross =
-      dto.basicSalary +
-      (dto.housingAllowance ?? 0) +
-      (dto.transportAllowance ?? 0) +
-      (dto.otherAllowances ?? 0);
-    const newAnnualSalaryMinor = BigInt(newMonthlyGross) * 1200n;
-    const previousAnnualSalaryMinor = currentActive
-      ? BigInt(
-          (currentActive.basicSalary ?? 0) +
-            (currentActive.housingAllowance ?? 0) +
-            (currentActive.transportAllowance ?? 0) +
-            (currentActive.otherAllowances ?? 0),
-        ) * 1200n
-      : BigInt(employee.annualSalaryMinor ?? 0);
-
-    if (this.prisma.employee?.update) {
-      await this.prisma.employee
-        .update({
-          where: { id: dto.employeeId },
-          data: {
-            annualSalaryMinor: newAnnualSalaryMinor,
-            salaryAmount: newMonthlyGross,
-            currency: dto.currency ?? employee.currency ?? 'NGN',
-            payFrequency:
-              dto.paymentFrequency ?? employee.payFrequency ?? 'MONTHLY',
-          },
-        })
-        .catch(() => undefined);
-    }
-
-    let historyEntry: any = null;
-    if (this.prisma.compensationHistory?.create) {
-      historyEntry = await this.prisma.compensationHistory
-        .create({
-          data: {
-            organizationId: orgId,
-            employeeId: dto.employeeId,
-            effectiveDate: effectiveFromDate,
-            annualSalaryMinor: newAnnualSalaryMinor,
-            previousSalary: previousAnnualSalaryMinor,
-            newSalary: newAnnualSalaryMinor,
-            currency: dto.currency ?? 'NGN',
-            payFrequency: dto.paymentFrequency ?? 'MONTHLY',
-            reason: dto.reason ?? null,
-            changedByUserId: user.id,
-          },
-        })
-        .catch(() => null);
-    }
 
     return {
       message: 'Compensation record set successfully',
-      compensationRecord: newRecord,
-      ...(historyEntry ? { compensationHistory: historyEntry } : {}),
+      compensationRecord: result.newRecord,
+      ...(result.historyEntry
+        ? { compensationHistory: result.historyEntry }
+        : {}),
     };
   }
 
@@ -305,10 +305,21 @@ export class PayrollService {
     const itemsData: any[] = [];
     for (const emp of employees) {
       const comp = emp.compensationRecords[0];
-      const basicSalary = comp ? comp.basicSalary : emp.salaryAmount;
-      const housingAllowance = comp ? comp.housingAllowance : 0;
-      const transportAllowance = comp ? comp.transportAllowance : 0;
-      const otherAllowances = comp ? comp.otherAllowances : 0;
+      // CompensationRecord stores monetary amounts in kobo.
+      // emp.salaryAmount is stored in Naira.
+      // Compliance calculations and PayrollItem storage operate in whole Naira.
+      const basicSalary = comp
+        ? Math.round(comp.basicSalary / 100)
+        : emp.salaryAmount || 0;
+      const housingAllowance = comp
+        ? Math.round((comp.housingAllowance || 0) / 100)
+        : 0;
+      const transportAllowance = comp
+        ? Math.round((comp.transportAllowance || 0) / 100)
+        : 0;
+      const otherAllowances = comp
+        ? Math.round((comp.otherAllowances || 0) / 100)
+        : 0;
 
       const deductions =
         await this.complianceService.calculatePayrollDeductions({
@@ -592,6 +603,12 @@ export class PayrollService {
       );
     }
 
+    // Persist status as PROCESSING before initiating transfers to eliminate double execution
+    await this.prisma.payrollRun.update({
+      where: { id: runId },
+      data: { status: 'PROCESSING' },
+    });
+
     let bulkTransfer: any = null;
     if (this.bankingService) {
       const supportedBanks: BankItem[] = await this.bankingService
@@ -621,9 +638,19 @@ export class PayrollService {
         };
       });
 
-      bulkTransfer = await this.bankingService
-        .executePayrollTransfers(orgId, run.id, transfers)
-        .catch(() => null);
+      try {
+        bulkTransfer = await this.bankingService.executePayrollTransfers(
+          orgId,
+          run.id,
+          transfers,
+        );
+      } catch (err) {
+        await this.prisma.payrollRun.update({
+          where: { id: runId },
+          data: { status: 'FUNDING_CHECK_PASSED' },
+        });
+        throw err;
+      }
     }
 
     const executedAt = new Date();

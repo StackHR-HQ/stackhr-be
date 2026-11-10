@@ -11,6 +11,10 @@ import {
 export class ChecklistItemInputDto {
   @IsOptional()
   @IsString()
+  id?: string;
+
+  @IsOptional()
+  @IsString()
   label?: string;
 
   @IsOptional()

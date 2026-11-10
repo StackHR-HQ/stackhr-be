@@ -119,6 +119,8 @@ describe('SpendService', () => {
       prismaMock.expense.findFirst.mockResolvedValue({
         id: 'exp-1',
         organizationId: 'org-123',
+        status: 'PENDING',
+        employeeId: 'emp-123',
       });
       prismaMock.expense.update.mockResolvedValue({
         id: 'exp-1',
@@ -136,7 +138,8 @@ describe('SpendService', () => {
       prismaMock.expense.findFirst.mockResolvedValue({
         id: 'exp-1',
         organizationId: 'org-123',
-        employeeId: 'emp-1',
+        status: 'PENDING',
+        employeeId: 'emp-123',
       });
       prismaMock.document = {
         create: jest.fn().mockResolvedValue({ id: 'doc-receipt-1' }),
@@ -165,6 +168,38 @@ describe('SpendService', () => {
       expect(result.expense.receiptUrl).toBe(
         '/v1/api/people/documents/doc-receipt-1/download',
       );
+    });
+
+    it('should throw ForbiddenException if employee attaches receipt to another employee claim', async () => {
+      prismaMock.expense.findFirst.mockResolvedValue({
+        id: 'exp-1',
+        organizationId: 'org-123',
+        status: 'PENDING',
+        employeeId: 'other-emp',
+      });
+
+      await expect(
+        service.attachReceipt(mockUser, 'exp-1', {
+          receiptUrl: 'https://example.com/receipt.pdf',
+        }),
+      ).rejects.toThrow(
+        'You are not authorized to attach receipts to another employee expense claim',
+      );
+    });
+
+    it('should throw BadRequestException if expense is not in PENDING status', async () => {
+      prismaMock.expense.findFirst.mockResolvedValue({
+        id: 'exp-1',
+        organizationId: 'org-123',
+        status: 'APPROVED',
+        employeeId: 'emp-123',
+      });
+
+      await expect(
+        service.attachReceipt(mockUser, 'exp-1', {
+          receiptUrl: 'https://example.com/receipt.pdf',
+        }),
+      ).rejects.toThrow('Receipts can only be attached to pending expenses');
     });
 
     it('should throw NotFoundException if expense claim is not found', async () => {

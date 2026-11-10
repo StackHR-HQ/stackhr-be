@@ -6,6 +6,7 @@ import {
   Logger,
   NotFoundException,
   Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
@@ -133,17 +134,36 @@ export class SpendService {
       );
     }
 
+    if (user.role === USER_ROLES.EMPLOYEE) {
+      const callerEmployee = await this.getEmployeeForUser(user);
+      if (expense.employeeId !== callerEmployee.id) {
+        throw new ForbiddenException(
+          'You are not authorized to attach receipts to another employee expense claim',
+        );
+      }
+    }
+
+    if (expense.status !== 'PENDING') {
+      throw new BadRequestException(
+        `Receipts can only be attached to pending expenses (current status: ${expense.status})`,
+      );
+    }
+
     let resolvedReceiptUrl = dto?.receiptUrl?.trim();
 
     if (file) {
       validateDocumentFile(file);
       const storageKey = `organizations/${orgId}/expenses/${expenseId}/receipts/${randomUUID()}`;
-      if (this.documentStorage && process.env.S3_BUCKET) {
+      if (this.documentStorage) {
         await this.documentStorage.put({
           key: storageKey,
           body: file.buffer,
           contentType: file.mimetype,
         });
+      } else if (process.env.NODE_ENV !== 'test') {
+        throw new ServiceUnavailableException(
+          'Document storage is not configured',
+        );
       }
       if (this.prisma.document) {
         const doc = await this.prisma.document.create({
