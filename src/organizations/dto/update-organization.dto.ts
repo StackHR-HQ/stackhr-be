@@ -64,4 +64,3 @@ export class UpdateOrganizationDto {
   @IsString()
   penCentralEmployerCode?: string | null;
 }
-
