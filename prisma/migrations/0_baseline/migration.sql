@@ -1,6 +1,47 @@
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 
+-- Ensure pgcrypto extension is installed for cryptographic randomness
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Provision uuidv7() function for Postgres versions prior to native support (< 17/18)
+CREATE OR REPLACE FUNCTION uuidv7()
+RETURNS uuid
+AS $$
+DECLARE
+  v_time timestamp with time zone := clock_timestamp();
+  v_secs bigint := FLOOR(EXTRACT(EPOCH FROM v_time));
+  v_msec bigint := MOD(FLOOR(EXTRACT(MILLISECONDS FROM v_time)), 1000);
+  v_timestamp bigint := (v_secs * 1000) + v_msec;
+  v_bytes bytea;
+BEGIN
+  v_bytes := set_byte(
+    set_byte(
+      set_byte(
+        set_byte(
+          set_byte(
+            set_byte(
+              gen_random_bytes(16),
+              0, (v_timestamp >> 40)::bit(8)::int
+            ),
+            1, (v_timestamp >> 32)::bit(8)::int
+          ),
+          2, (v_timestamp >> 24)::bit(8)::int
+        ),
+        3, (v_timestamp >> 16)::bit(8)::int
+      ),
+      4, (v_timestamp >> 8)::bit(8)::int
+    ),
+    5, (v_timestamp)::bit(8)::int
+  );
+
+  v_bytes := set_byte(v_bytes, 6, (get_byte(v_bytes, 6) & 15) | 112);
+  v_bytes := set_byte(v_bytes, 8, (get_byte(v_bytes, 8) & 63) | 128);
+
+  RETURN encode(v_bytes, 'hex')::uuid;
+END;
+$$ LANGUAGE plpgsql VOLATILE;
+
 -- CreateEnum
 CREATE TYPE "IdempotencyStatus" AS ENUM ('IN_PROGRESS', 'COMPLETED', 'FAILED');
 
