@@ -19,6 +19,7 @@ import {
   AttachEmployerDto,
   PensionScheduleQueryDto,
   UpdatePensionConfigDto,
+  UpdatePensionRatesDto,
   ValidateEmployerCodeDto,
 } from './dto/pension.dto';
 import { Idempotent } from '../common/idempotency/idempotency.decorator';
@@ -82,6 +83,21 @@ export class PensionController {
     @Body() dto: UpdatePensionConfigDto,
   ) {
     return this.pensionService.updateEmployerConfig(user, dto);
+  }
+
+  @Get('rates')
+  @RequireRoles(...PENSION_ADMIN_ROLES)
+  getPensionRates(@CurrentUser() user: AuthenticatedUser) {
+    return this.pensionService.getPensionRates(user);
+  }
+
+  @Patch('rates')
+  @RequireRoles(...PENSION_ADMIN_ROLES)
+  updatePensionRates(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdatePensionRatesDto,
+  ) {
+    return this.pensionService.updatePensionRates(user, dto);
   }
 
   @Post('schedules/from-payroll/:payrollRunId')

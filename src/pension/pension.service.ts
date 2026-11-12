@@ -21,6 +21,7 @@ import {
   AttachEmployerDto,
   PensionScheduleQueryDto,
   UpdatePensionConfigDto,
+  UpdatePensionRatesDto,
   ValidateEmployerCodeDto,
 } from './dto/pension.dto';
 import { randomUUID } from 'crypto';
@@ -234,22 +235,79 @@ export class PensionService {
     };
   }
 
+  private validatePensionRates(
+    employeeRate?: number | null,
+    employerRate?: number | null,
+  ) {
+    if (
+      employeeRate !== undefined &&
+      employeeRate !== null &&
+      employeeRate < 0.08
+    ) {
+      throw new BadRequestException(
+        'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+      );
+    }
+    if (
+      employerRate !== undefined &&
+      employerRate !== null &&
+      employerRate < 0.1
+    ) {
+      throw new BadRequestException(
+        'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+      );
+    }
+  }
+
   async updateEmployerConfig(
     user: AuthenticatedUser,
     dto: UpdatePensionConfigDto,
   ) {
     const orgId = this.checkOrgContext(user);
 
+    this.validatePensionRates(
+      dto.pensionEmployeeRateOverride,
+      dto.pensionEmployerRateOverride,
+    );
+
+    const updateData: {
+      penCentralEmployerCode?: string | null;
+      pensionEmployeeRateOverride?: number | null;
+      pensionEmployerRateOverride?: number | null;
+      pensionBasisOverride?: string | null;
+    } = {};
+
+    if (dto.penCentralEmployerCode !== undefined) {
+      updateData.penCentralEmployerCode =
+        dto.penCentralEmployerCode?.trim() || null;
+    }
+    if (dto.pensionEmployeeRateOverride !== undefined) {
+      updateData.pensionEmployeeRateOverride = dto.pensionEmployeeRateOverride;
+    }
+    if (dto.pensionEmployerRateOverride !== undefined) {
+      updateData.pensionEmployerRateOverride = dto.pensionEmployerRateOverride;
+    }
+    if (dto.pensionBasisOverride !== undefined) {
+      updateData.pensionBasisOverride = dto.pensionBasisOverride
+        ? dto.pensionBasisOverride.trim().toUpperCase()
+        : null;
+    }
+
     const org = await this.prisma.organization.update({
       where: { id: orgId },
-      data: {
-        penCentralEmployerCode: dto.penCentralEmployerCode.trim(),
-      },
+      data: updateData,
     });
 
     return {
-      message: 'PenCentral employer code updated successfully',
+      message: 'Pension configuration updated successfully',
       penCentralEmployerCode: org.penCentralEmployerCode,
+      pensionEmployeeRateOverride: org.pensionEmployeeRateOverride,
+      pensionEmployerRateOverride: org.pensionEmployerRateOverride,
+      pensionBasisOverride: org.pensionBasisOverride,
+      statutoryMinimums: {
+        minEmployeeRate: 0.08,
+        minEmployerRate: 0.1,
+      },
     };
   }
 
@@ -257,7 +315,14 @@ export class PensionService {
     const orgId = this.checkOrgContext(user);
     const org = await this.prisma.organization.findUnique({
       where: { id: orgId },
-      select: { id: true, name: true, penCentralEmployerCode: true },
+      select: {
+        id: true,
+        name: true,
+        penCentralEmployerCode: true,
+        pensionEmployeeRateOverride: true,
+        pensionEmployerRateOverride: true,
+        pensionBasisOverride: true,
+      },
     });
 
     if (!org) {
@@ -288,6 +353,110 @@ export class PensionService {
       ...org,
       isAttached,
       employerName,
+      statutoryMinimums: {
+        minEmployeeRate: 0.08,
+        minEmployerRate: 0.1,
+        legalBasis: 'Pension Reform Act 2014 Section 4(1)',
+      },
+    };
+  }
+
+  async getPensionRates(user: AuthenticatedUser) {
+    const orgId = this.checkOrgContext(user);
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: {
+        id: true,
+        name: true,
+        pensionEmployeeRateOverride: true,
+        pensionEmployerRateOverride: true,
+        pensionBasisOverride: true,
+      },
+    });
+
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    const employeeRate = org.pensionEmployeeRateOverride ?? 0.08;
+    const employerRate = org.pensionEmployerRateOverride ?? 0.1;
+    const basis = org.pensionBasisOverride || 'BASIC,HOUSING,TRANSPORT';
+
+    return {
+      effectiveRates: {
+        employeeRate,
+        employerRate,
+        basis,
+      },
+      overrides: {
+        pensionEmployeeRateOverride: org.pensionEmployeeRateOverride,
+        pensionEmployerRateOverride: org.pensionEmployerRateOverride,
+        pensionBasisOverride: org.pensionBasisOverride,
+        hasCustomRates:
+          org.pensionEmployeeRateOverride !== null ||
+          org.pensionEmployerRateOverride !== null ||
+          org.pensionBasisOverride !== null,
+      },
+      statutoryMinimums: {
+        minEmployeeRate: 0.08,
+        minEmployerRate: 0.1,
+        legalBasis: 'Pension Reform Act 2014 Section 4(1)',
+        description:
+          'Statutory minimum pension contribution is 8% for employee and 10% for employer. Custom rates cannot fall below these minimums.',
+      },
+    };
+  }
+
+  async updatePensionRates(
+    user: AuthenticatedUser,
+    dto: UpdatePensionRatesDto,
+  ) {
+    const orgId = this.checkOrgContext(user);
+
+    this.validatePensionRates(
+      dto.pensionEmployeeRateOverride,
+      dto.pensionEmployerRateOverride,
+    );
+
+    const updateData: {
+      pensionEmployeeRateOverride?: number | null;
+      pensionEmployerRateOverride?: number | null;
+      pensionBasisOverride?: string | null;
+    } = {};
+
+    if (dto.pensionEmployeeRateOverride !== undefined) {
+      updateData.pensionEmployeeRateOverride = dto.pensionEmployeeRateOverride;
+    }
+    if (dto.pensionEmployerRateOverride !== undefined) {
+      updateData.pensionEmployerRateOverride = dto.pensionEmployerRateOverride;
+    }
+    if (dto.pensionBasisOverride !== undefined) {
+      updateData.pensionBasisOverride = dto.pensionBasisOverride
+        ? dto.pensionBasisOverride.trim().toUpperCase()
+        : null;
+    }
+
+    const org = await this.prisma.organization.update({
+      where: { id: orgId },
+      data: updateData,
+    });
+
+    return {
+      message: 'Pension rates updated successfully',
+      effectiveRates: {
+        employeeRate: org.pensionEmployeeRateOverride ?? 0.08,
+        employerRate: org.pensionEmployerRateOverride ?? 0.1,
+        basis: org.pensionBasisOverride || 'BASIC,HOUSING,TRANSPORT',
+      },
+      overrides: {
+        pensionEmployeeRateOverride: org.pensionEmployeeRateOverride,
+        pensionEmployerRateOverride: org.pensionEmployerRateOverride,
+        pensionBasisOverride: org.pensionBasisOverride,
+      },
+      statutoryMinimums: {
+        minEmployeeRate: 0.08,
+        minEmployerRate: 0.1,
+      },
     };
   }
 

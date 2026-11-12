@@ -13,6 +13,7 @@ describe('OrganizationsService', () => {
     prismaMock = {
       organization: {
         findUnique: jest.fn(),
+        update: jest.fn(),
       },
     };
 
@@ -81,5 +82,74 @@ describe('OrganizationsService', () => {
     };
 
     await expect(service.getCurrent(user)).rejects.toThrow(ForbiddenException);
+  });
+
+  describe('updateCurrent', () => {
+    const adminUser: AuthenticatedUser = {
+      id: 'admin-1',
+      name: 'Admin User',
+      email: 'admin@acme.com',
+      userType: USER_TYPES.BUSINESS,
+      role: USER_ROLES.BUSINESS_ADMIN,
+      organizationId: 'org-1',
+    };
+
+    it('should update organization settings and pension rates', async () => {
+      const mockUpdated = {
+        id: 'org-1',
+        name: 'Acme Updated',
+        pensionEmployeeRateOverride: 0.08,
+        pensionEmployerRateOverride: 0.1,
+      };
+      prismaMock.organization.update.mockResolvedValue(mockUpdated);
+
+      const result = await service.updateCurrent(adminUser, {
+        name: 'Acme Updated',
+        pensionEmployeeRateOverride: 0.08,
+        pensionEmployerRateOverride: 0.1,
+      });
+
+      expect(result).toEqual(mockUpdated);
+      expect(prismaMock.organization.update).toHaveBeenCalledWith({
+        where: { id: 'org-1' },
+        data: {
+          name: 'Acme Updated',
+          pensionEmployeeRateOverride: 0.08,
+          pensionEmployerRateOverride: 0.1,
+          pensionBasisOverride: undefined,
+        },
+      });
+    });
+
+    it('should reject employee pension rate below statutory minimum of 8% (0.08)', async () => {
+      await expect(
+        service.updateCurrent(adminUser, {
+          pensionEmployeeRateOverride: 0.05,
+        }),
+      ).rejects.toThrow(
+        'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+      );
+    });
+
+    it('should reject employer pension rate below statutory minimum of 10% (0.10)', async () => {
+      await expect(
+        service.updateCurrent(adminUser, {
+          pensionEmployerRateOverride: 0.08,
+        }),
+      ).rejects.toThrow(
+        'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+      );
+    });
+
+    it('should throw ForbiddenException if user has no org context', async () => {
+      const noOrgUser: AuthenticatedUser = {
+        ...adminUser,
+        organizationId: null,
+      };
+
+      await expect(
+        service.updateCurrent(noOrgUser, { name: 'New Name' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
   });
 });

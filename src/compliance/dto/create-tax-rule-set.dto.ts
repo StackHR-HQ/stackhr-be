@@ -64,12 +64,20 @@ export class CreateTaxRuleSetDto {
   @IsOptional()
   rentReliefCap?: number = 500000;
 
-  @IsNumber()
+  @IsNumber({}, { message: 'pensionEmployeeRate must be a valid number' })
   @IsOptional()
+  @Min(0.08, {
+    message:
+      'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+  })
   pensionEmployeeRate?: number = 0.08;
 
-  @IsNumber()
+  @IsNumber({}, { message: 'pensionEmployerRate must be a valid number' })
   @IsOptional()
+  @Min(0.1, {
+    message:
+      'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+  })
   pensionEmployerRate?: number = 0.1;
 
   @IsString()

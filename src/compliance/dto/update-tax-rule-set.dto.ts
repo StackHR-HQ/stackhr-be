@@ -7,6 +7,7 @@ import {
   IsArray,
   ValidateIf,
   ValidateNested,
+  Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TaxRuleBandDto } from './create-tax-rule-set.dto';
@@ -41,12 +42,20 @@ export class UpdateTaxRuleSetDto {
   @IsOptional()
   rentReliefCap?: number;
 
-  @IsNumber()
+  @IsNumber({}, { message: 'pensionEmployeeRate must be a valid number' })
   @IsOptional()
+  @Min(0.08, {
+    message:
+      'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+  })
   pensionEmployeeRate?: number;
 
-  @IsNumber()
+  @IsNumber({}, { message: 'pensionEmployerRate must be a valid number' })
   @IsOptional()
+  @Min(0.1, {
+    message:
+      'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+  })
   pensionEmployerRate?: number;
 
   @IsString()

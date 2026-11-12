@@ -1,18 +1,72 @@
 import { Transform } from 'class-transformer';
 import {
-  IsNotEmpty,
   IsOptional,
   IsString,
+  IsNumber,
+  Min,
+  ValidateIf,
   Matches,
   MaxLength,
 } from 'class-validator';
 import { BadRequestException } from '@nestjs/common';
 
 export class UpdatePensionConfigDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(50)
-  penCentralEmployerCode: string;
+  penCentralEmployerCode?: string;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsNumber({}, { message: 'Employee pension rate must be a valid number' })
+  @Min(0.08, {
+    message:
+      'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+  })
+  pensionEmployeeRateOverride?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsNumber({}, { message: 'Employer pension rate must be a valid number' })
+  @Min(0.1, {
+    message:
+      'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+  })
+  pensionEmployerRateOverride?: number | null;
+
+  @IsOptional()
+  @IsString({
+    message:
+      'Pension basis must be a string containing components (e.g. BASIC,HOUSING,TRANSPORT)',
+  })
+  pensionBasisOverride?: string | null;
+}
+
+export class UpdatePensionRatesDto {
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsNumber({}, { message: 'Employee pension rate must be a valid number' })
+  @Min(0.08, {
+    message:
+      'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+  })
+  pensionEmployeeRateOverride?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsNumber({}, { message: 'Employer pension rate must be a valid number' })
+  @Min(0.1, {
+    message:
+      'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+  })
+  pensionEmployerRateOverride?: number | null;
+
+  @IsOptional()
+  @IsString({
+    message:
+      'Pension basis must be a string containing components (e.g. BASIC,HOUSING,TRANSPORT)',
+  })
+  pensionBasisOverride?: string | null;
 }
 
 export class ValidateEmployerCodeDto {

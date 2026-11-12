@@ -4896,6 +4896,65 @@
           ]
         },
         {
+          "name": "Update Current Organization",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pensionEmployeeRateOverride\": 0.08,\n  \"pensionEmployerRateOverride\": 0.10,\n  \"pensionBasisOverride\": \"BASIC,HOUSING,TRANSPORT\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/organizations/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organizations",
+                "current"
+              ]
+            },
+            "description": "Update active organization profile and settings, including pension rate overrides. Required role: BUSINESS_OWNER, BUSINESS_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"organization\": {\n    \"id\": \"org-123\",\n    \"name\": \"Acme Corp\",\n    \"pensionEmployeeRateOverride\": 0.08,\n    \"pensionEmployerRateOverride\": 0.1,\n    \"pensionBasisOverride\": \"BASIC,HOUSING,TRANSPORT\"\n  }\n}"
+            },
+            {
+              "name": "Validation Error - Below Statutory Minimum (400 Bad Request)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": [\n    \"Employee pension rate cannot be less than statutory minimum of 8% (0.08)\"\n  ],\n  \"error\": \"Bad Request\"\n}"
+            }
+          ]
+        },
+        {
           "name": "Get Current Organization",
           "request": {
             "method": "GET",
@@ -4930,6 +4989,65 @@
                 }
               ],
               "body": "{\n  \"organization\": {\n    \"id\": \"org-123\",\n    \"name\": \"Acme Corp\",\n    \"slug\": \"acme-corp\",\n    \"currency\": \"NGN\",\n    \"payrollFrequency\": \"MONTHLY\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Current Organization",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pensionEmployeeRateOverride\": 0.08,\n  \"pensionEmployerRateOverride\": 0.10,\n  \"pensionBasisOverride\": \"BASIC,HOUSING,TRANSPORT\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/organizations/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organizations",
+                "current"
+              ]
+            },
+            "description": "Update active organization profile and settings, including pension rate overrides. Required role: BUSINESS_OWNER, BUSINESS_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"organization\": {\n    \"id\": \"org-123\",\n    \"name\": \"Acme Corp\",\n    \"pensionEmployeeRateOverride\": 0.08,\n    \"pensionEmployerRateOverride\": 0.1,\n    \"pensionBasisOverride\": \"BASIC,HOUSING,TRANSPORT\"\n  }\n}"
+            },
+            {
+              "name": "Validation Error - Below Statutory Minimum (400 Bad Request)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": [\n    \"Employee pension rate cannot be less than statutory minimum of 8% (0.08)\"\n  ],\n  \"error\": \"Bad Request\"\n}"
             }
           ]
         }
@@ -6501,6 +6619,103 @@
                 }
               ],
               "body": "{\n  \"success\": true,\n  \"message\": \"PenCentral employer code updated successfully\",\n  \"data\": {\n    \"penCentralEmployerCode\": \"EMP001\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Pension Rates & Statutory Minimums",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pension/rates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "rates"
+              ]
+            },
+            "description": "Retrieve active pension rates, overrides, and statutory minimum thresholds (8% employee, 10% employer under PRA 2014). Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"effectiveRates\": {\n      \"employeeRate\": 0.08,\n      \"employerRate\": 0.1,\n      \"basis\": \"BASIC,HOUSING,TRANSPORT\"\n    },\n    \"overrides\": {\n      \"pensionEmployeeRateOverride\": null,\n      \"pensionEmployerRateOverride\": null,\n      \"pensionBasisOverride\": null,\n      \"hasCustomRates\": false\n    },\n    \"statutoryMinimums\": {\n      \"minEmployeeRate\": 0.08,\n      \"minEmployerRate\": 0.1,\n      \"legalBasis\": \"Pension Reform Act 2014 Section 4(1)\",\n      \"description\": \"Statutory minimum pension contribution is 8% for employee and 10% for employer. Custom rates cannot fall below these minimums.\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Pension Rates",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "stackhr_session={{sessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pensionEmployeeRateOverride\": 0.10,\n  \"pensionEmployerRateOverride\": 0.12,\n  \"pensionBasisOverride\": \"BASIC,HOUSING,TRANSPORT\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/pension/rates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pension",
+                "rates"
+              ]
+            },
+            "description": "Update organization pension rate overrides. Must be >= 0.08 for employee and >= 0.10 for employer. Required role: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "Success (200 OK)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Pension rates updated successfully\",\n  \"data\": {\n    \"effectiveRates\": {\n      \"employeeRate\": 0.1,\n      \"employerRate\": 0.12,\n      \"basis\": \"BASIC,HOUSING,TRANSPORT\"\n    },\n    \"overrides\": {\n      \"pensionEmployeeRateOverride\": 0.1,\n      \"pensionEmployerRateOverride\": 0.12,\n      \"pensionBasisOverride\": \"BASIC,HOUSING,TRANSPORT\"\n    },\n    \"statutoryMinimums\": {\n      \"minEmployeeRate\": 0.08,\n      \"minEmployerRate\": 0.1\n    }\n  }\n}"
+            },
+            {
+              "name": "Validation Error - Below Statutory Minimum (400 Bad Request)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"statusCode\": 400,\n  \"message\": [\n    \"Employee pension rate cannot be less than statutory minimum of 8% (0.08)\",\n    \"Employer pension rate cannot be less than statutory minimum of 10% (0.10)\"\n  ],\n  \"error\": \"Bad Request\"\n}"
             }
           ]
         },

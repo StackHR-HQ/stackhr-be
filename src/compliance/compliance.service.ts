@@ -137,11 +137,13 @@ export class ComplianceService {
     const annualTransport = monthlyTransport * 12;
     const annualGross = monthlyGross * 12;
 
-    // Pension calculation
-    const pensionEmpRate =
+    // Pension calculation (Pension Reform Act 2014: statutory minimums 8% employee, 10% employer)
+    const rawEmpRate =
       params.pensionEmployeeRateOverride ?? ruleSet.pensionEmployeeRate;
-    const pensionEmprRate =
+    const rawEmprRate =
       params.pensionEmployerRateOverride ?? ruleSet.pensionEmployerRate;
+    const pensionEmpRate = Math.max(rawEmpRate, 0.08);
+    const pensionEmprRate = Math.max(rawEmprRate, 0.1);
     const pensionBasisConfig = (
       params.pensionBasisOverride || ruleSet.pensionBasisFields
     ).toUpperCase();
@@ -301,9 +303,34 @@ export class ComplianceService {
     }
   }
 
+  private validatePensionRates(employeeRate?: number, employerRate?: number) {
+    if (
+      employeeRate !== undefined &&
+      employeeRate !== null &&
+      employeeRate < 0.08
+    ) {
+      throw new BadRequestException(
+        'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+      );
+    }
+    if (
+      employerRate !== undefined &&
+      employerRate !== null &&
+      employerRate < 0.1
+    ) {
+      throw new BadRequestException(
+        'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+      );
+    }
+  }
+
   async createRuleSet(dto: CreateTaxRuleSetDto) {
     const { taxRules, ...ruleSetData } = dto;
 
+    this.validatePensionRates(
+      ruleSetData.pensionEmployeeRate,
+      ruleSetData.pensionEmployerRate,
+    );
     this.validateTaxBands(taxRules);
 
     return this.prisma.taxRuleSet.create({
@@ -337,6 +364,11 @@ export class ComplianceService {
     await this.findRuleSetById(id);
 
     const { taxRules, ...ruleSetData } = dto;
+
+    this.validatePensionRates(
+      ruleSetData.pensionEmployeeRate,
+      ruleSetData.pensionEmployerRate,
+    );
 
     if (taxRules && taxRules.length > 0) {
       this.validateTaxBands(taxRules);
