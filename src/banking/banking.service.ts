@@ -1,11 +1,13 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../database/prisma.service';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import { AnchorClient } from './anchor/anchor.client';
 import {
   AnchorBulkTransferResult,
@@ -103,9 +105,14 @@ export class BankingService {
 
   async syncDepositAccountBalance(organizationId: string) {
     const account = await this.getDepositAccount(organizationId);
+    const currentLocalBalance =
+      account.balanceKobo !== undefined
+        ? Number(account.balanceKobo)
+        : undefined;
 
     const balance = await this.anchorClient.getAccountBalance(
       account.anchorAccountId,
+      currentLocalBalance,
     );
 
     const updated = await this.prisma.organizationDepositAccount.update({
@@ -260,10 +267,48 @@ export class BankingService {
     };
   }
 
-  async getCorporateCards(organizationId: string, employeeId?: string) {
+  private async resolveEmployeeForUser(
+    organizationId: string,
+    employeeOrUserId: string,
+    userEmail?: string,
+  ) {
+    if (!this.prisma.employee?.findFirst) {
+      return { id: employeeOrUserId };
+    }
+    const employee = await this.prisma.employee.findFirst({
+      where: {
+        organizationId,
+        OR: [
+          { id: employeeOrUserId },
+          { userId: employeeOrUserId },
+          ...(userEmail ? [{ email: userEmail }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    return employee;
+  }
+
+  async getCorporateCards(
+    organizationId: string,
+    employeeId?: string,
+    userEmail?: string,
+  ) {
     const where: Record<string, string> = { organizationId };
     if (employeeId) {
-      where.employeeId = employeeId;
+      if (userEmail) {
+        const resolved = await this.resolveEmployeeForUser(
+          organizationId,
+          employeeId,
+          userEmail,
+        );
+        if (!resolved) {
+          return { cards: [] };
+        }
+        where.employeeId = resolved.id;
+      } else {
+        where.employeeId = employeeId;
+      }
     }
 
     const cards = await this.prisma.corporateCard.findMany({
@@ -279,7 +324,11 @@ export class BankingService {
     return { cards };
   }
 
-  async getCorporateCardDetails(organizationId: string, cardId: string) {
+  async getCorporateCardDetails(
+    organizationId: string,
+    cardId: string,
+    callerUser?: AuthenticatedUser,
+  ) {
     const card = await this.prisma.corporateCard.findFirst({
       where: { id: cardId, organizationId },
       include: {
@@ -293,6 +342,19 @@ export class BankingService {
       throw new NotFoundException(`Corporate card "${cardId}" not found`);
     }
 
+    if (callerUser) {
+      const resolved = await this.resolveEmployeeForUser(
+        organizationId,
+        callerUser.id,
+        callerUser.email,
+      );
+      if (!resolved || card.employeeId !== resolved.id) {
+        throw new ForbiddenException(
+          'You do not have permission to view this corporate card',
+        );
+      }
+    }
+
     const liveCard = await this.anchorClient
       .getCard(card.anchorCardId)
       .catch(() => null);
@@ -303,10 +365,88 @@ export class BankingService {
     };
   }
 
+  async getCardTransactions(
+    organizationId: string,
+    cardId: string,
+    callerUser?: AuthenticatedUser,
+  ) {
+    const card = await this.prisma.corporateCard.findFirst({
+      where: { id: cardId, organizationId },
+      include: {
+        employee: {
+          select: { id: true, fullName: true, email: true },
+        },
+      },
+    });
+
+    if (!card) {
+      throw new NotFoundException(`Corporate card "${cardId}" not found`);
+    }
+
+    if (callerUser) {
+      const resolved = await this.resolveEmployeeForUser(
+        organizationId,
+        callerUser.id,
+        callerUser.email,
+      );
+      if (!resolved || card.employeeId !== resolved.id) {
+        throw new ForbiddenException(
+          'You do not have permission to view transactions for this corporate card',
+        );
+      }
+    }
+
+    const expenses = await this.prisma.expense.findMany({
+      where: {
+        organizationId,
+        OR: [
+          { cardId: card.id },
+          { employeeId: card.employeeId, category: 'Corporate Card' },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const totalSpentKobo = expenses.reduce(
+      (sum, exp) => sum + (exp.amount ?? 0) * 100,
+      0,
+    );
+    const remainingLimitKobo = Math.max(
+      0,
+      card.spendingLimitKobo - totalSpentKobo,
+    );
+
+    return {
+      cardId: card.id,
+      maskedPan: card.maskedPan,
+      brand: card.brand,
+      status: card.status,
+      currency: card.currency,
+      spendingLimitKobo: card.spendingLimitKobo,
+      spendingInterval: card.spendingInterval,
+      totalSpentKobo,
+      remainingLimitKobo,
+      transactions: expenses.map((exp) => ({
+        id: exp.id,
+        cardId: (exp as any).cardId ?? card.id,
+        employeeId: exp.employeeId,
+        amount: exp.amount,
+        amountKobo: exp.amount * 100,
+        currency: exp.currency,
+        category: exp.category,
+        description: exp.description,
+        receiptUrl: exp.receiptUrl,
+        status: exp.status,
+        createdAt: exp.createdAt,
+      })),
+    };
+  }
+
   async toggleCardFreeze(
     organizationId: string,
     cardId: string,
     dto: ToggleCardFreezeDto,
+    callerUser?: AuthenticatedUser,
   ) {
     const card = await this.prisma.corporateCard.findFirst({
       where: { id: cardId, organizationId },
@@ -316,9 +456,29 @@ export class BankingService {
       throw new NotFoundException(`Corporate card "${cardId}" not found`);
     }
 
-    const newStatus = dto.action === 'FREEZE' ? 'FROZEN' : 'ACTIVE';
+    const action = dto.action ?? (dto.freeze === false ? 'UNFREEZE' : 'FREEZE');
 
-    if (dto.action === 'FREEZE') {
+    if (callerUser) {
+      if (action !== 'FREEZE') {
+        throw new ForbiddenException(
+          'Only organization administrators can unfreeze a corporate card',
+        );
+      }
+      const resolved = await this.resolveEmployeeForUser(
+        organizationId,
+        callerUser.id,
+        callerUser.email,
+      );
+      if (!resolved || card.employeeId !== resolved.id) {
+        throw new ForbiddenException(
+          'You can only freeze your own corporate card',
+        );
+      }
+    }
+
+    const newStatus = action === 'FREEZE' ? 'FROZEN' : 'ACTIVE';
+
+    if (action === 'FREEZE') {
       await this.anchorClient.freezeCard(card.anchorCardId);
     } else {
       await this.anchorClient.unfreezeCard(card.anchorCardId);
@@ -330,7 +490,7 @@ export class BankingService {
     });
 
     const eventName =
-      dto.action === 'FREEZE'
+      action === 'FREEZE'
         ? BANKING_EVENTS.CORPORATE_CARD_FROZEN
         : BANKING_EVENTS.CORPORATE_CARD_UNFROZEN;
 
@@ -645,6 +805,7 @@ export class BankingService {
               id: randomUUID(),
               organizationId: card.organizationId,
               employeeId: card.employeeId,
+              cardId: card.id,
               category: 'Corporate Card',
               amount: amountMajor,
               currency: card.currency,

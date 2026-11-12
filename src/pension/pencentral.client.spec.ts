@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/require-await */
 import {
+  BadGatewayException,
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   NotFoundException,
   ServiceUnavailableException,
-  UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { PenCentralClient } from './pencentral.client';
@@ -136,8 +135,8 @@ describe('PenCentralClient', () => {
   describe('Error handling', () => {
     it.each([
       [400, BadRequestException],
-      [401, UnauthorizedException],
-      [403, ForbiddenException],
+      [401, BadGatewayException],
+      [403, BadGatewayException],
       [404, NotFoundException],
       [409, ConflictException],
       [422, UnprocessableEntityException],

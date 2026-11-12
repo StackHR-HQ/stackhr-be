@@ -36,12 +36,16 @@ describe('PayrollService', () => {
       employee: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
+        update: jest.fn().mockResolvedValue({}),
       },
       compensationRecord: {
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
         findMany: jest.fn(),
+      },
+      compensationHistory: {
+        create: jest.fn().mockResolvedValue({}),
       },
       payrollRun: {
         findFirst: jest.fn(),
@@ -60,6 +64,9 @@ describe('PayrollService', () => {
       user: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      $transaction: jest
+        .fn()
+        .mockImplementation((cb: (tx: any) => any) => cb(prismaMock)),
     };
 
     approvalsServiceMock = {

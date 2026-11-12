@@ -83,6 +83,7 @@ async function bootstrap() {
     origin: allowedOrigins,
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Content-Disposition'],
   });
 
   const port = process.env.PORT ? Number(process.env.PORT) : 3001;

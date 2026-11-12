@@ -81,10 +81,11 @@ export class UpdateEmployeeEmploymentDto {
 /** A compensation change creates a dated entry in the history. */
 export class UpdateEmployeeCompensationDto {
   /** Annual salary in integer minor units of `currency`. */
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(Number.MAX_SAFE_INTEGER)
-  annualSalaryMinor: number;
+  annualSalaryMinor?: number;
 
   @IsOptional()
   @Matches(/^[A-Z]{3}$/, { message: 'currency must be an ISO 4217 code' })
@@ -101,6 +102,36 @@ export class UpdateEmployeeCompensationDto {
   })
   @IsISO8601({ strict: true })
   effectiveDate?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(50)
+  pfaCode?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(150)
+  pensionProvider?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(50)
+  pensionRsaNumber?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(50)
+  tin?: string;
 }
 
 const PHONE_PATTERN = /^\+[1-9]\d{6,14}$/;
@@ -176,6 +207,30 @@ export class UpdateEmployeePersonalDto {
   @ValidateNested()
   @Type(() => EmergencyContactDto)
   emergencyContact?: EmergencyContactDto;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(50)
+  pfaCode?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(150)
+  pensionProvider?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(50)
+  pensionRsaNumber?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(50)
+  tin?: string;
 }
 
 /**
@@ -189,8 +244,19 @@ export class UpdateEmployeePaymentDto {
   @MaxLength(100)
   bankName: string;
 
+  @IsOptional()
   @Matches(/^\d{4}$/, { message: 'accountLast4 must be exactly 4 digits' })
-  accountLast4: string;
+  accountLast4?: string;
+
+  @IsOptional()
+  @Matches(/^\d{10}$/, { message: 'accountNumber must be 10 digits' })
+  accountNumber?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(150)
+  accountName?: string;
 }
 
 /** PATCH accepts only the top-level sections being changed. */
@@ -214,4 +280,28 @@ export class UpdateEmployeeDto {
   @ValidateNested()
   @Type(() => UpdateEmployeeCompensationDto)
   compensation?: UpdateEmployeeCompensationDto;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(50)
+  pfaCode?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(150)
+  pensionProvider?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(50)
+  pensionRsaNumber?: string;
+
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(50)
+  tin?: string;
 }

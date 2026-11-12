@@ -183,6 +183,188 @@ describe('ComplianceService', () => {
     });
   });
 
+  describe('createRuleSet band validation', () => {
+    it('should reject non-contiguous bands', async () => {
+      await expect(
+        service.createRuleSet({
+          name: 'Invalid Contiguity',
+          effectiveFrom: '2026-01-01',
+          taxRules: [
+            {
+              bandOrder: 1,
+              bandName: 'Band 1',
+              lowerLimit: 0,
+              upperLimit: 800000,
+              taxRate: 0,
+            },
+            {
+              bandOrder: 2,
+              bandName: 'Band 2',
+              lowerLimit: 1000000, // Gap!
+              upperLimit: null,
+              taxRate: 0.15,
+            },
+          ],
+        }),
+      ).rejects.toThrow(
+        'Tax bands must be contiguous without gaps or overlaps',
+      );
+    });
+
+    it('should reject null upper limit on non-highest band', async () => {
+      await expect(
+        service.createRuleSet({
+          name: 'Null on intermediate band',
+          effectiveFrom: '2026-01-01',
+          taxRules: [
+            {
+              bandOrder: 1,
+              bandName: 'Band 1',
+              lowerLimit: 0,
+              upperLimit: null,
+              taxRate: 0,
+            },
+            {
+              bandOrder: 2,
+              bandName: 'Band 2',
+              lowerLimit: 800000,
+              upperLimit: 2000000,
+              taxRate: 0.15,
+            },
+          ],
+        }),
+      ).rejects.toThrow('Only the highest tax band');
+    });
+
+    it('should accept valid contiguous bands with null upper limit only on the last band', async () => {
+      const result = await service.createRuleSet({
+        name: 'Valid Bands',
+        effectiveFrom: '2026-01-01',
+        taxRules: [
+          {
+            bandOrder: 1,
+            bandName: 'Band 1',
+            lowerLimit: 0,
+            upperLimit: 800000,
+            taxRate: 0,
+          },
+          {
+            bandOrder: 2,
+            bandName: 'Band 2',
+            lowerLimit: 800000,
+            upperLimit: null,
+            taxRate: 0.15,
+          },
+        ],
+      });
+      expect(result).toBeDefined();
+    });
+    it('should clamp pension rates to statutory minimums (8% employee, 10% employer)', async () => {
+      // Pass sub-statutory overrides (e.g. 0.05 and 0.06)
+      const result = await service.calculatePayrollDeductions({
+        basicSalary: 600000,
+        housingAllowance: 200000,
+        transportAllowance: 100000,
+        otherAllowances: 100000,
+        pensionEmployeeRateOverride: 0.05, // Below 8% statutory minimum
+        pensionEmployerRateOverride: 0.06, // Below 10% statutory minimum
+      });
+
+      // Annual pension basis: (600k + 200k + 100k) * 12 = 10,800,000
+      // Clamped employee pension: 10,800,000 * 0.08 / 12 = 72,000
+      // Clamped employer pension: 10,800,000 * 0.10 / 12 = 90,000
+      expect(result.pensionDeductionMonthly).toBe(72000);
+      expect(result.employerPensionDeductionMonthly).toBe(90000);
+    });
+
+    it('should allow pension rates higher than statutory minimums', async () => {
+      const result = await service.calculatePayrollDeductions({
+        basicSalary: 600000,
+        housingAllowance: 200000,
+        transportAllowance: 100000,
+        otherAllowances: 100000,
+        pensionEmployeeRateOverride: 0.1, // 10% (> 8%)
+        pensionEmployerRateOverride: 0.15, // 15% (> 10%)
+      });
+
+      // Annual pension basis = 10,800,000
+      // Employee pension: 10,800,000 * 0.10 / 12 = 90,000
+      // Employer pension: 10,800,000 * 0.15 / 12 = 135,000
+      expect(result.pensionDeductionMonthly).toBe(90000);
+      expect(result.employerPensionDeductionMonthly).toBe(135000);
+    });
+  });
+
+  describe('pension rate validation on rule sets', () => {
+    it('rejects createRuleSet when pensionEmployeeRate is below 0.08', async () => {
+      await expect(
+        service.createRuleSet({
+          name: 'Invalid Pension Rule Set',
+          effectiveFrom: '2026-01-01',
+          pensionEmployeeRate: 0.05,
+          taxRules: [
+            {
+              bandOrder: 1,
+              bandName: 'First 800k',
+              lowerLimit: 0,
+              upperLimit: null,
+              taxRate: 0.0,
+            },
+          ],
+        }),
+      ).rejects.toThrow(
+        'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+      );
+    });
+
+    it('rejects createRuleSet when pensionEmployerRate is below 0.10', async () => {
+      await expect(
+        service.createRuleSet({
+          name: 'Invalid Pension Rule Set',
+          effectiveFrom: '2026-01-01',
+          pensionEmployerRate: 0.08,
+          taxRules: [
+            {
+              bandOrder: 1,
+              bandName: 'First 800k',
+              lowerLimit: 0,
+              upperLimit: null,
+              taxRate: 0.0,
+            },
+          ],
+        }),
+      ).rejects.toThrow(
+        'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+      );
+    });
+
+    it('rejects updateRuleSet when pensionEmployeeRate is below 0.08', async () => {
+      (prisma.taxRuleSet.findUnique as jest.Mock).mockResolvedValue({
+        id: 'TRS-1',
+      });
+      await expect(
+        service.updateRuleSet('TRS-1', {
+          pensionEmployeeRate: 0.04,
+        }),
+      ).rejects.toThrow(
+        'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+      );
+    });
+
+    it('rejects updateRuleSet when pensionEmployerRate is below 0.10', async () => {
+      (prisma.taxRuleSet.findUnique as jest.Mock).mockResolvedValue({
+        id: 'TRS-1',
+      });
+      await expect(
+        service.updateRuleSet('TRS-1', {
+          pensionEmployerRate: 0.09,
+        }),
+      ).rejects.toThrow(
+        'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+      );
+    });
+  });
+
   describe('getAlerts', () => {
     it('should return compliance alerts for organization', async () => {
       (prisma.employee.findMany as jest.Mock)

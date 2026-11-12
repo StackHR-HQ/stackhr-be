@@ -1,8 +1,16 @@
-import { Controller, Get, Optional } from '@nestjs/common';
+import {
+  Controller,
+  ForbiddenException,
+  Get,
+  Optional,
+  Req,
+} from '@nestjs/common';
+import type { Request } from 'express';
 import { AppService } from './app.service';
 import { PrismaService } from './database/prisma.service';
 import { OutboxService } from './common/outbox/outbox.service';
 import { ResilientHttpClient } from './common/resilience/resilient-client';
+import { AuthService } from './auth/auth.service';
 
 @Controller()
 export class AppController {
@@ -11,6 +19,7 @@ export class AppController {
     @Optional() private readonly prisma?: PrismaService,
     @Optional() private readonly outboxService?: OutboxService,
     @Optional() private readonly resilientClient?: ResilientHttpClient,
+    @Optional() private readonly authService?: AuthService,
   ) {}
 
   @Get()
@@ -19,7 +28,18 @@ export class AppController {
   }
 
   @Get(['health', 'v1/api/health'])
-  async getHealth() {
+  async getHealth(@Req() req?: Request) {
+    if (req && this.authService) {
+      const token = this.authService.getTokenFromRequest(req);
+      if (token) {
+        const user = await this.authService.validateSession(token);
+        if (user && user.userType === 'BUSINESS') {
+          throw new ForbiddenException(
+            'System health telemetry is restricted to platform administrators or internal probes',
+          );
+        }
+      }
+    }
     const mem = process.memoryUsage();
     let dbStatus: 'up' | 'down' = 'up';
     let dbLatencyMs = 0;

@@ -6,6 +6,7 @@ import {
   IsBoolean,
   IsNumber,
   IsArray,
+  ValidateIf,
   ValidateNested,
   Min,
 } from 'class-validator';
@@ -24,9 +25,10 @@ export class TaxRuleBandDto {
   @Min(0)
   lowerLimit: number;
 
-  @IsNumber()
   @IsOptional()
-  upperLimit?: number;
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsNumber()
+  upperLimit?: number | null;
 
   @IsNumber()
   @Min(0)
@@ -45,9 +47,10 @@ export class CreateTaxRuleSetDto {
   @IsDateString()
   effectiveFrom: string;
 
-  @IsDateString()
   @IsOptional()
-  effectiveTo?: string;
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsDateString()
+  effectiveTo?: string | null;
 
   @IsBoolean()
   @IsOptional()
@@ -61,12 +64,20 @@ export class CreateTaxRuleSetDto {
   @IsOptional()
   rentReliefCap?: number = 500000;
 
-  @IsNumber()
+  @IsNumber({}, { message: 'pensionEmployeeRate must be a valid number' })
   @IsOptional()
+  @Min(0.08, {
+    message:
+      'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+  })
   pensionEmployeeRate?: number = 0.08;
 
-  @IsNumber()
+  @IsNumber({}, { message: 'pensionEmployerRate must be a valid number' })
   @IsOptional()
+  @Min(0.1, {
+    message:
+      'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+  })
   pensionEmployerRate?: number = 0.1;
 
   @IsString()

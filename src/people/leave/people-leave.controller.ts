@@ -27,6 +27,14 @@ export class PeopleLeaveController {
     return this.leaveService.listRequests(user);
   }
 
+  @Get('requests/:requestId')
+  getRequest(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('requestId') requestId: string,
+  ) {
+    return this.leaveService.getRequest(user, requestId);
+  }
+
   @Patch('requests/:requestId/decision')
   decideRequest(
     @CurrentUser() user: AuthenticatedUser,

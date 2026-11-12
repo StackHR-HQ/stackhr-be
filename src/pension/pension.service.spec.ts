@@ -277,6 +277,111 @@ describe('PensionService', () => {
 
       const res = await service.getEmployerConfig(mockUser);
       expect(res.penCentralEmployerCode).toBe('EMP-001');
+      expect(res.statutoryMinimums.minEmployeeRate).toBe(0.08);
+      expect(res.statutoryMinimums.minEmployerRate).toBe(0.1);
+    });
+
+    it('rejects updateEmployerConfig when pensionEmployeeRate is below 0.08', async () => {
+      await expect(
+        service.updateEmployerConfig(mockUser, {
+          pensionEmployeeRateOverride: 0.05,
+        }),
+      ).rejects.toThrow(
+        'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+      );
+    });
+
+    it('rejects updateEmployerConfig when pensionEmployerRate is below 0.10', async () => {
+      await expect(
+        service.updateEmployerConfig(mockUser, {
+          pensionEmployerRateOverride: 0.07,
+        }),
+      ).rejects.toThrow(
+        'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+      );
+    });
+  });
+
+  describe('Pension Rates Management', () => {
+    it('gets default rates when no overrides exist', async () => {
+      (prisma.organization.findUnique as jest.Mock).mockResolvedValue({
+        id: 'org-123',
+        name: 'Acme Corp',
+        pensionEmployeeRateOverride: null,
+        pensionEmployerRateOverride: null,
+        pensionBasisOverride: null,
+      });
+
+      const res = await service.getPensionRates(mockUser);
+      expect(res.effectiveRates.employeeRate).toBe(0.08);
+      expect(res.effectiveRates.employerRate).toBe(0.1);
+      expect(res.effectiveRates.basis).toBe('BASIC,HOUSING,TRANSPORT');
+      expect(res.overrides.hasCustomRates).toBe(false);
+      expect(res.statutoryMinimums.minEmployeeRate).toBe(0.08);
+      expect(res.statutoryMinimums.minEmployerRate).toBe(0.1);
+    });
+
+    it('gets overridden rates when custom rates are set', async () => {
+      (prisma.organization.findUnique as jest.Mock).mockResolvedValue({
+        id: 'org-123',
+        name: 'Acme Corp',
+        pensionEmployeeRateOverride: 0.1,
+        pensionEmployerRateOverride: 0.15,
+        pensionBasisOverride: 'BASIC,HOUSING',
+      });
+
+      const res = await service.getPensionRates(mockUser);
+      expect(res.effectiveRates.employeeRate).toBe(0.1);
+      expect(res.effectiveRates.employerRate).toBe(0.15);
+      expect(res.effectiveRates.basis).toBe('BASIC,HOUSING');
+      expect(res.overrides.hasCustomRates).toBe(true);
+    });
+
+    it('updates pension rates with valid values above minimums', async () => {
+      (prisma.organization.update as jest.Mock).mockResolvedValue({
+        id: 'org-123',
+        pensionEmployeeRateOverride: 0.1,
+        pensionEmployerRateOverride: 0.12,
+        pensionBasisOverride: 'BASIC,HOUSING,TRANSPORT',
+      });
+
+      const res = await service.updatePensionRates(mockUser, {
+        pensionEmployeeRateOverride: 0.1,
+        pensionEmployerRateOverride: 0.12,
+        pensionBasisOverride: 'BASIC,HOUSING,TRANSPORT',
+      });
+
+      expect(res.message).toBe('Pension rates updated successfully');
+      expect(res.effectiveRates.employeeRate).toBe(0.1);
+      expect(res.effectiveRates.employerRate).toBe(0.12);
+      expect(prisma.organization.update).toHaveBeenCalledWith({
+        where: { id: 'org-123' },
+        data: {
+          pensionEmployeeRateOverride: 0.1,
+          pensionEmployerRateOverride: 0.12,
+          pensionBasisOverride: 'BASIC,HOUSING,TRANSPORT',
+        },
+      });
+    });
+
+    it('rejects updatePensionRates when employee rate is below 0.08', async () => {
+      await expect(
+        service.updatePensionRates(mockUser, {
+          pensionEmployeeRateOverride: 0.04,
+        }),
+      ).rejects.toThrow(
+        'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+      );
+    });
+
+    it('rejects updatePensionRates when employer rate is below 0.10', async () => {
+      await expect(
+        service.updatePensionRates(mockUser, {
+          pensionEmployerRateOverride: 0.08,
+        }),
+      ).rejects.toThrow(
+        'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+      );
     });
   });
 

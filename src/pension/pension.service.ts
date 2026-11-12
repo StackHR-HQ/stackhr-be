@@ -21,8 +21,10 @@ import {
   AttachEmployerDto,
   PensionScheduleQueryDto,
   UpdatePensionConfigDto,
+  UpdatePensionRatesDto,
   ValidateEmployerCodeDto,
 } from './dto/pension.dto';
+import { randomUUID } from 'crypto';
 
 const MONTH_NAMES = [
   'January',
@@ -233,22 +235,79 @@ export class PensionService {
     };
   }
 
+  private validatePensionRates(
+    employeeRate?: number | null,
+    employerRate?: number | null,
+  ) {
+    if (
+      employeeRate !== undefined &&
+      employeeRate !== null &&
+      employeeRate < 0.08
+    ) {
+      throw new BadRequestException(
+        'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+      );
+    }
+    if (
+      employerRate !== undefined &&
+      employerRate !== null &&
+      employerRate < 0.1
+    ) {
+      throw new BadRequestException(
+        'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+      );
+    }
+  }
+
   async updateEmployerConfig(
     user: AuthenticatedUser,
     dto: UpdatePensionConfigDto,
   ) {
     const orgId = this.checkOrgContext(user);
 
+    this.validatePensionRates(
+      dto.pensionEmployeeRateOverride,
+      dto.pensionEmployerRateOverride,
+    );
+
+    const updateData: {
+      penCentralEmployerCode?: string | null;
+      pensionEmployeeRateOverride?: number | null;
+      pensionEmployerRateOverride?: number | null;
+      pensionBasisOverride?: string | null;
+    } = {};
+
+    if (dto.penCentralEmployerCode !== undefined) {
+      updateData.penCentralEmployerCode =
+        dto.penCentralEmployerCode?.trim() || null;
+    }
+    if (dto.pensionEmployeeRateOverride !== undefined) {
+      updateData.pensionEmployeeRateOverride = dto.pensionEmployeeRateOverride;
+    }
+    if (dto.pensionEmployerRateOverride !== undefined) {
+      updateData.pensionEmployerRateOverride = dto.pensionEmployerRateOverride;
+    }
+    if (dto.pensionBasisOverride !== undefined) {
+      updateData.pensionBasisOverride = dto.pensionBasisOverride
+        ? dto.pensionBasisOverride.trim().toUpperCase()
+        : null;
+    }
+
     const org = await this.prisma.organization.update({
       where: { id: orgId },
-      data: {
-        penCentralEmployerCode: dto.penCentralEmployerCode.trim(),
-      },
+      data: updateData,
     });
 
     return {
-      message: 'PenCentral employer code updated successfully',
+      message: 'Pension configuration updated successfully',
       penCentralEmployerCode: org.penCentralEmployerCode,
+      pensionEmployeeRateOverride: org.pensionEmployeeRateOverride,
+      pensionEmployerRateOverride: org.pensionEmployerRateOverride,
+      pensionBasisOverride: org.pensionBasisOverride,
+      statutoryMinimums: {
+        minEmployeeRate: 0.08,
+        minEmployerRate: 0.1,
+      },
     };
   }
 
@@ -256,7 +315,14 @@ export class PensionService {
     const orgId = this.checkOrgContext(user);
     const org = await this.prisma.organization.findUnique({
       where: { id: orgId },
-      select: { id: true, name: true, penCentralEmployerCode: true },
+      select: {
+        id: true,
+        name: true,
+        penCentralEmployerCode: true,
+        pensionEmployeeRateOverride: true,
+        pensionEmployerRateOverride: true,
+        pensionBasisOverride: true,
+      },
     });
 
     if (!org) {
@@ -287,6 +353,110 @@ export class PensionService {
       ...org,
       isAttached,
       employerName,
+      statutoryMinimums: {
+        minEmployeeRate: 0.08,
+        minEmployerRate: 0.1,
+        legalBasis: 'Pension Reform Act 2014 Section 4(1)',
+      },
+    };
+  }
+
+  async getPensionRates(user: AuthenticatedUser) {
+    const orgId = this.checkOrgContext(user);
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: {
+        id: true,
+        name: true,
+        pensionEmployeeRateOverride: true,
+        pensionEmployerRateOverride: true,
+        pensionBasisOverride: true,
+      },
+    });
+
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    const employeeRate = org.pensionEmployeeRateOverride ?? 0.08;
+    const employerRate = org.pensionEmployerRateOverride ?? 0.1;
+    const basis = org.pensionBasisOverride || 'BASIC,HOUSING,TRANSPORT';
+
+    return {
+      effectiveRates: {
+        employeeRate,
+        employerRate,
+        basis,
+      },
+      overrides: {
+        pensionEmployeeRateOverride: org.pensionEmployeeRateOverride,
+        pensionEmployerRateOverride: org.pensionEmployerRateOverride,
+        pensionBasisOverride: org.pensionBasisOverride,
+        hasCustomRates:
+          org.pensionEmployeeRateOverride !== null ||
+          org.pensionEmployerRateOverride !== null ||
+          org.pensionBasisOverride !== null,
+      },
+      statutoryMinimums: {
+        minEmployeeRate: 0.08,
+        minEmployerRate: 0.1,
+        legalBasis: 'Pension Reform Act 2014 Section 4(1)',
+        description:
+          'Statutory minimum pension contribution is 8% for employee and 10% for employer. Custom rates cannot fall below these minimums.',
+      },
+    };
+  }
+
+  async updatePensionRates(
+    user: AuthenticatedUser,
+    dto: UpdatePensionRatesDto,
+  ) {
+    const orgId = this.checkOrgContext(user);
+
+    this.validatePensionRates(
+      dto.pensionEmployeeRateOverride,
+      dto.pensionEmployerRateOverride,
+    );
+
+    const updateData: {
+      pensionEmployeeRateOverride?: number | null;
+      pensionEmployerRateOverride?: number | null;
+      pensionBasisOverride?: string | null;
+    } = {};
+
+    if (dto.pensionEmployeeRateOverride !== undefined) {
+      updateData.pensionEmployeeRateOverride = dto.pensionEmployeeRateOverride;
+    }
+    if (dto.pensionEmployerRateOverride !== undefined) {
+      updateData.pensionEmployerRateOverride = dto.pensionEmployerRateOverride;
+    }
+    if (dto.pensionBasisOverride !== undefined) {
+      updateData.pensionBasisOverride = dto.pensionBasisOverride
+        ? dto.pensionBasisOverride.trim().toUpperCase()
+        : null;
+    }
+
+    const org = await this.prisma.organization.update({
+      where: { id: orgId },
+      data: updateData,
+    });
+
+    return {
+      message: 'Pension rates updated successfully',
+      effectiveRates: {
+        employeeRate: org.pensionEmployeeRateOverride ?? 0.08,
+        employerRate: org.pensionEmployerRateOverride ?? 0.1,
+        basis: org.pensionBasisOverride || 'BASIC,HOUSING,TRANSPORT',
+      },
+      overrides: {
+        pensionEmployeeRateOverride: org.pensionEmployeeRateOverride,
+        pensionEmployerRateOverride: org.pensionEmployerRateOverride,
+        pensionBasisOverride: org.pensionBasisOverride,
+      },
+      statutoryMinimums: {
+        minEmployeeRate: 0.08,
+        minEmployerRate: 0.1,
+      },
     };
   }
 
@@ -330,9 +500,46 @@ export class PensionService {
     }
 
     if (payrollRun.pensionRemittanceSchedule) {
-      throw new ConflictException(
-        `A pension remittance schedule already exists for payroll run ${payrollRunId}`,
-      );
+      const existing = payrollRun.pensionRemittanceSchedule;
+      const canReplace =
+        existing.status === 'CANCELLED' ||
+        existing.status === 'VALIDATION_FAILED';
+
+      if (!canReplace) {
+        throw new ConflictException(
+          `A pension remittance schedule already exists for payroll run ${payrollRunId} (status: ${existing.status})`,
+        );
+      }
+
+      // Snapshot the previous schedule in audit before replacing it,
+      // so there is a local trail if PenCentral ever issued funding accounts.
+      await this.prisma.auditEvent.create({
+        data: {
+          id: randomUUID(),
+          organizationId: orgId,
+          targetType: 'PensionRemittanceSchedule',
+          targetId: existing.id,
+          action: 'pension_schedule.replaced',
+          actorUserId: user.id,
+          description: `Replaced pension schedule ${existing.id} (status: ${existing.status}) for payroll run ${existing.payrollRunId}`,
+          changes: {
+            previous: {
+              id: existing.id,
+              status: existing.status,
+              payrollRunId: existing.payrollRunId,
+              totalAmount: existing.totalAmount,
+              periodMonth: existing.periodMonth,
+              periodYear: existing.periodYear,
+              createdAt: existing.createdAt,
+            },
+            reason: 'Replaced by new schedule generation',
+          },
+        },
+      });
+
+      await this.prisma.pensionRemittanceSchedule.delete({
+        where: { id: existing.id },
+      });
     }
 
     // Must be at least APPROVED or EXECUTED
@@ -432,6 +639,65 @@ export class PensionService {
     return {
       message: 'Draft pension remittance schedule created successfully',
       schedule,
+    };
+  }
+
+  async cancelSchedule(user: AuthenticatedUser, scheduleId: string) {
+    const orgId = this.checkOrgContext(user);
+
+    const schedule = await this.prisma.pensionRemittanceSchedule.findFirst({
+      where: { id: scheduleId, organizationId: orgId },
+    });
+
+    if (!schedule) {
+      throw new NotFoundException(
+        `Remittance schedule ${scheduleId} not found`,
+      );
+    }
+
+    if (schedule.status === 'CANCELLED') {
+      throw new BadRequestException('Remittance schedule is already cancelled');
+    }
+
+    // Only allow cancellation of pre-submission states.
+    // Once submitted to PenCentral or in payment-pending, the upstream provider
+    // may have already issued virtual funding accounts. Cancelling locally would
+    // risk double remittance with no local audit trail of the first payment.
+    const cancellableStatuses: string[] = [
+      PENSION_SCHEDULE_STATUS.DRAFT,
+      PENSION_SCHEDULE_STATUS.VALIDATING,
+      PENSION_SCHEDULE_STATUS.VALIDATION_FAILED,
+      PENSION_SCHEDULE_STATUS.VALIDATED,
+    ];
+
+    if (!cancellableStatuses.includes(schedule.status)) {
+      throw new ConflictException(
+        `Cannot cancel schedule once submitted to PenCentral or while payment is pending (current status: ${schedule.status}). Please contact support.`,
+      );
+    }
+
+    const updated = await this.prisma.pensionRemittanceSchedule.update({
+      where: { id: scheduleId },
+      data: { status: 'CANCELLED' },
+    });
+
+    // Record audit event for cancellation
+    await this.prisma.auditEvent.create({
+      data: {
+        id: randomUUID(),
+        organizationId: orgId,
+        targetType: 'PensionRemittanceSchedule',
+        targetId: scheduleId,
+        action: 'pension_schedule.cancelled',
+        actorUserId: user.id,
+        description: `Cancelled pension schedule ${scheduleId} (previous status: ${schedule.status})`,
+        changes: { previousStatus: schedule.status, newStatus: 'CANCELLED' },
+      },
+    });
+
+    return {
+      message: 'Remittance schedule cancelled successfully',
+      schedule: updated,
     };
   }
 

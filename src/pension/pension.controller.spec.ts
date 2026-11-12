@@ -23,6 +23,8 @@ describe('PensionController', () => {
       getRegisteredPfas: jest.fn(),
       getEmployerConfig: jest.fn(),
       updateEmployerConfig: jest.fn(),
+      getPensionRates: jest.fn(),
+      updatePensionRates: jest.fn(),
       createScheduleFromPayroll: jest.fn(),
       listSchedules: jest.fn(),
       getSchedule: jest.fn(),
@@ -84,6 +86,20 @@ describe('PensionController', () => {
     expect(service.updateEmployerConfig).toHaveBeenCalledWith(mockUser, {
       penCentralEmployerCode: 'EMP001',
     });
+  });
+
+  it('delegates getPensionRates', async () => {
+    await controller.getPensionRates(mockUser);
+    expect(service.getPensionRates).toHaveBeenCalledWith(mockUser);
+  });
+
+  it('delegates updatePensionRates', async () => {
+    const dto = {
+      pensionEmployeeRateOverride: 0.1,
+      pensionEmployerRateOverride: 0.12,
+    };
+    await controller.updatePensionRates(mockUser, dto);
+    expect(service.updatePensionRates).toHaveBeenCalledWith(mockUser, dto);
   });
 
   it('delegates createScheduleFromPayroll', async () => {
