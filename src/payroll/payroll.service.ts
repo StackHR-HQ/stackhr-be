@@ -1058,7 +1058,7 @@ export class PayrollService {
       const rec = compRecordByEmp.get(emp.id);
       const basicSalary = rec
         ? rec.basicSalary
-        : Math.trunc(Number(emp.annualSalaryMinor) / 12);
+        : Math.trunc(Number(emp.annualSalaryMinor) / 1200);
       const housingAllowance = rec?.housingAllowance ?? 0;
       const transportAllowance = rec?.transportAllowance ?? 0;
       const otherAllowances = rec?.otherAllowances ?? 0;
