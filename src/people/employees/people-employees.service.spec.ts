@@ -143,7 +143,7 @@ describe('PeopleEmployeesService', () => {
           effectiveDate: '2026-10-01',
           annualSalaryMinor: 1_200_000_000,
           previousSalary: 0,
-          newSalary: 0,
+          newSalary: 1_200_000_000,
           reason: null,
           currency: 'NGN',
           payFrequency: 'MONTHLY',
@@ -152,6 +152,9 @@ describe('PeopleEmployeesService', () => {
     });
 
     it('creates an employee that then appears in the organization directory', async () => {
+      fake.seed('organization', [
+        { id: 'org_a', name: 'Acme Corp', slug: 'acme' },
+      ]);
       fake.seed('department', [
         { id: 'dep_people', organizationId: 'org_a', name: 'People' },
       ]);
@@ -160,6 +163,7 @@ describe('PeopleEmployeesService', () => {
 
       expect(created).toEqual({
         id: expect.any(String) as unknown,
+        employeeNumber: 'ACME-EMP-0001',
         fullName: 'Ada Okafor',
         email: 'ada@example.com',
         avatarInitials: 'AO',
@@ -323,8 +327,8 @@ describe('PeopleEmployeesService', () => {
           id: expect.any(String) as unknown,
           effectiveDate: '2026-11-01',
           annualSalaryMinor: 600_000_000,
-          previousSalary: 0,
-          newSalary: 0,
+          previousSalary: 540_000_000,
+          newSalary: 600_000_000,
           reason: null,
           currency: 'NGN',
           payFrequency: 'MONTHLY',
@@ -391,6 +395,7 @@ describe('PeopleEmployeesService', () => {
       await expect(service.listEmployees(adminUser())).resolves.toEqual([
         {
           id: 'emp_ada',
+          employeeNumber: null,
           fullName: 'Ada Okafor',
           email: 'ada@acme.test',
           avatarInitials: 'AO',
@@ -560,6 +565,7 @@ describe('PeopleEmployeesService', () => {
 
       expect(detail).toEqual({
         id: 'emp_ada',
+        employeeNumber: null,
         fullName: 'Ada Okafor',
         email: 'ada@acme.test',
         avatarInitials: 'AO',
@@ -570,6 +576,10 @@ describe('PeopleEmployeesService', () => {
         employmentStatus: 'active',
         startDate: '2026-01-05',
         workLocation: 'Lagos',
+        pfaCode: null,
+        pensionProvider: null,
+        pensionRsaNumber: null,
+        tin: null,
         personalInfo: {
           dateOfBirth: '1994-03-02',
           gender: 'Female',
@@ -580,6 +590,10 @@ describe('PeopleEmployeesService', () => {
           emergencyContactName: 'Chidi Okafor',
           emergencyContactPhone: '',
           emergencyContactRelationship: '',
+          pfaCode: null,
+          pensionProvider: null,
+          pensionRsaNumber: null,
+          tin: null,
         },
         compensation: {
           salary: 450000,
@@ -588,6 +602,12 @@ describe('PeopleEmployeesService', () => {
           payFrequency: 'Monthly',
           bankName: 'GTBank',
           bankAccountLast4: '1234',
+          accountNumber: null,
+          accountName: null,
+          pfaCode: null,
+          pensionProvider: null,
+          pensionRsaNumber: null,
+          tin: null,
         },
         leaveBalance: [{ type: 'Annual Leave', totalDays: 20, usedDays: 3 }],
         leaveRequests: [

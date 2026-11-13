@@ -78,6 +78,12 @@ export class EmployeeEmploymentDto {
   @IsOptional()
   @Transform(trim)
   @IsString()
+  @MaxLength(100)
+  employeeNumber?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
   @MaxLength(150)
   workLocation?: string;
 }
@@ -94,6 +100,30 @@ export class EmployeeCompensationDto {
 
   @IsIn(PAY_FREQUENCIES)
   payFrequency: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(50)
+  pfaCode?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(150)
+  pensionProvider?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(50)
+  pensionRsaNumber?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(50)
+  tin?: string;
 }
 
 export class CreateEmployeeDto {
@@ -112,4 +142,28 @@ export class CreateEmployeeDto {
   @IsOptional()
   @IsBoolean()
   sendInvitation?: boolean;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(50)
+  pfaCode?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(150)
+  pensionProvider?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(50)
+  pensionRsaNumber?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(50)
+  tin?: string;
 }

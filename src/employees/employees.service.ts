@@ -12,6 +12,10 @@ import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { OffboardEmployeeDto } from './dto/offboard-employee.dto';
 import { EmployeeQueryDto } from './dto/employee-query.dto';
 import { ReassignManagerDto } from './dto/reassign-manager.dto';
+import {
+  getOrgPrefix,
+  computeNextEmployeeNumber,
+} from '../common/utils/employee-number.util';
 
 @Injectable()
 export class EmployeesService {
@@ -76,11 +80,27 @@ export class EmployeesService {
     }
 
     let employeeNumber = dto.employeeNumber;
-    if (!employeeNumber) {
-      const count = await this.prisma.employee.count({
-        where: { organizationId: orgId },
+    if (employeeNumber) {
+      const existingWithNum = await this.prisma.employee.findFirst({
+        where: { organizationId: orgId, employeeNumber },
       });
-      employeeNumber = `EMP-${String(count + 1).padStart(4, '0')}`;
+      if (existingWithNum) {
+        throw new ConflictException(
+          `Employee number "${employeeNumber}" is already in use in this organization`,
+        );
+      }
+    } else {
+      const org = await this.prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { slug: true, name: true },
+      });
+      const prefix = getOrgPrefix(org);
+
+      const existingEmployees = await this.prisma.employee.findMany({
+        where: { organizationId: orgId, employeeNumber: { not: null } },
+        select: { employeeNumber: true },
+      });
+      employeeNumber = computeNextEmployeeNumber(prefix, existingEmployees);
     }
 
     const employee = await this.prisma.employee.create({
@@ -265,7 +285,7 @@ export class EmployeesService {
     id: string,
     dto: UpdateEmployeeDto,
   ) {
-    this.checkOrgContext(user);
+    const orgId = this.checkOrgContext(user);
     const employee = await this.prisma.employee.findFirst({
       where: { id },
     });
@@ -296,6 +316,21 @@ export class EmployeesService {
       if (existing) {
         throw new ConflictException(
           'An employee with this email already exists',
+        );
+      }
+    }
+
+    if (dto.employeeNumber) {
+      const duplicate = await this.prisma.employee.findFirst({
+        where: {
+          organizationId: orgId,
+          employeeNumber: dto.employeeNumber,
+          id: { not: id },
+        },
+      });
+      if (duplicate) {
+        throw new ConflictException(
+          `Employee number "${dto.employeeNumber}" is already in use in this organization`,
         );
       }
     }

@@ -4,10 +4,12 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type { AuthenticatedUser } from '../../auth/auth.types';
 import { requirePeopleOrganization } from '../common/people-access';
 import { avatarInitials, toDateOnly } from '../common/people-mappers';
 import { TenantPrismaService } from '../tenant/tenant-prisma.service';
+import type { SaveOnboardingTemplateDto } from './dto/onboarding.dto';
 
 function toOnboardingRow(
   employee: { id: string; fullName: string; jobTitle: string; startDate: Date },
@@ -78,6 +80,316 @@ export class PeopleOnboardingService {
           })),
       }));
     });
+  }
+
+  createTemplate(user: AuthenticatedUser, input: SaveOnboardingTemplateDto) {
+    const organizationId = requirePeopleOrganization(user);
+    const name = requireId(input.name ?? input.title, 'name');
+    const rawItems = input.checklist ?? input.tasks ?? [];
+
+    return this.tenant.run(organizationId, async (client) => {
+      const resolvedDepartmentIds = await this.resolveDepartmentIds(
+        client,
+        organizationId,
+        input,
+      );
+
+      const template = await client.onboardingTemplate.create({
+        data: {
+          organizationId,
+          name,
+          revision: 1,
+        },
+      });
+
+      for (const departmentId of resolvedDepartmentIds) {
+        await client.onboardingTemplateDepartment.deleteMany({
+          where: { organizationId, departmentId },
+        });
+        await client.onboardingTemplateDepartment.create({
+          data: {
+            organizationId,
+            templateId: template.id,
+            departmentId,
+          },
+        });
+      }
+
+      const createdItems: Array<{ id: string; label: string; stage: string }> =
+        [];
+      for (const [index, item] of rawItems.entries()) {
+        const label = requireId(item.label ?? item.title, 'label');
+        const stage =
+          typeof item.stage === 'string' && item.stage.trim()
+            ? item.stage.trim()
+            : 'Day one';
+        const created = await client.onboardingChecklistItem.create({
+          data: {
+            organizationId,
+            templateId: template.id,
+            label,
+            stage,
+            position: index,
+          },
+        });
+        createdItems.push({
+          id: created.id,
+          label: created.label,
+          stage: created.stage,
+        });
+      }
+
+      return {
+        id: template.id,
+        name: template.name,
+        departmentIds: resolvedDepartmentIds,
+        checklist: createdItems,
+      };
+    });
+  }
+
+  updateTemplate(
+    user: AuthenticatedUser,
+    templateId: string,
+    input: SaveOnboardingTemplateDto,
+  ) {
+    const organizationId = requirePeopleOrganization(user);
+    return this.tenant.run(organizationId, async (client) => {
+      const existing = await client.onboardingTemplate.findFirst({
+        where: { id: templateId, organizationId },
+      });
+      if (!existing) {
+        throw new NotFoundException('Onboarding template was not found');
+      }
+
+      const nextName =
+        input.name !== undefined || input.title !== undefined
+          ? requireId(input.name ?? input.title, 'name')
+          : existing.name;
+
+      const updated = await client.onboardingTemplate.update({
+        where: { id: templateId },
+        data: {
+          name: nextName,
+          revision: (existing.revision ?? 1) + 1,
+        },
+      });
+
+      if (input.departmentIds !== undefined || input.department !== undefined) {
+        const resolvedDepartmentIds = await this.resolveDepartmentIds(
+          client,
+          organizationId,
+          input,
+        );
+        await client.onboardingTemplateDepartment.deleteMany({
+          where: { organizationId, templateId },
+        });
+        for (const departmentId of resolvedDepartmentIds) {
+          await client.onboardingTemplateDepartment.deleteMany({
+            where: { organizationId, departmentId },
+          });
+          await client.onboardingTemplateDepartment.create({
+            data: {
+              organizationId,
+              templateId,
+              departmentId,
+            },
+          });
+        }
+      }
+
+      const rawItems = input.checklist ?? input.tasks;
+      if (rawItems !== undefined) {
+        const existingItems = await client.onboardingChecklistItem.findMany({
+          where: { organizationId, templateId },
+        });
+        const existingMap = new Map(
+          existingItems.map((item) => [item.id, item]),
+        );
+        const incomingIds = new Set<string>();
+
+        for (const [index, item] of rawItems.entries()) {
+          const label = requireId(item.label ?? item.title, 'label');
+          const stage =
+            typeof item.stage === 'string' && item.stage.trim()
+              ? item.stage.trim()
+              : 'Day one';
+          const itemId = typeof item.id === 'string' ? item.id.trim() : null;
+
+          if (itemId && existingMap.has(itemId)) {
+            incomingIds.add(itemId);
+            await client.onboardingChecklistItem.update({
+              where: { id: itemId },
+              data: {
+                label,
+                stage,
+                position: index,
+              },
+            });
+          } else {
+            const created = await client.onboardingChecklistItem.create({
+              data: {
+                id: randomUUID(),
+                organizationId,
+                templateId,
+                label,
+                stage,
+                position: index,
+              },
+            });
+            incomingIds.add(created.id);
+          }
+        }
+
+        // Diff-based cleanup: only delete items that have zero employee completions
+        const toRemove = existingItems.filter((it) => !incomingIds.has(it.id));
+        for (const item of toRemove) {
+          const completionsCount = await client.onboardingItemCompletion.count({
+            where: { organizationId, itemId: item.id },
+          });
+          if (completionsCount === 0) {
+            await client.onboardingChecklistItem.delete({
+              where: { id: item.id },
+            });
+          }
+        }
+      }
+
+      const [defaults, items] = await Promise.all([
+        client.onboardingTemplateDepartment.findMany({
+          where: { organizationId, templateId },
+        }),
+        client.onboardingChecklistItem.findMany({
+          where: { organizationId, templateId },
+          orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        }),
+      ]);
+
+      return {
+        id: updated.id,
+        name: updated.name,
+        departmentIds: defaults.map((d) => d.departmentId),
+        checklist: items.map((item) => ({
+          id: item.id,
+          label: item.label,
+          stage: item.stage,
+        })),
+      };
+    });
+  }
+
+  deleteTemplate(user: AuthenticatedUser, templateId: string) {
+    const organizationId = requirePeopleOrganization(user);
+    return this.tenant.run(organizationId, async (client) => {
+      const existing = await client.onboardingTemplate.findFirst({
+        where: { id: templateId, organizationId },
+      });
+      if (!existing) {
+        throw new NotFoundException('Onboarding template was not found');
+      }
+      const activeAssignments = await client.employeeOnboarding.count({
+        where: { organizationId, templateId },
+      });
+      if (activeAssignments > 0) {
+        throw new ConflictException({
+          code: 'CONFLICT',
+          message:
+            'Cannot delete an onboarding template that is assigned to employees',
+        });
+      }
+      await client.onboardingTemplateDepartment.deleteMany({
+        where: { organizationId, templateId },
+      });
+      await client.onboardingChecklistItem.deleteMany({
+        where: { organizationId, templateId },
+      });
+      await client.onboardingTemplate.delete({
+        where: { id: templateId },
+      });
+    });
+  }
+
+  getEmployeeChecklist(user: AuthenticatedUser, employeeId: string) {
+    const organizationId = requirePeopleOrganization(user);
+    return this.tenant.run(organizationId, async (client) => {
+      const [employee, assignment] = await Promise.all([
+        client.employee.findFirst({
+          where: { id: employeeId, organizationId },
+        }),
+        client.employeeOnboarding.findFirst({
+          where: { employeeId, organizationId },
+        }),
+      ]);
+      if (!employee) {
+        throw new NotFoundException('Employee was not found');
+      }
+      if (!assignment) {
+        return {
+          employeeId: employee.id,
+          employeeName: employee.fullName,
+          avatarInitials: avatarInitials(employee.fullName),
+          jobTitle: employee.jobTitle,
+          startDate: toDateOnly(employee.startDate),
+          templateId: null,
+          completedItemIds: [],
+          checklist: [],
+        };
+      }
+
+      const [items, completions] = await Promise.all([
+        client.onboardingChecklistItem.findMany({
+          where: { organizationId, templateId: assignment.templateId },
+          orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        }),
+        client.onboardingItemCompletion.findMany({
+          where: { organizationId, employeeId },
+          orderBy: [{ completedAt: 'asc' }, { itemId: 'asc' }],
+        }),
+      ]);
+      const completionByItem = new Map(
+        completions.map((c) => [c.itemId, c.completedAt]),
+      );
+
+      return {
+        ...toOnboardingRow(employee, assignment.templateId, completions),
+        checklist: items.map((item) => ({
+          id: item.id,
+          label: item.label,
+          title: item.label,
+          stage: item.stage,
+          completed: completionByItem.has(item.id),
+          completedAt: completionByItem.get(item.id)?.toISOString() ?? null,
+        })),
+      };
+    });
+  }
+
+  private async resolveDepartmentIds(
+    client: {
+      department: {
+        findMany: (args: {
+          where: { organizationId: string };
+        }) => Promise<Array<{ id: string; name: string }>>;
+      };
+    },
+    organizationId: string,
+    input: SaveOnboardingTemplateDto,
+  ): Promise<string[]> {
+    const ids = new Set<string>(input.departmentIds ?? []);
+    if (input.department && input.department.trim()) {
+      const deptVal = input.department.trim();
+      const departments = await client.department.findMany({
+        where: { organizationId },
+      });
+      const match = departments.find(
+        (d) =>
+          d.id === deptVal || d.name.toLowerCase() === deptVal.toLowerCase(),
+      );
+      if (match) {
+        ids.add(match.id);
+      }
+    }
+    return Array.from(ids);
   }
 
   listEmployees(user: AuthenticatedUser) {

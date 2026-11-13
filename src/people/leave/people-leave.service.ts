@@ -59,6 +59,51 @@ export class PeopleLeaveService {
     });
   }
 
+  getRequest(user: AuthenticatedUser, requestId: string) {
+    const organizationId = requirePeopleOrganization(user);
+    return this.tenant.run(organizationId, async (client) => {
+      const [request, lookups] = await Promise.all([
+        client.leaveRequest.findFirst({
+          where: { id: requestId, organizationId },
+          include: {
+            leaveType: true,
+            employee: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                department: true,
+                jobTitle: true,
+              },
+            },
+          },
+        }),
+        loadLookups(client, organizationId),
+      ]);
+
+      if (!request) {
+        throw new NotFoundException('Leave request was not found');
+      }
+
+      const view = toLeaveRequestView(request, lookups);
+
+      return {
+        request: {
+          ...view,
+          reason: (request as any).reason ?? null,
+          createdAt: request.createdAt,
+          leaveType: request.leaveType,
+          employee: request.employee,
+        },
+        leaveRequest: {
+          ...request,
+          leaveType: request.leaveType,
+          employee: request.employee,
+        },
+      };
+    });
+  }
+
   listTypes(user: AuthenticatedUser) {
     const organizationId = requirePeopleOrganization(user);
     return this.tenant.run(organizationId, async (client) => {
@@ -69,8 +114,10 @@ export class PeopleLeaveService {
       return types.map((type) => ({
         id: type.id,
         name: type.name,
-        defaultDays: type.defaultDays ?? type.daysPerYear,
+        defaultDays: type.defaultDays ?? type.daysPerYear ?? 20,
+        daysPerYear: type.daysPerYear ?? type.defaultDays ?? 20,
         paid: type.paid,
+        requiresApproval: type.requiresApproval ?? true,
         tone: type.tone,
         description: type.description,
       }));

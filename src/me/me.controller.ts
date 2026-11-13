@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { CurrentUser } from '../auth/auth.decorators';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { MeService } from './me.service';
 import { UpdateMeProfileDto } from './dto/update-me-profile.dto';
+import { UpdateMeOnboardingItemDto } from './dto/update-me-onboarding-item.dto';
 
 @Controller('me')
 @UseGuards(AuthGuard, RolesGuard)
@@ -22,6 +23,37 @@ export class MeController {
     @Body() dto: UpdateMeProfileDto,
   ) {
     return this.meService.updateProfile(user, dto);
+  }
+
+  @Get('onboarding')
+  getOnboarding(@CurrentUser() user: AuthenticatedUser) {
+    return this.meService.getOnboarding(user);
+  }
+
+  @Patch('onboarding/items/:itemId')
+  updateOnboardingItem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('itemId') itemId: string,
+    @Body() dto: UpdateMeOnboardingItemDto,
+  ) {
+    return this.meService.updateOnboardingItem(
+      user,
+      itemId,
+      dto.completed ?? true,
+    );
+  }
+
+  @Patch('onboarding/tasks/:taskId')
+  updateOnboardingTask(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('taskId') taskId: string,
+    @Body() dto: UpdateMeOnboardingItemDto,
+  ) {
+    return this.meService.updateOnboardingItem(
+      user,
+      taskId,
+      dto.completed ?? true,
+    );
   }
 
   @Get('compensation-history')
@@ -67,5 +99,10 @@ export class MeController {
   @Get('advances')
   getSalaryAdvances(@CurrentUser() user: AuthenticatedUser) {
     return this.meService.getSalaryAdvances(user);
+  }
+
+  @Get('cards')
+  getCorporateCards(@CurrentUser() user: AuthenticatedUser) {
+    return this.meService.getCorporateCards(user);
   }
 }

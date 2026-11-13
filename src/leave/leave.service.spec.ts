@@ -374,7 +374,7 @@ describe('LeaveService', () => {
       });
     });
 
-    it('should throw BadRequestException if leave requests are associated with the leave type', async () => {
+    it('should throw ConflictException if leave requests are associated with the leave type', async () => {
       prismaMock.leaveType.findFirst.mockResolvedValue({
         id: 'lt-1',
         name: 'Sick Leave',
@@ -384,7 +384,7 @@ describe('LeaveService', () => {
 
       await expect(
         service.deleteLeaveType(mockAdminUser, 'lt-1'),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(ConflictException);
     });
 
     it('should throw NotFoundException if leave type not found', async () => {

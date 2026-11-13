@@ -5,7 +5,10 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { CreateTaxRuleSetDto } from './dto/create-tax-rule-set.dto';
+import {
+  CreateTaxRuleSetDto,
+  TaxRuleBandDto,
+} from './dto/create-tax-rule-set.dto';
 import { UpdateTaxRuleSetDto } from './dto/update-tax-rule-set.dto';
 
 export interface CalculateDeductionsParams {
@@ -134,11 +137,13 @@ export class ComplianceService {
     const annualTransport = monthlyTransport * 12;
     const annualGross = monthlyGross * 12;
 
-    // Pension calculation
-    const pensionEmpRate =
+    // Pension calculation (Pension Reform Act 2014: statutory minimums 8% employee, 10% employer)
+    const rawEmpRate =
       params.pensionEmployeeRateOverride ?? ruleSet.pensionEmployeeRate;
-    const pensionEmprRate =
+    const rawEmprRate =
       params.pensionEmployerRateOverride ?? ruleSet.pensionEmployerRate;
+    const pensionEmpRate = Math.max(rawEmpRate, 0.08);
+    const pensionEmprRate = Math.max(rawEmprRate, 0.1);
     const pensionBasisConfig = (
       params.pensionBasisOverride || ruleSet.pensionBasisFields
     ).toUpperCase();
@@ -253,12 +258,80 @@ export class ComplianceService {
     return ruleSet;
   }
 
-  async createRuleSet(dto: CreateTaxRuleSetDto) {
-    const { taxRules, ...ruleSetData } = dto;
-
+  private validateTaxBands(taxRules: TaxRuleBandDto[]): void {
     if (!taxRules || taxRules.length === 0) {
       throw new BadRequestException('At least one tax band rule is required.');
     }
+
+    const sorted = [...taxRules].sort((a, b) => a.bandOrder - b.bandOrder);
+
+    for (let i = 0; i < sorted.length; i++) {
+      const current = sorted[i];
+
+      if (current.bandOrder !== i + 1) {
+        throw new BadRequestException(
+          `Tax band order must be sequential starting at 1. Found order ${current.bandOrder} at position ${i + 1}.`,
+        );
+      }
+
+      if (current.upperLimit !== null && current.upperLimit !== undefined) {
+        if (current.upperLimit <= current.lowerLimit) {
+          throw new BadRequestException(
+            `Tax band "${current.bandName}" upper limit (${current.upperLimit}) must be greater than lower limit (${current.lowerLimit}).`,
+          );
+        }
+      }
+
+      const isLast = i === sorted.length - 1;
+      if (
+        !isLast &&
+        (current.upperLimit === null || current.upperLimit === undefined)
+      ) {
+        throw new BadRequestException(
+          `Only the highest tax band (band ${sorted[sorted.length - 1].bandOrder}) can have an unbounded (null) upper limit.`,
+        );
+      }
+
+      if (i > 0) {
+        const prev = sorted[i - 1];
+        if (current.lowerLimit !== prev.upperLimit) {
+          throw new BadRequestException(
+            `Tax bands must be contiguous without gaps or overlaps. Band "${current.bandName}" lower limit (${current.lowerLimit}) does not match previous band upper limit (${prev.upperLimit}).`,
+          );
+        }
+      }
+    }
+  }
+
+  private validatePensionRates(employeeRate?: number, employerRate?: number) {
+    if (
+      employeeRate !== undefined &&
+      employeeRate !== null &&
+      employeeRate < 0.08
+    ) {
+      throw new BadRequestException(
+        'Employee pension rate cannot be less than statutory minimum of 8% (0.08)',
+      );
+    }
+    if (
+      employerRate !== undefined &&
+      employerRate !== null &&
+      employerRate < 0.1
+    ) {
+      throw new BadRequestException(
+        'Employer pension rate cannot be less than statutory minimum of 10% (0.10)',
+      );
+    }
+  }
+
+  async createRuleSet(dto: CreateTaxRuleSetDto) {
+    const { taxRules, ...ruleSetData } = dto;
+
+    this.validatePensionRates(
+      ruleSetData.pensionEmployeeRate,
+      ruleSetData.pensionEmployerRate,
+    );
+    this.validateTaxBands(taxRules);
 
     return this.prisma.taxRuleSet.create({
       data: {
@@ -292,6 +365,15 @@ export class ComplianceService {
 
     const { taxRules, ...ruleSetData } = dto;
 
+    this.validatePensionRates(
+      ruleSetData.pensionEmployeeRate,
+      ruleSetData.pensionEmployerRate,
+    );
+
+    if (taxRules && taxRules.length > 0) {
+      this.validateTaxBands(taxRules);
+    }
+
     return this.prisma.$transaction(async (tx) => {
       if (taxRules && taxRules.length > 0) {
         // Replace existing bands
@@ -318,9 +400,12 @@ export class ComplianceService {
           effectiveFrom: ruleSetData.effectiveFrom
             ? new Date(ruleSetData.effectiveFrom)
             : undefined,
-          effectiveTo: ruleSetData.effectiveTo
-            ? new Date(ruleSetData.effectiveTo)
-            : undefined,
+          effectiveTo:
+            ruleSetData.effectiveTo === null
+              ? null
+              : ruleSetData.effectiveTo
+                ? new Date(ruleSetData.effectiveTo)
+                : undefined,
         },
         include: {
           taxRules: {

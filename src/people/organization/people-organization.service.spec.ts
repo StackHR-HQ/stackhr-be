@@ -304,4 +304,67 @@ describe('PeopleOrganizationService', () => {
       ]);
     });
   });
+
+  describe('createTeam, updateTeam & deleteTeam', () => {
+    it('creates, updates, and deletes a team with its members', async () => {
+      fake.seed('employee', [
+        employeeRow({ id: 'emp_ada' }),
+        employeeRow({
+          id: 'emp_bola',
+          fullName: 'Bola Ade',
+          email: 'bola@acme.test',
+        }),
+      ]);
+
+      const created = await service.createTeam(adminUser(), {
+        name: 'Core Platform',
+        description: 'Backend & Infra',
+        leadEmployeeId: 'emp_ada',
+        memberIds: ['emp_bola', 'emp_ada'],
+      });
+
+      expect(created).toEqual({
+        id: expect.any(String) as unknown,
+        name: 'Core Platform',
+        description: 'Backend & Infra',
+        leadEmployeeId: 'emp_ada',
+        memberIds: ['emp_ada', 'emp_bola'],
+      });
+
+      const updated = await service.updateTeam(adminUser(), created.id, {
+        name: 'Platform Engineering',
+        leadEmployeeId: 'emp_bola',
+        memberIds: ['emp_bola'],
+      });
+
+      expect(updated).toEqual({
+        id: created.id,
+        name: 'Platform Engineering',
+        description: 'Backend & Infra',
+        leadEmployeeId: 'emp_bola',
+        memberIds: ['emp_bola'],
+      });
+
+      await service.deleteTeam(adminUser(), created.id);
+      await expect(service.listTeams(adminUser())).resolves.toEqual([]);
+    });
+
+    it('rejects duplicate team names in the same organization', async () => {
+      fake.seed('team', [
+        {
+          id: 'team_1',
+          organizationId: ORG_A,
+          name: 'Platform',
+          description: '',
+          leadEmployeeId: null,
+        },
+      ]);
+
+      await expect(
+        service.createTeam(adminUser(), {
+          name: 'platform',
+        }),
+      ).rejects.toMatchObject({ status: 409 });
+    });
+  });
 });

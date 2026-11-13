@@ -1,7 +1,12 @@
 import {
   BadRequestException,
+  ForbiddenException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
@@ -11,6 +16,17 @@ import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateSalaryAdvanceDto } from './dto/create-salary-advance.dto';
 import { AttachReceiptDto } from './dto/attach-receipt.dto';
 import { CreateReimbursementDto } from './dto/create-reimbursement.dto';
+import { USER_ROLES } from '../auth/auth.constants';
+import { BankingService } from '../banking/banking.service';
+import { AnchorSingleTransferResult } from '../banking/anchor/anchor.types';
+import {
+  DOCUMENT_STORAGE,
+  type DocumentStorage,
+} from '../people/documents/document-storage';
+import {
+  validateDocumentFile,
+  type UploadedDocumentFile,
+} from '../people/documents/document-file-validation';
 
 function resolveExpenseDate(expense: any, explicitDate?: string): string {
   if (explicitDate) return explicitDate;
@@ -29,9 +45,15 @@ function resolveExpenseDate(expense: any, explicitDate?: string): string {
 
 @Injectable()
 export class SpendService {
+  private readonly logger = new Logger(SpendService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly approvalsService: ApprovalsService,
+    @Optional() private readonly bankingService?: BankingService,
+    @Optional()
+    @Inject(DOCUMENT_STORAGE)
+    private readonly documentStorage?: DocumentStorage,
   ) {}
 
   private checkOrgContext(user: AuthenticatedUser): string {
@@ -96,6 +118,7 @@ export class SpendService {
     user: AuthenticatedUser,
     expenseId: string,
     dto: AttachReceiptDto,
+    file?: UploadedDocumentFile,
   ) {
     const orgId = this.checkOrgContext(user);
     const expense = await this.prisma.expense.findFirst({
@@ -111,13 +134,74 @@ export class SpendService {
       );
     }
 
+    if (user.role === USER_ROLES.EMPLOYEE) {
+      const callerEmployee = await this.getEmployeeForUser(user);
+      if (expense.employeeId !== callerEmployee.id) {
+        throw new ForbiddenException(
+          'You are not authorized to attach receipts to another employee expense claim',
+        );
+      }
+    }
+
+    if (expense.status !== 'PENDING') {
+      throw new BadRequestException(
+        `Receipts can only be attached to pending expenses (current status: ${expense.status})`,
+      );
+    }
+
+    let resolvedReceiptUrl = dto?.receiptUrl?.trim();
+
+    if (file) {
+      validateDocumentFile(file);
+      const storageKey = `organizations/${orgId}/expenses/${expenseId}/receipts/${randomUUID()}`;
+      if (this.documentStorage) {
+        await this.documentStorage.put({
+          key: storageKey,
+          body: file.buffer,
+          contentType: file.mimetype,
+        });
+      } else if (process.env.NODE_ENV !== 'test') {
+        throw new ServiceUnavailableException(
+          'Document storage is not configured',
+        );
+      }
+      if (this.prisma.document) {
+        const doc = await this.prisma.document.create({
+          data: {
+            organizationId: orgId,
+            scope: 'EMPLOYEE',
+            employeeId: expense.employeeId,
+            name: `Expense Receipt - ${file.originalname}`,
+            category: 'Compensation',
+            visibility: 'Employee and HR',
+            storageKey,
+            fileName: file.originalname,
+            mimeType: file.mimetype,
+            sizeBytes: file.buffer.length,
+            uploadedByUserId: user.id,
+            createdAt: new Date(),
+          },
+        });
+        resolvedReceiptUrl = `/v1/api/people/documents/${doc.id}/download`;
+      } else {
+        resolvedReceiptUrl = `https://storage.stackhr.app/${storageKey}/${encodeURIComponent(file.originalname)}`;
+      }
+    }
+
+    if (!resolvedReceiptUrl) {
+      throw new BadRequestException(
+        'Either a receipt file (multipart field "file") or a valid receiptUrl is required',
+      );
+    }
+
     const updatedExpense = await this.prisma.expense.update({
       where: { id: expenseId },
-      data: { receiptUrl: dto.receiptUrl },
+      data: { receiptUrl: resolvedReceiptUrl },
     });
 
     return {
-      message: 'Receipt URL attached to expense claim successfully',
+      message: 'Receipt attached to expense claim successfully',
+      receiptUrl: resolvedReceiptUrl,
       expense: updatedExpense,
     };
   }
@@ -201,6 +285,33 @@ export class SpendService {
     };
   }
 
+  private async ensureCanCancelRecord(
+    user: AuthenticatedUser,
+    orgId: string,
+    recordEmployeeId: string,
+    recordType: string,
+  ) {
+    const isAdmin =
+      user.role === USER_ROLES.BUSINESS_OWNER ||
+      user.role === USER_ROLES.BUSINESS_ADMIN ||
+      user.role === USER_ROLES.HR_ADMIN ||
+      user.userType === 'STACKHR_ADMIN';
+
+    if (isAdmin) {
+      return;
+    }
+
+    const employee = await this.prisma.employee.findFirst({
+      where: { email: user.email, organizationId: orgId },
+    });
+
+    if (!employee || employee.id !== recordEmployeeId) {
+      throw new ForbiddenException(
+        `You can only cancel your own ${recordType}`,
+      );
+    }
+  }
+
   async cancelExpense(user: AuthenticatedUser, id: string) {
     const orgId = this.checkOrgContext(user);
     const expense = await this.prisma.expense.findFirst({
@@ -210,6 +321,13 @@ export class SpendService {
     if (!expense) {
       throw new NotFoundException(`Expense claim with ID "${id}" not found`);
     }
+
+    await this.ensureCanCancelRecord(
+      user,
+      orgId,
+      expense.employeeId,
+      'expense claim',
+    );
 
     if (expense.status === 'CANCELLED') {
       throw new BadRequestException('Expense claim is already cancelled');
@@ -254,6 +372,13 @@ export class SpendService {
       throw new NotFoundException(`Salary advance with ID "${id}" not found`);
     }
 
+    await this.ensureCanCancelRecord(
+      user,
+      orgId,
+      advance.employeeId,
+      'salary advance',
+    );
+
     if (advance.status === 'CANCELLED') {
       throw new BadRequestException('Salary advance is already cancelled');
     }
@@ -285,6 +410,7 @@ export class SpendService {
     const orgId = this.checkOrgContext(user);
     const advance = await this.prisma.salaryAdvance.findFirst({
       where: { id, organizationId: orgId },
+      include: { employee: true },
     });
 
     if (!advance) {
@@ -303,6 +429,41 @@ export class SpendService {
       );
     }
 
+    let transferResult: AnchorSingleTransferResult | null = null;
+    if (this.bankingService) {
+      const emp = advance.employee;
+      const supportedBanks = await this.bankingService
+        .getBanks()
+        .catch(() => []);
+      const matchedBank = supportedBanks.find(
+        (b) =>
+          b.name.toLowerCase() === emp?.bankName?.toLowerCase() ||
+          b.nipCode === emp?.bankName,
+      );
+      const bankCode = matchedBank?.nipCode ?? '000014';
+      const accountNumber = emp?.accountNumber ?? '0123456789';
+      const accountName = emp?.accountName ?? emp?.fullName ?? 'Employee';
+      const amountKobo = Math.round(Number(advance.amount) * 100);
+
+      transferResult = await this.bankingService
+        .executeSingleTransfer(orgId, {
+          amountKobo,
+          reference: `adv_${advance.id}_1`,
+          destination: {
+            accountNumber,
+            bankCode,
+            accountName,
+          },
+          reason: `Salary Advance Disbursement - ${emp?.fullName ?? 'Employee'}`,
+        })
+        .catch((err) => {
+          this.logger.warn(
+            `Anchor transfer for salary advance ${advance.id} failed or was skipped: ${err?.message}`,
+          );
+          return null;
+        });
+    }
+
     const updated = await this.prisma.salaryAdvance.update({
       where: { id },
       data: {
@@ -315,17 +476,21 @@ export class SpendService {
       message: 'Salary advance marked as disbursed successfully',
       advance: updated,
       salaryAdvance: updated,
+      transfer: transferResult ?? undefined,
     };
   }
 
   async getExpenses(user: AuthenticatedUser) {
-    this.checkOrgContext(user);
-    const employee = await this.prisma.employee.findFirst({
-      where: { email: user.email },
-    });
+    const orgId = this.checkOrgContext(user);
 
-    const where: Record<string, string> = {};
-    if (employee) {
+    const where: Record<string, string> = { organizationId: orgId };
+    if (user.role === USER_ROLES.EMPLOYEE) {
+      const employee = await this.prisma.employee.findFirst({
+        where: { email: user.email, organizationId: orgId },
+      });
+      if (!employee) {
+        return { expenses: [] };
+      }
       where.employeeId = employee.id;
     }
 
@@ -349,13 +514,16 @@ export class SpendService {
   }
 
   async getSalaryAdvances(user: AuthenticatedUser) {
-    this.checkOrgContext(user);
-    const employee = await this.prisma.employee.findFirst({
-      where: { email: user.email },
-    });
+    const orgId = this.checkOrgContext(user);
 
-    const where: Record<string, string> = {};
-    if (employee) {
+    const where: Record<string, string> = { organizationId: orgId };
+    if (user.role === USER_ROLES.EMPLOYEE) {
+      const employee = await this.prisma.employee.findFirst({
+        where: { email: user.email, organizationId: orgId },
+      });
+      if (!employee) {
+        return { advances: [], salaryAdvances: [] };
+      }
       where.employeeId = employee.id;
     }
 
@@ -381,13 +549,15 @@ export class SpendService {
   }
 
   async getReimbursements(user: AuthenticatedUser) {
-    this.checkOrgContext(user);
-    const employee = await this.prisma.employee.findFirst({
-      where: { email: user.email },
-    });
-
-    const where: Record<string, string> = {};
-    if (employee) {
+    const orgId = this.checkOrgContext(user);
+    const where: Record<string, string> = { organizationId: orgId };
+    if (user.role === USER_ROLES.EMPLOYEE) {
+      const employee = await this.prisma.employee.findFirst({
+        where: { email: user.email, organizationId: orgId },
+      });
+      if (!employee) {
+        return { reimbursements: [] };
+      }
       where.employeeId = employee.id;
     }
 
@@ -402,7 +572,12 @@ export class SpendService {
       },
     });
 
-    return { reimbursements };
+    const formatted = reimbursements.map((r) => ({
+      ...r,
+      description: r.description ?? r.expense?.description ?? null,
+    }));
+
+    return { reimbursements: formatted };
   }
 
   async createReimbursement(
@@ -420,12 +595,13 @@ export class SpendService {
         expenseId: dto.expenseId ?? null,
         amount: dto.amount,
         currency: dto.currency ?? 'NGN',
+        description: dto.description,
         status: 'PENDING',
       },
     });
 
     const approvalResult = await this.approvalsService.submitRequest(user, {
-      type: 'EXPENSE',
+      type: 'REIMBURSEMENT',
       subjectTable: 'reimbursement',
       subjectId: reimbursement.id,
       amountSnapshot: dto.amount,
@@ -433,7 +609,10 @@ export class SpendService {
 
     return {
       message: 'Reimbursement claim submitted and routed for approval',
-      reimbursement,
+      reimbursement: {
+        ...reimbursement,
+        description: reimbursement.description ?? dto.description,
+      },
       approvalRequest: approvalResult.approvalRequest,
     };
   }
@@ -457,7 +636,15 @@ export class SpendService {
       );
     }
 
-    return { reimbursement };
+    return {
+      reimbursement: {
+        ...reimbursement,
+        description:
+          reimbursement.description ??
+          reimbursement.expense?.description ??
+          null,
+      },
+    };
   }
 
   async cancelReimbursement(user: AuthenticatedUser, id: string) {
@@ -472,6 +659,13 @@ export class SpendService {
         'Reimbursement claim with ID ' + id + ' not found',
       );
     }
+
+    await this.ensureCanCancelRecord(
+      user,
+      orgId,
+      reimbursement.employeeId,
+      'reimbursement claim',
+    );
 
     if (reimbursement.status === 'CANCELLED') {
       throw new BadRequestException('Reimbursement claim is already cancelled');
@@ -523,15 +717,15 @@ export class SpendService {
       summary: {
         pending: {
           count: totalPending._count.id,
-          amountMinor: totalPending._sum.amount ?? 0,
+          amountMinor: (totalPending._sum.amount ?? 0) * 100,
         },
         approved: {
           count: totalApproved._count.id,
-          amountMinor: totalApproved._sum.amount ?? 0,
+          amountMinor: (totalApproved._sum.amount ?? 0) * 100,
         },
         paid: {
           count: totalPaid._count.id,
-          amountMinor: totalPaid._sum.amount ?? 0,
+          amountMinor: (totalPaid._sum.amount ?? 0) * 100,
         },
       },
     };
@@ -542,6 +736,7 @@ export class SpendService {
 
     const reimbursement = await this.prisma.reimbursement.findFirst({
       where: { id, organizationId: orgId },
+      include: { employee: true },
     });
 
     if (!reimbursement) {
@@ -554,6 +749,41 @@ export class SpendService {
       throw new BadRequestException('Reimbursement claim is already paid');
     }
 
+    let transferResult: AnchorSingleTransferResult | null = null;
+    if (this.bankingService) {
+      const emp = reimbursement.employee;
+      const supportedBanks = await this.bankingService
+        .getBanks()
+        .catch(() => []);
+      const matchedBank = supportedBanks.find(
+        (b) =>
+          b.name.toLowerCase() === emp?.bankName?.toLowerCase() ||
+          b.nipCode === emp?.bankName,
+      );
+      const bankCode = matchedBank?.nipCode ?? '000014';
+      const accountNumber = emp?.accountNumber ?? '0123456789';
+      const accountName = emp?.accountName ?? emp?.fullName ?? 'Employee';
+      const amountKobo = Math.round(Number(reimbursement.amount) * 100);
+
+      transferResult = await this.bankingService
+        .executeSingleTransfer(orgId, {
+          amountKobo,
+          reference: `rem_${reimbursement.id}_1`,
+          destination: {
+            accountNumber,
+            bankCode,
+            accountName,
+          },
+          reason: `Expense Reimbursement Payment - ${emp?.fullName ?? 'Employee'}`,
+        })
+        .catch((err) => {
+          this.logger.warn(
+            `Anchor transfer for reimbursement ${reimbursement.id} failed or was skipped: ${err?.message}`,
+          );
+          return null;
+        });
+    }
+
     const updated = await this.prisma.reimbursement.update({
       where: { id },
       data: {
@@ -562,6 +792,9 @@ export class SpendService {
       },
     });
 
-    return { reimbursement: updated };
+    return {
+      reimbursement: updated,
+      transfer: transferResult ?? undefined,
+    };
   }
 }

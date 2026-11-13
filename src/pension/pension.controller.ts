@@ -19,6 +19,7 @@ import {
   AttachEmployerDto,
   PensionScheduleQueryDto,
   UpdatePensionConfigDto,
+  UpdatePensionRatesDto,
   ValidateEmployerCodeDto,
 } from './dto/pension.dto';
 import { Idempotent } from '../common/idempotency/idempotency.decorator';
@@ -84,6 +85,21 @@ export class PensionController {
     return this.pensionService.updateEmployerConfig(user, dto);
   }
 
+  @Get('rates')
+  @RequireRoles(...PENSION_ADMIN_ROLES)
+  getPensionRates(@CurrentUser() user: AuthenticatedUser) {
+    return this.pensionService.getPensionRates(user);
+  }
+
+  @Patch('rates')
+  @RequireRoles(...PENSION_ADMIN_ROLES)
+  updatePensionRates(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdatePensionRatesDto,
+  ) {
+    return this.pensionService.updatePensionRates(user, dto);
+  }
+
   @Post('schedules/from-payroll/:payrollRunId')
   @RequireRoles(...PENSION_ADMIN_ROLES)
   createScheduleFromPayroll(
@@ -106,6 +122,15 @@ export class PensionController {
   @RequireRoles(...PENSION_ADMIN_ROLES)
   getSchedule(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.pensionService.getSchedule(user, id);
+  }
+
+  @Patch('schedules/:id/cancel')
+  @RequireRoles(...PENSION_ADMIN_ROLES)
+  cancelSchedule(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.pensionService.cancelSchedule(user, id);
   }
 
   @Post('schedules/:id/validate')

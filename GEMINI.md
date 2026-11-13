@@ -39,6 +39,10 @@ documentation is not optional polish — it is how integration actually happens.
 5. **Read-before-write, every session.** Before touching a module, re-read the relevant
    section of `docs/DECISIONS.md` and `docs/FEATURE_PROGRESS.md` so you don't reintroduce
    a pattern that was already rejected.
+6. **Strict Package Manager: Strictly `yarn` only.** The project exclusively uses `yarn`
+   (e.g., `yarn install`, `yarn add`, `yarn test`, `yarn build`, `yarn lint`). Do NOT use
+   `npm`, `npx`, or `pnpm`. Do not commit or introduce `package-lock.json`, `pnpm-lock.yaml`,
+   or `pnpm-workspace.yaml`.
 
 ---
 

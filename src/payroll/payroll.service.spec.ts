@@ -6,6 +6,7 @@ import { ApprovalsService } from '../approvals/approvals.service';
 import { ComplianceService } from '../compliance/compliance.service';
 import { USER_ROLES, USER_TYPES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { BankingService } from '../banking/banking.service';
 
 describe('PayrollService', () => {
   let service: PayrollService;
@@ -35,12 +36,16 @@ describe('PayrollService', () => {
       employee: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
+        update: jest.fn().mockResolvedValue({}),
       },
       compensationRecord: {
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
         findMany: jest.fn(),
+      },
+      compensationHistory: {
+        create: jest.fn().mockResolvedValue({}),
       },
       payrollRun: {
         findFirst: jest.fn(),
@@ -59,6 +64,9 @@ describe('PayrollService', () => {
       user: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      $transaction: jest
+        .fn()
+        .mockImplementation((cb: (tx: any) => any) => cb(prismaMock)),
     };
 
     approvalsServiceMock = {
@@ -291,6 +299,75 @@ describe('PayrollService', () => {
 
       expect(result.payrollRun.status).toBe('EXECUTED');
       expect(result.paymentExportBatch.employeeTransfers).toHaveLength(1);
+    });
+
+    it('should initiate automated bulk transfer via BankingService when available', async () => {
+      const mockBankingService = {
+        getBanks: jest
+          .fn()
+          .mockResolvedValue([
+            { id: '1', name: 'ACCESS BANK', nipCode: '000014' },
+          ]),
+        executePayrollTransfers: jest.fn().mockResolvedValue({
+          id: 'blk-123',
+          reference: 'blk_ref_123',
+          status: 'PROCESSING',
+          transfersCount: 1,
+          totalAmountKobo: 41400000,
+        }),
+      };
+
+      const customService = new PayrollService(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        prismaMock,
+        approvalsServiceMock as unknown as ApprovalsService,
+        complianceServiceMock as unknown as ComplianceService,
+        mockBankingService as unknown as BankingService,
+      );
+
+      prismaMock.payrollRun.findFirst.mockResolvedValue({
+        id: 'run-1',
+        title: 'October 2026 Payroll',
+        status: 'FUNDING_CHECK_PASSED',
+        totalNet: 414000,
+        items: [
+          {
+            employeeId: 'emp-1',
+            netSalary: 414000,
+            employee: {
+              id: 'emp-1',
+              fullName: 'John Doe',
+              bankName: 'ACCESS BANK',
+              accountNumber: '0123456789',
+              accountName: 'John Doe',
+            },
+          },
+        ],
+      });
+      prismaMock.payrollRun.update.mockResolvedValue({
+        id: 'run-1',
+        status: 'EXECUTED',
+        executedAt: new Date(),
+      });
+
+      const result = await customService.executePayment(mockAdminUser, 'run-1');
+
+      expect(mockBankingService.executePayrollTransfers).toHaveBeenCalledWith(
+        'org-123',
+        'run-1',
+        expect.arrayContaining([
+          expect.objectContaining({
+            amountKobo: 41400000,
+            reference: 'pyr_run-1_emp-1_1',
+            destination: expect.objectContaining({
+              accountNumber: '0123456789',
+              bankCode: '000014',
+            }),
+          }),
+        ]),
+      );
+      expect(result.bulkTransfer.id).toBe('blk-123');
+      expect(result.payrollRun.status).toBe('EXECUTED');
     });
   });
 

@@ -74,6 +74,12 @@ function setup(existing: StoredEmployee[] = []) {
       update: jest.fn(),
       count: jest.fn().mockResolvedValue(2),
     },
+    compensationRecord: {
+      create: jest.fn().mockResolvedValue({ id: 'comp-1' }),
+    },
+    compensationHistory: {
+      create: jest.fn().mockResolvedValue({ id: 'hist-1' }),
+    },
   };
   const transaction = jest.fn(
     async (fn: (tx: Prisma.TransactionClient) => unknown) =>

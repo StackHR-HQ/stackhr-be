@@ -3,11 +3,17 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { ComplianceService } from '../compliance/compliance.service';
+import { BankingService } from '../banking/banking.service';
+import type {
+  BankItem,
+  BulkTransferItem,
+} from '../banking/anchor/anchor.types';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { SetCompensationDto } from './dto/set-compensation.dto';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
@@ -19,6 +25,7 @@ export class PayrollService {
     private readonly prisma: PrismaService,
     private readonly approvalsService: ApprovalsService,
     private readonly complianceService: ComplianceService,
+    @Optional() private readonly bankingService?: BankingService,
   ) {}
 
   private checkOrgContext(user: AuthenticatedUser): string {
@@ -47,40 +54,91 @@ export class PayrollService {
       ? new Date(dto.effectiveFrom)
       : new Date();
 
-    const currentActive = await this.prisma.compensationRecord.findFirst({
-      where: {
-        employeeId: dto.employeeId,
-        organizationId: orgId,
-        effectiveTo: null,
-      },
-    });
-
-    if (currentActive) {
-      await this.prisma.compensationRecord.update({
-        where: { id: currentActive.id },
-        data: { effectiveTo: effectiveFromDate },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const currentActive = await tx.compensationRecord.findFirst({
+        where: {
+          employeeId: dto.employeeId,
+          organizationId: orgId,
+          effectiveTo: null,
+        },
       });
-    }
 
-    const newRecord = await this.prisma.compensationRecord.create({
-      data: {
-        id: randomUUID(),
-        organizationId: orgId,
-        employeeId: dto.employeeId,
-        effectiveFrom: effectiveFromDate,
-        effectiveTo: null,
-        basicSalary: dto.basicSalary,
-        housingAllowance: dto.housingAllowance ?? 0,
-        transportAllowance: dto.transportAllowance ?? 0,
-        otherAllowances: dto.otherAllowances ?? 0,
-        currency: dto.currency ?? 'NGN',
-        paymentFrequency: dto.paymentFrequency ?? 'MONTHLY',
-      },
+      if (currentActive) {
+        await tx.compensationRecord.update({
+          where: { id: currentActive.id },
+          data: { effectiveTo: effectiveFromDate },
+        });
+      }
+
+      const newRecord = await tx.compensationRecord.create({
+        data: {
+          id: randomUUID(),
+          organizationId: orgId,
+          employeeId: dto.employeeId,
+          effectiveFrom: effectiveFromDate,
+          effectiveTo: null,
+          basicSalary: dto.basicSalary,
+          housingAllowance: dto.housingAllowance ?? 0,
+          transportAllowance: dto.transportAllowance ?? 0,
+          otherAllowances: dto.otherAllowances ?? 0,
+          currency: dto.currency ?? 'NGN',
+          paymentFrequency: dto.paymentFrequency ?? 'MONTHLY',
+        },
+      });
+
+      const newMonthlyGrossKobo =
+        dto.basicSalary +
+        (dto.housingAllowance ?? 0) +
+        (dto.transportAllowance ?? 0) +
+        (dto.otherAllowances ?? 0);
+      const newAnnualSalaryMinor = BigInt(newMonthlyGrossKobo) * 12n;
+      const previousAnnualSalaryMinor = currentActive
+        ? BigInt(
+            (currentActive.basicSalary ?? 0) +
+              (currentActive.housingAllowance ?? 0) +
+              (currentActive.transportAllowance ?? 0) +
+              (currentActive.otherAllowances ?? 0),
+          ) * 12n
+        : BigInt(employee.annualSalaryMinor ?? 0);
+
+      const salaryAmountNaira = Math.round(newMonthlyGrossKobo / 100);
+
+      await tx.employee.update({
+        where: { id: dto.employeeId },
+        data: {
+          annualSalaryMinor: newAnnualSalaryMinor,
+          salaryAmount: salaryAmountNaira,
+          currency: dto.currency ?? employee.currency ?? 'NGN',
+          payFrequency:
+            dto.paymentFrequency ?? employee.payFrequency ?? 'MONTHLY',
+        },
+      });
+
+      const historyEntry = await tx.compensationHistory.create({
+        data: {
+          id: randomUUID(),
+          organizationId: orgId,
+          employeeId: dto.employeeId,
+          effectiveDate: effectiveFromDate,
+          annualSalaryMinor: newAnnualSalaryMinor,
+          previousSalary: previousAnnualSalaryMinor,
+          newSalary: newAnnualSalaryMinor,
+          currency: dto.currency ?? 'NGN',
+          payFrequency: dto.paymentFrequency ?? 'MONTHLY',
+          reason: dto.reason ?? null,
+          changedByUserId: user.id,
+        },
+      });
+
+      return { newRecord, historyEntry };
     });
 
     return {
       message: 'Compensation record set successfully',
-      compensationRecord: newRecord,
+      compensationRecord: result.newRecord,
+      ...(result.historyEntry
+        ? { compensationHistory: result.historyEntry }
+        : {}),
     };
   }
 
@@ -247,10 +305,21 @@ export class PayrollService {
     const itemsData: any[] = [];
     for (const emp of employees) {
       const comp = emp.compensationRecords[0];
-      const basicSalary = comp ? comp.basicSalary : emp.salaryAmount;
-      const housingAllowance = comp ? comp.housingAllowance : 0;
-      const transportAllowance = comp ? comp.transportAllowance : 0;
-      const otherAllowances = comp ? comp.otherAllowances : 0;
+      // CompensationRecord stores monetary amounts in kobo.
+      // emp.salaryAmount is stored in Naira.
+      // Compliance calculations and PayrollItem storage operate in whole Naira.
+      const basicSalary = comp
+        ? Math.round(comp.basicSalary / 100)
+        : emp.salaryAmount || 0;
+      const housingAllowance = comp
+        ? Math.round((comp.housingAllowance || 0) / 100)
+        : 0;
+      const transportAllowance = comp
+        ? Math.round((comp.transportAllowance || 0) / 100)
+        : 0;
+      const otherAllowances = comp
+        ? Math.round((comp.otherAllowances || 0) / 100)
+        : 0;
 
       const deductions =
         await this.complianceService.calculatePayrollDeductions({
@@ -430,6 +499,18 @@ export class PayrollService {
       );
     }
 
+    const depositAccount = await this.prisma.organizationDepositAccount
+      ?.findUnique({
+        where: { organizationId: orgId },
+      })
+      .catch(() => null);
+
+    const requiredKobo = BigInt(Math.round((run.totalNet || 0) * 100));
+    const availableKobo = depositAccount
+      ? depositAccount.balanceKobo
+      : BigInt(0);
+    const isSufficient = depositAccount ? availableKobo >= requiredKobo : false;
+
     const nextStatus = dto.confirmed
       ? 'FUNDING_CHECK_PASSED'
       : 'FUNDING_SHORTFALL';
@@ -455,6 +536,14 @@ export class PayrollService {
               status: nextStatus,
               confirmed: dto.confirmed,
               notes: dto.notes ?? null,
+              fundingDetails: depositAccount
+                ? {
+                    accountNumber: depositAccount.accountNumber,
+                    availableBalanceKobo: Number(availableKobo),
+                    requiredKobo: Number(requiredKobo),
+                    isSufficient,
+                  }
+                : null,
             },
           },
         })
@@ -466,6 +555,18 @@ export class PayrollService {
         ? 'Funding check passed successfully. Ready for payment execution.'
         : 'Funding shortfall recorded. Payment execution blocked until resolved.',
       payrollRun: updatedRun,
+      fundingDetails: depositAccount
+        ? {
+            accountNumber: depositAccount.accountNumber,
+            bankName: depositAccount.bankName,
+            availableBalanceKobo: Number(availableKobo),
+            requiredKobo: Number(requiredKobo),
+            isSufficient,
+            shortfallKobo: isSufficient
+              ? 0
+              : Number(requiredKobo - availableKobo),
+          }
+        : null,
     };
   }
 
@@ -478,7 +579,14 @@ export class PayrollService {
         items: {
           include: {
             employee: {
-              select: { id: true, fullName: true, email: true },
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                bankName: true,
+                accountNumber: true,
+                accountName: true,
+              },
             },
           },
         },
@@ -495,15 +603,57 @@ export class PayrollService {
       );
     }
 
-    const executedAt = new Date();
-    const updatedRun = await this.prisma.payrollRun.update({
+    // Persist status as PROCESSING before initiating transfers to eliminate double execution
+    await this.prisma.payrollRun.update({
       where: { id: runId },
-      data: {
-        status: 'EXECUTED',
-        executedAt,
-      },
+      data: { status: 'PROCESSING' },
     });
 
+    let bulkTransfer: any = null;
+    if (this.bankingService) {
+      const supportedBanks: BankItem[] = await this.bankingService
+        .getBanks()
+        .catch(() => [] as BankItem[]);
+      const transfers: BulkTransferItem[] = run.items.map((item: any) => {
+        const emp = item.employee;
+        const matchedBank = supportedBanks.find(
+          (b) =>
+            b.name.toLowerCase() === emp?.bankName?.toLowerCase() ||
+            b.nipCode === emp?.bankName,
+        );
+        const bankCode = matchedBank?.nipCode ?? '000014';
+        const accountNumber = emp?.accountNumber ?? '0123456789';
+        const accountName = emp?.accountName ?? emp?.fullName ?? 'Employee';
+
+        return {
+          amountKobo: Math.round((item.netSalary || 0) * 100),
+          currency: 'NGN',
+          reference: `pyr_${run.id}_${item.employeeId}_1`,
+          destination: {
+            accountNumber,
+            bankCode,
+            accountName,
+          },
+          narration: `${run.title} Salary`,
+        };
+      });
+
+      try {
+        bulkTransfer = await this.bankingService.executePayrollTransfers(
+          orgId,
+          run.id,
+          transfers,
+        );
+      } catch (err) {
+        await this.prisma.payrollRun.update({
+          where: { id: runId },
+          data: { status: 'FUNDING_CHECK_PASSED' },
+        });
+        throw err;
+      }
+    }
+
+    const executedAt = new Date();
     // Generate bank transfer payout file export payload (ADR-004)
     const paymentExportBatch = {
       runId: run.id,
@@ -517,6 +667,16 @@ export class PayrollService {
         currency: 'NGN',
       })),
     };
+
+    const updatedRun = await this.prisma.payrollRun.update({
+      where: { id: runId },
+      data: {
+        status: 'EXECUTED',
+        executedAt,
+        bulkTransferJson: bulkTransfer ?? null,
+        paymentExportBatchJson: paymentExportBatch as any,
+      },
+    });
 
     if (this.prisma.auditEvent) {
       await this.prisma.auditEvent
@@ -533,6 +693,7 @@ export class PayrollService {
               executedAt: executedAt.toISOString(),
               totalPayoutNet: run.totalNet,
               employeeCount: run.items.length,
+              bulkTransferId: bulkTransfer?.id ?? null,
             },
           },
         })
@@ -540,8 +701,11 @@ export class PayrollService {
     }
 
     return {
-      message: 'Payment execution recorded and bank transfer file exported',
+      message: bulkTransfer
+        ? 'Payment execution recorded and automated bulk transfer initiated via Anchor BaaS'
+        : 'Payment execution recorded and bank transfer file exported',
       payrollRun: updatedRun,
+      bulkTransfer,
       paymentExportBatch,
     };
   }
@@ -732,7 +896,7 @@ export class PayrollService {
             },
             orderBy: { createdAt: 'desc' },
           })
-        : Promise.resolve([]),
+        : Promise.resolve([] as any[]),
     ]);
 
     if (!run) {
@@ -765,7 +929,7 @@ export class PayrollService {
       (e) => e.action === 'payroll_run.created',
     );
     const creatorUser = creationEvent
-      ? actorMap.get(creationEvent.actorUserId)
+      ? actorMap.get(String(creationEvent.actorUserId))
       : null;
     const createdBy =
       creatorUser?.name ||
@@ -788,6 +952,8 @@ export class PayrollService {
 
     const payDay = org?.payDate ?? 25;
     const formatted = this.formatPayrollRun(run, payDay);
+    const bulkTransfer = (run as any).bulkTransferJson ?? null;
+    const paymentExportBatch = (run as any).paymentExportBatchJson ?? null;
 
     return {
       payrollRun: {
@@ -796,7 +962,11 @@ export class PayrollService {
         rejectionReason: approval?.rejectionReason ?? null,
         complianceWarnings,
         auditTrail,
+        bulkTransfer,
+        paymentExportBatch,
       },
+      bulkTransfer,
+      paymentExportBatch,
     };
   }
 

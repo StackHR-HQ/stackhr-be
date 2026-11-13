@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   OnModuleInit,
@@ -618,7 +619,9 @@ export class AuthService implements OnModuleInit {
               select: {
                 organizationId: true,
                 role: true,
-                organization: { select: { name: true, slug: true } },
+                organization: {
+                  select: { name: true, slug: true, metadata: true },
+                },
               },
             },
           },
@@ -635,13 +638,25 @@ export class AuthService implements OnModuleInit {
       return null;
     }
 
-    if (
-      session.activeOrganizationId &&
-      !session.user.memberships.some(
+    if (session.activeOrganizationId) {
+      const activeMembership = session.user.memberships.find(
         (member) => member.organizationId === session.activeOrganizationId,
-      )
-    )
-      return null;
+      );
+      if (!activeMembership) {
+        return null;
+      }
+
+      try {
+        const meta = activeMembership.organization?.metadata
+          ? JSON.parse(activeMembership.organization.metadata)
+          : null;
+        if (meta?.status === 'suspended') {
+          return null;
+        }
+      } catch {
+        // ignore JSON parse error
+      }
+    }
 
     const user = this.toAuthenticatedUser(
       session.user,
@@ -763,7 +778,9 @@ export class AuthService implements OnModuleInit {
           select: {
             organizationId: true,
             role: true,
-            organization: { select: { name: true, slug: true } },
+            organization: {
+              select: { name: true, slug: true, metadata: true },
+            },
           },
         },
       },
@@ -810,6 +827,24 @@ export class AuthService implements OnModuleInit {
           );
     if (userType === USER_TYPES.BUSINESS && !membership) {
       throw new UnauthorizedException('Invalid workspace, email or password');
+    }
+
+    if (userType === USER_TYPES.BUSINESS && membership) {
+      try {
+        const metaRaw = (membership.organization as Record<string, unknown>)
+          ?.metadata;
+        const metaStr = typeof metaRaw === 'string' ? metaRaw : null;
+        const meta = metaStr
+          ? (JSON.parse(metaStr) as Record<string, unknown>)
+          : null;
+        if (meta?.status === 'suspended') {
+          throw new ForbiddenException(
+            'This organization has been suspended. Please contact support.',
+          );
+        }
+      } catch (err) {
+        if (err instanceof ForbiddenException) throw err;
+      }
     }
     const authenticatedUser = this.toAuthenticatedUser(
       user,
@@ -1033,6 +1068,74 @@ export class AuthService implements OnModuleInit {
   private evictUserSessions(userId: string): void {
     for (const [tokenHash, entry] of this.sessionCache.entries()) {
       if (entry.user.id === userId) {
+        this.sessionCache.delete(tokenHash);
+      }
+    }
+  }
+
+  /**
+   * Revokes all active sessions in the database for a user and evicts them from the memory cache immediately.
+   */
+  async revokeSessionsForUser(userId: string): Promise<void> {
+    await this.prisma.session.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    this.evictUserSessions(userId);
+  }
+
+  /**
+   * Revokes all active sessions for members of an organization (and any session active in this org)
+   * in the database and evicts them from the memory cache immediately.
+   */
+  async revokeSessionsForOrganization(organizationId: string): Promise<void> {
+    const members = await this.prisma.member.findMany({
+      where: { organizationId },
+      select: { userId: true },
+    });
+    const userIds = Array.from(new Set(members.map((m) => m.userId)));
+
+    await this.prisma.session.updateMany({
+      where: {
+        OR: [
+          { activeOrganizationId: organizationId },
+          ...(userIds.length > 0 ? [{ userId: { in: userIds } }] : []),
+        ],
+        revokedAt: null,
+      },
+      data: { revokedAt: new Date() },
+    });
+
+    for (const [tokenHash, entry] of this.sessionCache.entries()) {
+      if (
+        entry.user.organizationId === organizationId ||
+        userIds.includes(entry.user.id)
+      ) {
+        this.sessionCache.delete(tokenHash);
+      }
+    }
+  }
+
+  /**
+   * Revokes a specific session by ID in DB and evicts it from memory cache immediately.
+   */
+  async revokeSessionById(sessionId: string): Promise<void> {
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+    });
+    if (!session) return;
+
+    await this.prisma.session.update({
+      where: { id: sessionId },
+      data: { revokedAt: new Date() },
+    });
+
+    for (const [tokenHash, entry] of this.sessionCache.entries()) {
+      if (
+        tokenHash === session.token ||
+        (entry.user.id === session.userId &&
+          entry.expiresAt === session.expiresAt.getTime())
+      ) {
         this.sessionCache.delete(tokenHash);
       }
     }

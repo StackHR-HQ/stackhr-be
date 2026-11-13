@@ -58,6 +58,26 @@ describe('MeService', () => {
       document: {
         findMany: jest.fn(),
       },
+      employeeOnboarding: {
+        findFirst: jest.fn(),
+        upsert: jest.fn(),
+      },
+      onboardingTemplateDepartment: {
+        findFirst: jest.fn(),
+      },
+      onboardingTemplate: {
+        findFirst: jest.fn(),
+      },
+      onboardingChecklistItem: {
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+      },
+      onboardingItemCompletion: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        upsert: jest.fn(),
+        deleteMany: jest.fn(),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -335,6 +355,104 @@ describe('MeService', () => {
       const result = await service.getActivity(mockUser);
 
       expect(result.activity).toHaveLength(1);
+    });
+  });
+
+  describe('getOnboarding & updateOnboardingItem', () => {
+    it('returns employee onboarding checklist with progress', async () => {
+      prismaMock.employee.findFirst.mockResolvedValue({
+        id: 'emp-100',
+        fullName: 'Jane Doe',
+        status: 'ONBOARDING',
+        organizationId: 'org-123',
+      });
+      prismaMock.employeeOnboarding.findFirst.mockResolvedValue({
+        employeeId: 'emp-100',
+        organizationId: 'org-123',
+        templateId: 'tpl-1',
+      });
+      prismaMock.onboardingTemplate.findFirst.mockResolvedValue({
+        id: 'tpl-1',
+        name: 'Engineering Onboarding',
+      });
+      prismaMock.onboardingChecklistItem.findMany.mockResolvedValue([
+        {
+          id: 'item-1',
+          label: 'Sign NDA',
+          stage: 'Before day one',
+          position: 0,
+        },
+        {
+          id: 'item-2',
+          label: 'Configure workstation',
+          stage: 'Day one',
+          position: 1,
+        },
+      ]);
+      prismaMock.onboardingItemCompletion.findMany.mockResolvedValue([
+        {
+          employeeId: 'emp-100',
+          itemId: 'item-1',
+          completedAt: new Date('2026-10-01T10:00:00.000Z'),
+        },
+      ]);
+
+      const result = await service.getOnboarding(mockUser);
+
+      expect(result.onboarding.templateName).toBe('Engineering Onboarding');
+      expect(result.onboarding.totalItems).toBe(2);
+      expect(result.onboarding.completedCount).toBe(1);
+      expect(result.onboarding.progressPercent).toBe(50);
+    });
+
+    it('marks an onboarding item complete and records audit event', async () => {
+      prismaMock.employee.findFirst.mockResolvedValue({
+        id: 'emp-100',
+        fullName: 'Jane Doe',
+        status: 'ONBOARDING',
+        organizationId: 'org-123',
+      });
+      prismaMock.employeeOnboarding.findFirst.mockResolvedValue({
+        employeeId: 'emp-100',
+        organizationId: 'org-123',
+        templateId: 'tpl-1',
+      });
+      prismaMock.onboardingChecklistItem.findFirst.mockResolvedValue({
+        id: 'item-2',
+        label: 'Configure workstation',
+        stage: 'Day one',
+        position: 1,
+      });
+      prismaMock.onboardingItemCompletion.findUnique.mockResolvedValue(null);
+      prismaMock.onboardingTemplate.findFirst.mockResolvedValue({
+        id: 'tpl-1',
+        name: 'Engineering Onboarding',
+      });
+      prismaMock.onboardingChecklistItem.findMany.mockResolvedValue([
+        {
+          id: 'item-2',
+          label: 'Configure workstation',
+          stage: 'Day one',
+          position: 1,
+        },
+      ]);
+      prismaMock.onboardingItemCompletion.findMany.mockResolvedValue([
+        {
+          employeeId: 'emp-100',
+          itemId: 'item-2',
+          completedAt: new Date('2026-10-02T10:00:00.000Z'),
+        },
+      ]);
+
+      const result = await service.updateOnboardingItem(
+        mockUser,
+        'item-2',
+        true,
+      );
+
+      expect(prismaMock.onboardingItemCompletion.upsert).toHaveBeenCalled();
+      expect(prismaMock.auditEvent.create).toHaveBeenCalled();
+      expect(result.onboarding.completedCount).toBe(1);
     });
   });
 });

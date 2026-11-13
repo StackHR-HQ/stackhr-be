@@ -237,4 +237,52 @@ describe('PeopleOnboardingService', () => {
       });
     });
   });
+
+  describe('createTemplate, updateTemplate & deleteTemplate', () => {
+    it('creates, updates, and deletes an onboarding template', async () => {
+      fake.seed('department', [
+        { id: 'dep_sales', organizationId: ORG_A, name: 'Sales' },
+      ]);
+
+      const created = await service.createTemplate(adminUser(), {
+        name: 'Sales Onboarding',
+        departmentIds: ['dep_sales'],
+        checklist: [
+          { label: 'Setup CRM account', stage: 'Day one' },
+          { label: 'Shadow 3 discovery calls', stage: 'Week one' },
+        ],
+      });
+
+      expect(created).toEqual({
+        id: expect.any(String) as unknown,
+        name: 'Sales Onboarding',
+        departmentIds: ['dep_sales'],
+        checklist: [
+          {
+            id: expect.any(String) as unknown,
+            label: 'Setup CRM account',
+            stage: 'Day one',
+          },
+          {
+            id: expect.any(String) as unknown,
+            label: 'Shadow 3 discovery calls',
+            stage: 'Week one',
+          },
+        ],
+      });
+
+      const updated = await service.updateTemplate(adminUser(), created.id, {
+        name: 'Enterprise Sales Onboarding',
+        checklist: [{ label: 'Setup Salesforce', stage: 'Before day one' }],
+      });
+
+      expect(updated.name).toBe('Enterprise Sales Onboarding');
+      expect(updated.checklist).toHaveLength(1);
+      expect(updated.checklist[0].label).toBe('Setup Salesforce');
+
+      await service.deleteTemplate(adminUser(), created.id);
+      const templates = await service.listTemplates(adminUser());
+      expect(templates.find((t) => t.id === created.id)).toBeUndefined();
+    });
+  });
 });
