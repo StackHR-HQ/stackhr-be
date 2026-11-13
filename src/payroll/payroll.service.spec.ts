@@ -460,7 +460,7 @@ describe('PayrollService', () => {
   });
 
   describe('getAllCompensations', () => {
-    it('should return compensation records for all organization employees', async () => {
+    it('should return compensation records for all organization employees in kobo', async () => {
       prismaMock.employee.findMany.mockResolvedValue([
         {
           id: 'emp-1',
@@ -469,7 +469,7 @@ describe('PayrollService', () => {
           jobTitle: 'Engineer',
           department: 'Engineering',
           status: 'ACTIVE',
-          annualSalaryMinor: 12000000n,
+          annualSalaryMinor: 1200000000n,
           currency: 'NGN',
           payFrequency: 'MONTHLY',
           startDate: new Date('2026-01-01'),
@@ -479,10 +479,10 @@ describe('PayrollService', () => {
         {
           id: 'comp-1',
           employeeId: 'emp-1',
-          basicSalary: 60000,
-          housingAllowance: 20000,
-          transportAllowance: 10000,
-          otherAllowances: 10000,
+          basicSalary: 60000000,
+          housingAllowance: 20000000,
+          transportAllowance: 10000000,
+          otherAllowances: 10000000,
           paymentFrequency: 'MONTHLY',
           effectiveFrom: new Date('2026-01-01'),
         },
@@ -491,8 +491,33 @@ describe('PayrollService', () => {
       const result = await service.getAllCompensations(mockAdminUser);
 
       expect(result.compensations).toHaveLength(1);
-      expect(result.compensations[0].grossMonthlySalary).toBe(100000);
-      expect(result.compensations[0].basicSalary).toBe(60000);
+      expect(result.compensations[0].grossMonthlySalary).toBe(100000000);
+      expect(result.compensations[0].basicSalary).toBe(60000000);
+    });
+
+    it('should fall back to annualSalaryMinor / 12 (kobo) when no compensation record exists', async () => {
+      prismaMock.employee.findMany.mockResolvedValue([
+        {
+          id: 'emp-2',
+          fullName: 'Bob Builder',
+          email: 'bob@acme.com',
+          jobTitle: 'Designer',
+          department: 'Design',
+          status: 'ACTIVE',
+          annualSalaryMinor: 1200000000n, // 12,000,000 Naira in kobo
+          currency: 'NGN',
+          payFrequency: 'MONTHLY',
+          startDate: new Date('2026-01-01'),
+        },
+      ]);
+      prismaMock.compensationRecord.findMany.mockResolvedValue([]);
+
+      const result = await service.getAllCompensations(mockAdminUser);
+
+      expect(result.compensations).toHaveLength(1);
+      // Fallback: 1,200,000,000 kobo / 12 months = 100,000,000 kobo (1,000,000 Naira)
+      expect(result.compensations[0].basicSalary).toBe(100000000);
+      expect(result.compensations[0].grossMonthlySalary).toBe(100000000);
     });
   });
 
