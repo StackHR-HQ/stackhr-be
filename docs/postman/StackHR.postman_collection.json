@@ -3348,7 +3348,7 @@
                 "compensation"
               ]
             },
-            "description": "Set/update versioned effective-dated compensation record for an employee. Automatically closes previous active record and writes a CompensationHistory entry. NOTE: All monetary salary and allowance fields (basicSalary, housingAllowance, transportAllowance, otherAllowances) must be sent in KOBO (minor currency units, e.g. 30000000 = ₦300,000.00)."
+            "description": "Set/update versioned effective-dated compensation record for an employee. Automatically closes previous active record and writes a CompensationHistory entry."
           },
           "response": [
             {
@@ -3386,7 +3386,7 @@
                 "compensation"
               ]
             },
-            "description": "Returns all employees active compensation breakdown in the organization. NOTE: All salary and allowance amounts (basicSalary, housingAllowance, transportAllowance, otherAllowances, grossMonthlySalary, annualSalaryMinor) are returned in KOBO (minor currency units, e.g. 60000000 = ₦600,000.00)."
+            "description": "Returns all employees active compensation breakdown in the organization."
           },
           "response": [
             {
@@ -3411,7 +3411,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"compensations\": [\n      {\n        \"employeeId\": \"emp-1\",\n        \"fullName\": \"Ada Okafor\",\n        \"email\": \"ada@acme.com\",\n        \"jobTitle\": \"Software Engineer\",\n        \"department\": \"Engineering\",\n        \"status\": \"ACTIVE\",\n        \"annualSalaryMinor\": 1200000000,\n        \"currency\": \"NGN\",\n        \"paymentFrequency\": \"MONTHLY\",\n        \"basicSalary\": 60000000,\n        \"housingAllowance\": 25000000,\n        \"transportAllowance\": 10000000,\n        \"otherAllowances\": 5000000,\n        \"grossMonthlySalary\": 100000000,\n        \"effectiveFrom\": \"2026-01-01\"\n      }\n    ]\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"compensations\": [\n      {\n        \"employeeId\": \"emp-1\",\n        \"fullName\": \"Ada Okafor\",\n        \"email\": \"ada@acme.com\",\n        \"jobTitle\": \"Software Engineer\",\n        \"department\": \"Engineering\",\n        \"status\": \"ACTIVE\",\n        \"annualSalaryMinor\": 1200000000,\n        \"currency\": \"NGN\",\n        \"paymentFrequency\": \"MONTHLY\",\n        \"basicSalary\": 600000,\n        \"housingAllowance\": 250000,\n        \"transportAllowance\": 100000,\n        \"otherAllowances\": 50000,\n        \"grossMonthlySalary\": 1000000,\n        \"effectiveFrom\": \"2026-01-01\"\n      }\n    ]\n  }\n}"
             }
           ]
         },
