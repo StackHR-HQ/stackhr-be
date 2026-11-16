@@ -9,6 +9,7 @@ import { BachsWebhookController } from './bachs/bachs-webhook.controller';
 import { BachsWebhookGuard } from './bachs/bachs-webhook.guard';
 import { EntitlementsService } from './entitlements.service';
 import { EntitlementGuard } from './entitlement.guard';
+import { BillingSchedulerService } from './billing-scheduler.service';
 
 /** Global so any module can gate routes with @RequireEntitlement. */
 @Global()
@@ -23,7 +24,13 @@ import { EntitlementGuard } from './entitlement.guard';
     BachsWebhookGuard,
     EntitlementsService,
     EntitlementGuard,
+    BillingSchedulerService,
   ],
-  exports: [SubscriptionsService, EntitlementsService, EntitlementGuard],
+  exports: [
+    SubscriptionsService,
+    EntitlementsService,
+    EntitlementGuard,
+    BillingSchedulerService,
+  ],
 })
 export class BillingModule {}

@@ -104,6 +104,7 @@ Status values: `Not Started` · `In Progress` · `Blocked` · `Awaiting Review` 
 - [x] Self-serve billing endpoints: `/v1/api/billing/status`, `/plans`, `/subscribe`, `/change-plan`, `/cancel`, `/invoices/:id/pay` with pending downgrade cancellation — Status: Done
 - [x] Entitlement enforcement: `@RequireEntitlement` on payroll, disbursements, and pension remittance returning `402 PLAN_UPGRADE_REQUIRED` — Status: Done
 - [x] Seat cap enforcement: Headcount limits on employee creation, bulk onboarding, and employee reactivation from terminated state — Status: Done
+- [x] Billing Lifecycle Background Scheduler: Automated overdue checks, grace period tracking, restriction, period end downgrades/cancellations, and renewal invoice issuance — Status: Done
 - [x] Postman: Billing collection folder added with example success and 402 error responses — Status: Done
 - User stories: US-001, US-002, US-003
 
