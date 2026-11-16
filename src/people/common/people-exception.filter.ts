@@ -59,6 +59,9 @@ export class PeopleExceptionFilter implements ExceptionFilter {
         ...('fields' in details && details.fields
           ? { fields: details.fields }
           : {}),
+        ...('details' in details && details.details
+          ? { details: details.details }
+          : {}),
       },
     });
   }

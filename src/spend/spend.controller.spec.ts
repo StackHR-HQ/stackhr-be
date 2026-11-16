@@ -5,6 +5,7 @@ import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { USER_ROLES, USER_TYPES } from '../auth/auth.constants';
+import { EntitlementGuard } from '../billing/entitlement.guard';
 
 describe('SpendController', () => {
   let controller: SpendController;
@@ -41,6 +42,8 @@ describe('SpendController', () => {
       .overrideGuard(AuthGuard)
       .useValue({ canActivate: () => true })
       .overrideGuard(RolesGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(EntitlementGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

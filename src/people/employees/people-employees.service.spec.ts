@@ -3,20 +3,27 @@ import type { EmailService } from '../../notifications/email.service';
 import { createInMemoryTenant } from '../testing/in-memory-tenant';
 import { adminUser, employeeRow, ORG_B } from '../testing/fixtures';
 import { PeopleEmployeesService } from './people-employees.service';
+import type { EntitlementsService } from '../../billing/entitlements.service';
+import { PlanUpgradeRequiredException } from '../../billing/plan-upgrade-required.exception';
 
 describe('PeopleEmployeesService', () => {
   const originalFrontendUrl = process.env.FRONTEND_URL;
   let fake: ReturnType<typeof createInMemoryTenant>;
   let email: { send: jest.Mock };
   let service: PeopleEmployeesService;
+  let entitlements: { assertCanAddEmployees: jest.Mock };
 
   beforeEach(() => {
     process.env.FRONTEND_URL = 'https://app.stackhr.test';
     fake = createInMemoryTenant();
     email = { send: jest.fn().mockResolvedValue({ id: 'email_1' }) };
+    entitlements = {
+      assertCanAddEmployees: jest.fn().mockResolvedValue(undefined),
+    };
     service = new PeopleEmployeesService(
       fake.tenant,
       email as unknown as EmailService,
+      entitlements as unknown as EntitlementsService,
     );
   });
 
@@ -29,6 +36,28 @@ describe('PeopleEmployeesService', () => {
   });
 
   describe('createEmployee', () => {
+    it('refuses a new hire beyond the plan employee limit and sends no invitation', async () => {
+      entitlements.assertCanAddEmployees.mockRejectedValue(
+        new PlanUpgradeRequiredException('Your plan allows up to 5 employees', {
+          feature: 'employees',
+          currentPlan: 'FREE',
+          requiredPlan: 'STARTER',
+        }),
+      );
+
+      await expect(
+        service.createEmployee(adminUser(), {
+          ...newHire(),
+          sendInvitation: true,
+        }),
+      ).rejects.toBeInstanceOf(PlanUpgradeRequiredException);
+      expect(entitlements.assertCanAddEmployees).toHaveBeenCalledWith(
+        'org_a',
+        1,
+      );
+      expect(email.send).not.toHaveBeenCalled();
+    });
+
     it('emails an invitation link to the new hire when requested', async () => {
       fake.seed('department', [
         { id: 'dep_people', organizationId: 'org_a', name: 'People' },

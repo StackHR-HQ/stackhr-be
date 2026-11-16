@@ -2,12 +2,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PayrollListener } from './payroll.listener';
 import { PrismaService } from '../database/prisma.service';
 import { ApprovalDecidedEvent } from '../approvals/events/approval-decided.event';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { PlanUpgradeRequiredException } from '../billing/plan-upgrade-required.exception';
 
 describe('PayrollListener', () => {
   let listener: PayrollListener;
   let prisma: any;
+  let entitlements: { assertFeature: jest.Mock };
 
   beforeEach(async () => {
+    entitlements = { assertFeature: jest.fn().mockResolvedValue(undefined) };
     prisma = {
       payrollRun: {
         findUnique: jest.fn(),
@@ -27,10 +31,51 @@ describe('PayrollListener', () => {
       providers: [
         PayrollListener,
         { provide: PrismaService, useValue: prisma },
+        { provide: EntitlementsService, useValue: entitlements },
       ],
     }).compile();
 
     listener = module.get<PayrollListener>(PayrollListener);
+  });
+
+  it('generates no payslips and leaves the run unapproved when the plan excludes payroll', async () => {
+    entitlements.assertFeature.mockRejectedValue(
+      new PlanUpgradeRequiredException('Payroll is not included', {
+        feature: 'payroll',
+        currentPlan: 'FREE',
+        requiredPlan: 'STARTER',
+      }),
+    );
+    prisma.payrollRun.findUnique.mockResolvedValue({
+      id: 'run-100',
+      organizationId: 'org-1',
+      title: 'September payroll',
+      status: 'PENDING_APPROVAL',
+      items: [{ employeeId: 'emp-1', grossSalary: 100, netSalary: 90 }],
+    });
+
+    await listener.handleApprovalDecided({
+      approvalRequestId: 'app-pay-1',
+      organizationId: 'org-1',
+      type: 'PAYROLL',
+      requesterId: 'user-1',
+      approverId: 'user-2',
+      subjectTable: 'payroll_run',
+      subjectId: 'run-100',
+      status: 'APPROVED',
+      rejectionReason: null,
+    });
+
+    expect(entitlements.assertFeature).toHaveBeenCalledWith('org-1', 'payroll');
+    expect(prisma.payslip.createMany).not.toHaveBeenCalled();
+    expect(prisma.payrollRun.update).not.toHaveBeenCalled();
+    expect(prisma.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: 'org-1',
+        action: 'payroll_run.blocked_by_plan',
+        targetId: 'run-100',
+      }),
+    });
   });
 
   it('should ignore non-payroll approval events', async () => {

@@ -31,6 +31,8 @@ const TENANT_SCOPED_MODELS = [
   'DeadLetterEvent',
   'OrganizationDepositAccount',
   'CorporateCard',
+  'Subscription',
+  'BillingInvoice',
 ];
 
 @Injectable()

@@ -14,6 +14,7 @@ import { USER_ROLES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { SpendService } from './spend.service';
 import { CreateReimbursementDto } from './dto/create-reimbursement.dto';
+import { RequireEntitlement } from '../billing/require-entitlement.decorator';
 
 const ADMIN_ROLES = [
   USER_ROLES.BUSINESS_OWNER,
@@ -62,6 +63,7 @@ export class ReimbursementsController {
 
   @Post(':id/pay')
   @RequireRoles(...ADMIN_ROLES)
+  @RequireEntitlement('disbursement')
   payReimbursement(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,

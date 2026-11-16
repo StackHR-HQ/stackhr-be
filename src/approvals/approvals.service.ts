@@ -20,6 +20,7 @@ import {
 } from './events/approval-decided.event';
 import type { ApprovalRequest } from '../../generated/prisma/client';
 import { OutboxService } from '../common/outbox/outbox.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 
 @Injectable()
 export class ApprovalsService {
@@ -28,6 +29,7 @@ export class ApprovalsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly entitlements: EntitlementsService,
     @Optional() private readonly outboxService?: OutboxService,
   ) {}
 
@@ -443,6 +445,14 @@ export class ApprovalsService {
       throw new ForbiddenException(
         'You do not have permission to decide approval requests',
       );
+    }
+
+    // Approving payroll triggers payslips and payouts; refuse with 402 if the
+    // plan excludes payroll. Rejecting is always allowed.
+    const isPayroll =
+      approval.type === 'PAYROLL' || approval.subjectTable === 'payroll_run';
+    if (isPayroll && dto.status === 'APPROVED') {
+      await this.entitlements.assertFeature(approval.organizationId, 'payroll');
     }
 
     const updated = await this.prisma.approvalRequest.update({

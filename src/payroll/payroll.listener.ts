@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { PlanUpgradeRequiredException } from '../billing/plan-upgrade-required.exception';
 import {
   APPROVAL_EVENTS,
   ApprovalDecidedEvent,
@@ -11,7 +13,10 @@ import {
 export class PayrollListener {
   private readonly logger = new Logger(PayrollListener.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly entitlements: EntitlementsService,
+  ) {}
 
   @OnEvent(APPROVAL_EVENTS.DECIDED)
   async handleApprovalDecided(event: ApprovalDecidedEvent): Promise<void> {
@@ -45,6 +50,10 @@ export class PayrollListener {
     }
 
     if (event.status === 'APPROVED') {
+      // Defence in depth: approvals also refuse up front, but an event must
+      // never generate payslips for an org whose plan excludes payroll.
+      if (!(await this.isPayrollEntitled(run))) return;
+
       const existingPayslipsCount = await this.prisma.payslip.count({
         where: { payrollRunId: run.id },
       });
@@ -139,6 +148,36 @@ export class PayrollListener {
       }
 
       this.logger.log(`Payroll run ${runId} marked as rejected.`);
+    }
+  }
+
+  private async isPayrollEntitled(run: {
+    id: string;
+    organizationId: string;
+    title?: string | null;
+  }): Promise<boolean> {
+    try {
+      await this.entitlements.assertFeature(run.organizationId, 'payroll');
+      return true;
+    } catch (error) {
+      if (!(error instanceof PlanUpgradeRequiredException)) throw error;
+      this.logger.warn(
+        `Payroll run ${run.id} approval not applied: plan does not include payroll`,
+      );
+      await this.prisma.auditEvent
+        .create({
+          data: {
+            organizationId: run.organizationId,
+            actorUserId: 'system',
+            action: 'payroll_run.blocked_by_plan',
+            targetType: 'payroll_run',
+            targetId: run.id,
+            description: `Payroll run "${run.title ?? run.id}" was approved but not processed: the current plan does not include payroll`,
+            changes: { reason: 'PLAN_UPGRADE_REQUIRED' },
+          },
+        })
+        .catch(() => undefined);
+      return false;
     }
   }
 }
