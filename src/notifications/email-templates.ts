@@ -405,3 +405,194 @@ export function passwordResetEmail(resetUrl: string): TransactionalEmail {
     }),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Billing emails (₦ subscriptions)
+// ---------------------------------------------------------------------------
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+/** 1150000n kobo → "₦11,500.00" (locale-independent). */
+export function formatNaira(kobo: bigint): string {
+  const naira = (kobo / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const fraction = (kobo % 100n).toString().padStart(2, '0');
+  return `₦${naira}.${fraction}`;
+}
+
+/** "1 December 2026" in UTC (timezone-independent). */
+export function formatBillingDate(date: Date): string {
+  return `${date.getUTCDate()} ${MONTH_NAMES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+}
+
+export function billingPageUrl(invoiceId?: string): string {
+  return `${appUrl()}/settings/billing${invoiceId ? `?invoice=${encodeURIComponent(invoiceId)}` : ''}`;
+}
+
+function billingSummary(rows: Array<[string, string]>): string {
+  const body = rows
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding:6px 0;font-size:14px;color:${COLORS.muted};">${escapeHtml(label)}</td><td style="padding:6px 0;font-size:14px;font-weight:700;color:${COLORS.heading};text-align:right;">${escapeHtml(value)}</td></tr>`,
+    )
+    .join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px 0;">${body}</table>`;
+}
+
+const INVOICE_KIND_LABELS: Record<string, string> = {
+  INITIAL: 'subscription',
+  RENEWAL: 'renewal',
+  UPGRADE_PRORATION: 'plan upgrade',
+  OVERAGE_TRUEUP: 'additional employees',
+};
+
+export interface BillingInvoiceEmailInput {
+  organizationName: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  kind: string;
+  totalKobo: bigint;
+  dueAt: Date;
+}
+
+export function billingInvoiceEmail(
+  input: BillingInvoiceEmailInput,
+): TransactionalEmail {
+  const amount = formatNaira(input.totalKobo);
+  const due = formatBillingDate(input.dueAt);
+  const kind = INVOICE_KIND_LABELS[input.kind] ?? 'subscription';
+  const payUrl = billingPageUrl(input.invoiceId);
+  const subject = `StackHR invoice ${input.invoiceNumber} — ${amount} due ${due}`;
+  const text = `Hello,\n\nA new StackHR ${kind} invoice for ${input.organizationName} is ready.\n\nInvoice: ${input.invoiceNumber}\nAmount: ${amount}\nDue: ${due}\n\nPay by bank transfer or card here:\n${payUrl}\n\nThank you for using StackHR.`;
+  return {
+    subject,
+    text,
+    html: layout({
+      subject,
+      preheader: `${amount} due ${due} for ${input.organizationName}.`,
+      eyebrow: 'Invoice',
+      headline: `Your ${kind} invoice is ready.`,
+      intro: `Here is the latest StackHR invoice for ${input.organizationName}.`,
+      bodyHtml: billingSummary([
+        ['Invoice', input.invoiceNumber],
+        ['Amount', amount],
+        ['Due', due],
+      ]),
+      ctaUrl: payUrl,
+      ctaText: 'Pay invoice',
+    }),
+  };
+}
+
+export function billingPaymentReceivedEmail(
+  input: BillingInvoiceEmailInput,
+): TransactionalEmail {
+  const amount = formatNaira(input.totalKobo);
+  const subject = `Payment received — StackHR invoice ${input.invoiceNumber}`;
+  const text = `Hello,\n\nWe received ${amount} for invoice ${input.invoiceNumber} (${input.organizationName}). Thank you!\n\nView your billing history:\n${billingPageUrl()}`;
+  return {
+    subject,
+    text,
+    html: layout({
+      subject,
+      preheader: `We received ${amount}. Thank you!`,
+      eyebrow: 'Payment received',
+      headline: 'Thank you for your payment.',
+      intro: `We received your payment for ${input.organizationName}.`,
+      bodyHtml: billingSummary([
+        ['Invoice', input.invoiceNumber],
+        ['Amount paid', amount],
+      ]),
+      ctaUrl: billingPageUrl(),
+      ctaText: 'View billing',
+    }),
+  };
+}
+
+export function billingPaymentFailedEmail(
+  input: BillingInvoiceEmailInput & { reason: string },
+): TransactionalEmail {
+  const amount = formatNaira(input.totalKobo);
+  const payUrl = billingPageUrl(input.invoiceId);
+  const subject = `Payment failed — StackHR invoice ${input.invoiceNumber}`;
+  const text = `Hello,\n\nA payment of ${amount} for invoice ${input.invoiceNumber} (${input.organizationName}) did not go through (${input.reason}).\n\nPlease try again by bank transfer or card:\n${payUrl}`;
+  return {
+    subject,
+    text,
+    html: layout({
+      subject,
+      preheader: `Your payment of ${amount} did not go through.`,
+      eyebrow: 'Payment failed',
+      headline: 'Your payment did not go through.',
+      intro: `We could not collect payment for ${input.organizationName}.`,
+      bodyHtml: billingSummary([
+        ['Invoice', input.invoiceNumber],
+        ['Amount', amount],
+        ['Reason', input.reason],
+      ]),
+      ctaUrl: payUrl,
+      ctaText: 'Try again',
+    }),
+  };
+}
+
+export function billingOverdueEmail(
+  input: BillingInvoiceEmailInput & { graceEndsAt: Date },
+): TransactionalEmail {
+  const amount = formatNaira(input.totalKobo);
+  const graceEnds = formatBillingDate(input.graceEndsAt);
+  const payUrl = billingPageUrl(input.invoiceId);
+  const subject = `Overdue: StackHR invoice ${input.invoiceNumber} — pay by ${graceEnds}`;
+  const text = `Hello,\n\nInvoice ${input.invoiceNumber} for ${input.organizationName} (${amount}) is overdue.\n\nPayroll and payouts stay available until ${graceEnds}. After that they will be paused until the invoice is paid. Your data is safe either way.\n\nPay now:\n${payUrl}`;
+  return {
+    subject,
+    text,
+    html: layout({
+      subject,
+      preheader: `Pay ${amount} by ${graceEnds} to keep payroll running.`,
+      eyebrow: 'Payment overdue',
+      headline: 'Your invoice is overdue.',
+      intro: `Payroll and payouts stay available until ${graceEnds}. Pay before then to avoid interruption.`,
+      bodyHtml: billingSummary([
+        ['Invoice', input.invoiceNumber],
+        ['Amount', amount],
+        ['Pay by', graceEnds],
+      ]),
+      ctaUrl: payUrl,
+      ctaText: 'Pay now',
+    }),
+  };
+}
+
+export function billingRestrictedEmail(input: {
+  organizationName: string;
+}): TransactionalEmail {
+  const billingUrl = billingPageUrl();
+  const subject = `StackHR features restricted for ${input.organizationName}`;
+  const text = `Hello,\n\nBecause an invoice for ${input.organizationName} is unpaid, payroll, payouts and remittances are now locked. Your data is safe and nothing has been deleted.\n\nPay the outstanding invoice to restore everything immediately:\n${billingUrl}`;
+  return {
+    subject,
+    text,
+    html: layout({
+      subject,
+      preheader: 'Pay the outstanding invoice to restore payroll and payouts.',
+      eyebrow: 'Account restricted',
+      headline: 'Payroll and payouts are paused.',
+      intro: `An invoice for ${input.organizationName} is unpaid, so paid features are locked. Your data is safe and nothing has been deleted.`,
+      bodyHtml: '',
+      ctaUrl: billingUrl,
+      ctaText: 'Pay outstanding invoice',
+    }),
+  };
+}

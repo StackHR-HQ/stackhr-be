@@ -6,6 +6,7 @@ import {
   createPrismaMock,
 } from './testing/billing-fixtures';
 import type { BachsWebhookEvent } from './bachs/bachs.types';
+import { BillingNotifier } from './billing-notifier.service';
 
 const PERIOD_START = new Date('2026-11-16T00:00:00Z');
 const PERIOD_END = new Date('2026-12-16T00:00:00Z');
@@ -74,13 +75,16 @@ function collectionEvent(
 describe('BillingWebhookService', () => {
   let service: BillingWebhookService;
   let prisma: ReturnType<typeof createPrismaMock>;
+  let notifier: { paymentReceived: jest.Mock; paymentFailed: jest.Mock };
 
   beforeEach(async () => {
     prisma = createPrismaMock();
+    notifier = { paymentReceived: jest.fn(), paymentFailed: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BillingWebhookService,
         { provide: PrismaService, useValue: prisma },
+        { provide: BillingNotifier, useValue: notifier },
       ],
     }).compile();
     service = module.get(BillingWebhookService);
@@ -239,5 +243,50 @@ describe('BillingWebhookService', () => {
     expect(prisma.subscription.update.mock.calls[0][0].data).toMatchObject({
       cancelAtPeriodEnd: false,
     });
+  });
+
+  it('rolls the period forward on a paid renewal, applies the scheduled downgrade and emails a receipt', async () => {
+    prisma.billingInvoice.findFirst.mockResolvedValue(
+      starterInitialInvoice({
+        kind: 'RENEWAL',
+        periodStart: new Date('2026-12-01T00:00:00Z'),
+        periodEnd: new Date('2027-01-01T00:00:00Z'),
+        subscription: activeSubscription('GROWTH', {
+          status: 'PAST_DUE',
+          pendingPlanCode: 'STARTER',
+          pendingBillingCycle: 'MONTHLY',
+        }),
+      }),
+    );
+
+    await service.handle(collectionEvent('collection.succeeded'));
+
+    expect(prisma.subscription.update.mock.calls[0][0].data).toMatchObject({
+      status: 'ACTIVE',
+      planCode: 'STARTER',
+      currentPeriodStart: new Date('2026-12-01T00:00:00Z'),
+      currentPeriodEnd: new Date('2027-01-01T00:00:00Z'),
+      pendingPlanCode: null,
+      pendingBillingCycle: null,
+    });
+    expect(notifier.paymentReceived).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'inv-1' }),
+    );
+  });
+
+  it('emails the billing contacts when a collection fails', async () => {
+    prisma.billingInvoice.findFirst.mockResolvedValue(starterInitialInvoice());
+
+    await service.handle(
+      collectionEvent('collection.failed', {
+        status: 'failed',
+        message: 'declined',
+      }),
+    );
+
+    expect(notifier.paymentFailed).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'inv-1' }),
+      'declined',
+    );
   });
 });

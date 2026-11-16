@@ -5,6 +5,7 @@ import { bachsAmountToKobo } from './domain/pricing';
 import { transition } from './domain/state-machine';
 import type { SubscriptionStatus } from './domain/entitlements';
 import { invoiceIdFromReference } from './invoices.service';
+import { BillingNotifier } from './billing-notifier.service';
 import type { BachsWebhookEvent } from './bachs/bachs.types';
 
 const PROVIDER = 'bachs';
@@ -18,7 +19,10 @@ const PROVIDER = 'bachs';
 export class BillingWebhookService {
   private readonly logger = new Logger(BillingWebhookService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifier: BillingNotifier,
+  ) {}
 
   async handle(event: BachsWebhookEvent): Promise<{ duplicate: boolean }> {
     const record = await this.record(event);
@@ -115,7 +119,7 @@ export class BillingWebhookService {
       return;
     }
 
-    await this.prisma.$transaction(async (tx: any) => {
+    const applied = await this.prisma.$transaction(async (tx: any) => {
       const claimed = await tx.billingInvoice.updateMany({
         where: { id: invoice.id, status: 'OPEN' },
         data: {
@@ -125,7 +129,7 @@ export class BillingWebhookService {
           lastFailureReason: null,
         },
       });
-      if (claimed.count === 0) return; // already applied by a concurrent delivery
+      if (claimed.count === 0) return false; // already applied by a concurrent delivery
 
       const sub = invoice.subscription;
       const next = transition(
@@ -150,6 +154,11 @@ export class BillingWebhookService {
       if (invoice.kind === 'INITIAL' || invoice.kind === 'RENEWAL') {
         update.currentPeriodStart = invoice.periodStart;
         update.currentPeriodEnd = invoice.periodEnd;
+      }
+      if (invoice.kind === 'RENEWAL') {
+        // Any scheduled downgrade/cycle change was priced into this renewal.
+        update.pendingPlanCode = null;
+        update.pendingBillingCycle = null;
       }
       if (invoice.kind === 'INITIAL') {
         update.cancelAtPeriodEnd = false;
@@ -186,7 +195,9 @@ export class BillingWebhookService {
           },
         },
       });
+      return true;
     });
+    if (applied) await this.notifier.paymentReceived(invoice);
   }
 
   private async onCollectionUnderpaid(data: Record<string, any>) {
@@ -198,15 +209,14 @@ export class BillingWebhookService {
   private async onCollectionFailed(data: Record<string, any>) {
     const invoice = await this.findInvoice(data);
     if (!invoice || invoice.status !== 'OPEN') return;
+    const reason = String(
+      data.message ?? data.failure_reason ?? data.status ?? 'failed',
+    ).slice(0, 500);
     await this.prisma.billingInvoice.update({
       where: { id: invoice.id },
-      data: {
-        failedAttempts: { increment: 1 },
-        lastFailureReason: String(
-          data.message ?? data.failure_reason ?? data.status ?? 'failed',
-        ).slice(0, 500),
-      },
+      data: { failedAttempts: { increment: 1 }, lastFailureReason: reason },
     });
+    await this.notifier.paymentFailed(invoice, reason);
   }
 
   private async onPaymentMethodSaved(data: Record<string, any>) {

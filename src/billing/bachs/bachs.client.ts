@@ -8,6 +8,8 @@ import {
 import { CircuitBreaker } from '../../common/resilience/circuit-breaker';
 import { executeWithRetry } from '../../common/resilience/retry-policy';
 import type {
+  BachsCharge,
+  BachsChargeSavedCardParams,
   BachsCheckout,
   BachsCreateCheckoutParams,
   BachsCreateCustomerParams,
@@ -88,6 +90,30 @@ export class BachsClient {
       checkoutUrl: json.checkout_url,
       expiresAt: new Date(json.expires_at),
     };
+  }
+
+  /**
+   * Off-session charge of a saved card (POST /v1/charges). The result arrives
+   * by webhook (collection.succeeded / collection.failed), not in this call.
+   */
+  async chargeSavedCard(
+    params: BachsChargeSavedCardParams,
+  ): Promise<BachsCharge> {
+    if (this.isMockMode()) {
+      return {
+        chargeId: `ch_mock_${randomUUID().slice(0, 8)}`,
+        status: 'processing',
+      };
+    }
+    const json = await this.post('/v1/charges', params.idempotencyKey, {
+      customer: params.customerId,
+      payment_method: params.paymentMethodId,
+      amount: params.amount,
+      currency: 'NGN',
+      reference: params.reference,
+      description: params.description,
+    });
+    return { chargeId: json.payment_id ?? json.charge_id, status: json.status };
   }
 
   private async post(

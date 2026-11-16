@@ -157,6 +157,7 @@ export function createPrismaMock() {
       ),
     },
     subscription: {
+      findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn().mockResolvedValue(null),
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn(({ data }) =>

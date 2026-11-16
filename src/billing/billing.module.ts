@@ -9,11 +9,21 @@ import { BachsWebhookController } from './bachs/bachs-webhook.controller';
 import { BachsWebhookGuard } from './bachs/bachs-webhook.guard';
 import { EntitlementsService } from './entitlements.service';
 import { EntitlementGuard } from './entitlement.guard';
+import { BillingNotifier } from './billing-notifier.service';
+import { BillingCycleService } from './billing-cycle.service';
+import { BillingCycleRunner } from './billing-cycle.runner';
+import { BillingAdminController } from './billing-admin.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 /** Global so any module can gate routes with @RequireEntitlement. */
 @Global()
 @Module({
-  controllers: [BillingController, BachsWebhookController],
+  imports: [NotificationsModule],
+  controllers: [
+    BillingController,
+    BachsWebhookController,
+    BillingAdminController,
+  ],
   providers: [
     BillingService,
     SubscriptionsService,
@@ -23,6 +33,9 @@ import { EntitlementGuard } from './entitlement.guard';
     BachsWebhookGuard,
     EntitlementsService,
     EntitlementGuard,
+    BillingNotifier,
+    BillingCycleService,
+    BillingCycleRunner,
   ],
   exports: [SubscriptionsService, EntitlementsService, EntitlementGuard],
 })

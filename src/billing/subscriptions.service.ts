@@ -248,6 +248,8 @@ export class SubscriptionsService {
       where: { id: sub.id },
       data: { cancelAtPeriodEnd: true },
     });
+    // A renewal issued before cancelling is for a period that won't happen.
+    await this.invoices.voidAbandoned(organizationId, ['RENEWAL']);
     return {
       cancelAtPeriodEnd: true,
       effectiveAt: sub.currentPeriodEnd?.toISOString() ?? null,

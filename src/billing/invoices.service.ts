@@ -40,6 +40,11 @@ export function checkoutReference(invoiceId: string): string {
   return `${invoiceId}.${Date.now().toString(36)}`;
 }
 
+/** Saved-card renewals; off until Bachs confirms ₦ off-session charges. */
+export function isAutoChargeEnabled(): boolean {
+  return process.env.BILLING_AUTO_CHARGE_ENABLED === 'true';
+}
+
 export function invoiceIdFromReference(reference: string | null | undefined) {
   return reference ? reference.split('.')[0] : null;
 }
@@ -87,12 +92,10 @@ export class InvoicesService {
     });
   }
 
-  async issueWithCheckout(params: IssueInvoiceParams) {
-    // Resolve the Bachs customer first so a provider/config failure leaves no invoice behind.
-    await this.ensureCustomer(params.subscription);
-
+  /** Creates an OPEN invoice without a checkout (renewals, overage): the email links to the app, which creates a checkout on demand. */
+  issue(params: IssueInvoiceParams) {
     const now = new Date();
-    const invoice = await this.prisma.billingInvoice.create({
+    return this.prisma.billingInvoice.create({
       data: {
         organizationId: params.subscription.organizationId,
         subscriptionId: params.subscription.id,
@@ -113,6 +116,12 @@ export class InvoicesService {
         billedEmployeeCount: params.billedEmployeeCount ?? null,
       },
     });
+  }
+
+  async issueWithCheckout(params: IssueInvoiceParams) {
+    // Resolve the Bachs customer first so a provider/config failure leaves no invoice behind.
+    await this.ensureCustomer(params.subscription);
+    const invoice = await this.issue(params);
 
     let checkout: Awaited<ReturnType<InvoicesService['attachCheckout']>>;
     try {
@@ -189,9 +198,9 @@ export class InvoicesService {
       },
       successUrl: `${appUrl}/settings/billing?checkout=success`,
       cancelUrl: `${appUrl}/settings/billing?checkout=cancelled`,
-      // Saving a card makes Bachs offer cards only, hiding NGN bank transfer.
-      // Auto-charge is off until Bachs confirms ₦ off-session charges, so don't save.
-      savePaymentMethod: false,
+      // Saving a card makes Bachs offer cards only, hiding NGN bank transfer,
+      // so cards are saved only when auto-charge is deliberately enabled.
+      savePaymentMethod: isAutoChargeEnabled(),
     });
 
     const fields = {

@@ -223,6 +223,23 @@ describe('SubscriptionsService', () => {
       });
     });
 
+    it('voids an already-issued renewal so nothing is owed for the cancelled period', async () => {
+      prisma.subscription.findUnique.mockResolvedValue(
+        activeSubscription('GROWTH'),
+      );
+
+      await service.cancel('org-1');
+
+      expect(prisma.billingInvoice.updateMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: 'org-1',
+          status: 'OPEN',
+          kind: { in: ['RENEWAL'] },
+        },
+        data: { status: 'VOID' },
+      });
+    });
+
     it('has nothing to cancel on the Free plan', async () => {
       await expect(service.cancel('org-1')).rejects.toThrow(
         BadRequestException,

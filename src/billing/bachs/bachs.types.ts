@@ -35,3 +35,19 @@ export interface BachsWebhookEvent {
   organization_id?: string;
   data: Record<string, any>;
 }
+
+export interface BachsChargeSavedCardParams {
+  customerId: string;
+  paymentMethodId: string;
+  /** Decimal NGN string. */
+  amount: string;
+  reference: string;
+  /** Must change per attempt: a failed charge is final for its key. */
+  idempotencyKey: string;
+  description?: string;
+}
+
+export interface BachsCharge {
+  chargeId: string;
+  status: string;
+}

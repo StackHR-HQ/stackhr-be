@@ -1065,6 +1065,10 @@ model BillingInvoice {
   billedEmployeeCount    Int?
   failedAttempts         Int          @default(0)
   lastFailureReason      String?
+  /// Dunning emails sent for this invoice (overdue notice, mid-grace reminder).
+  remindersSent          Int          @default(0)
+  /// Saved-card auto-charge attempt (BILLING_AUTO_CHARGE_ENABLED).
+  lastChargeAttemptAt    DateTime?    @db.Timestamptz(3)
   createdAt              DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime     @updatedAt @db.Timestamptz(3)
   organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
