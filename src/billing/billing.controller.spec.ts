@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
+import { SubscriptionsService } from './subscriptions.service';
+import { InvoicesService } from './invoices.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -24,6 +26,8 @@ describe('BillingController', () => {
           provide: BillingService,
           useValue: billingServiceMock,
         },
+        { provide: SubscriptionsService, useValue: {} },
+        { provide: InvoicesService, useValue: {} },
       ],
     })
       .overrideGuard(AuthGuard)
@@ -48,11 +52,11 @@ describe('BillingController', () => {
       role: USER_ROLES.BUSINESS_OWNER,
       organizationId: 'org-123',
     };
-    billingServiceMock.getStatus.mockResolvedValue({ status: 'TRIALING' });
+    billingServiceMock.getStatus.mockResolvedValue({ status: 'FREE' });
 
     const result = await controller.getStatus(mockUser);
 
     expect(billingServiceMock.getStatus).toHaveBeenCalledWith(mockUser);
-    expect(result).toEqual({ status: 'TRIALING' });
+    expect(result).toEqual({ status: 'FREE' });
   });
 });

@@ -18,7 +18,7 @@ export const MONTHS_IN_CYCLE: Record<BillingCycle, number> = {
 };
 
 export interface InvoiceLine {
-  code: 'BASE_FEE' | 'OVERAGE';
+  code: 'BASE_FEE' | 'OVERAGE' | 'PRORATION';
   description: string;
   quantity: number;
   unitAmountKobo: bigint;

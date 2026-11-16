@@ -1058,6 +1058,11 @@ model BillingInvoice {
   bachsCheckoutUrl       String?
   bachsCheckoutExpiresAt DateTime?    @db.Timestamptz(3)
   bachsChargeId          String?
+  /// What paying this invoice applies to the subscription (snapshot at issue time).
+  targetPlanCode         String?
+  targetBillingCycle     String?
+  targetTerms            Json?
+  billedEmployeeCount    Int?
   failedAttempts         Int          @default(0)
   lastFailureReason      String?
   createdAt              DateTime     @default(now()) @db.Timestamptz(3)
