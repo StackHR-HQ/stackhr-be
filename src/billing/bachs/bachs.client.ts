@@ -81,7 +81,7 @@ export class BachsClient {
       success_url: params.successUrl,
       cancel_url: params.cancelUrl,
       expires_in_minutes: params.expiresInMinutes ?? 60,
-      save_payment_method: params.savePaymentMethod ?? true,
+      save_payment_method: params.savePaymentMethod ?? false,
     });
     return {
       checkoutId: json.checkout_id,

@@ -189,7 +189,9 @@ export class InvoicesService {
       },
       successUrl: `${appUrl}/settings/billing?checkout=success`,
       cancelUrl: `${appUrl}/settings/billing?checkout=cancelled`,
-      savePaymentMethod: true,
+      // Saving a card makes Bachs offer cards only, hiding NGN bank transfer.
+      // Auto-charge is off until Bachs confirms ₦ off-session charges, so don't save.
+      savePaymentMethod: false,
     });
 
     const fields = {

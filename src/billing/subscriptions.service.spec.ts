@@ -76,6 +76,17 @@ describe('SubscriptionsService', () => {
       );
     });
 
+    it('offers bank transfer by not asking Bachs to save a card (saving restricts checkout to cards)', async () => {
+      await service.subscribe('org-1', {
+        planCode: 'STARTER',
+        billingCycle: 'MONTHLY',
+      });
+
+      expect(bachs.createCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({ savePaymentMethod: false }),
+      );
+    });
+
     it('creates no invoice when Bachs rejects the customer (e.g. missing API scope)', async () => {
       bachs.createCustomer.mockRejectedValue(
         new Error('missing scope customers:write'),
