@@ -11,6 +11,7 @@ import { PrismaService } from '../database/prisma.service';
 import { USER_ROLES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateOnboardingTemplateDto } from './dto/create-template.dto';
+import { EntitlementsService } from '../billing/entitlements.service';
 
 // Matches the employee_names migration backfill: the last word is the family name.
 function splitFullName(fullName: string) {
@@ -50,7 +51,10 @@ export interface EmployeeInput {
 
 @Injectable()
 export class OnboardingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly entitlements: EntitlementsService,
+  ) {}
 
   async getCompanyInfo(user: AuthenticatedUser) {
     const organizationId = this.requireOrganization(user);
@@ -209,6 +213,11 @@ export class OnboardingService {
       throw new BadRequestException(
         'employees must contain between 1 and 1000 rows',
       );
+    // All-or-nothing: every row here is a new employee (duplicates are rejected).
+    await this.entitlements.assertCanAddEmployees(
+      organizationId,
+      inputs.length,
+    );
     const rows = inputs.map((input) => ({
       ...this.normalizeEmployeeInput(input),
       localId: this.optionalString(input.id),

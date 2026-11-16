@@ -26,6 +26,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       exception instanceof HttpException ? exception.getResponse() : null;
 
     let message = 'An unexpected error occurred';
+    // Machine-readable extras an exception may carry (e.g. PLAN_UPGRADE_REQUIRED).
+    let code: string | undefined;
+    let details: unknown;
     let errorString = 'InternalServerError';
 
     if (typeof exceptionResponse === 'string') {
@@ -48,6 +51,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       } else if (typeof resObj.error === 'string') {
         message = resObj.error;
       }
+
+      if (typeof resObj.code === 'string') code = resObj.code;
+      if (resObj.details !== undefined) details = resObj.details;
 
       if (typeof resObj.error === 'string') {
         errorString = resObj.error;
@@ -83,6 +89,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       error: {
         error: errorString,
         statusCode: status,
+        ...(code ? { code } : {}),
+        ...(details !== undefined ? { details } : {}),
         correlationId: correlationId || undefined,
         traceId: traceId || undefined,
       },

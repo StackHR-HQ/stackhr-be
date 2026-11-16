@@ -23,6 +23,7 @@ import {
   ValidateEmployerCodeDto,
 } from './dto/pension.dto';
 import { Idempotent } from '../common/idempotency/idempotency.decorator';
+import { RequireEntitlement } from '../billing/require-entitlement.decorator';
 
 const PENSION_ADMIN_ROLES = [
   USER_ROLES.BUSINESS_OWNER,
@@ -102,6 +103,7 @@ export class PensionController {
 
   @Post('schedules/from-payroll/:payrollRunId')
   @RequireRoles(...PENSION_ADMIN_ROLES)
+  @RequireEntitlement('pensionRemittance')
   createScheduleFromPayroll(
     @CurrentUser() user: AuthenticatedUser,
     @Param('payrollRunId') payrollRunId: string,
@@ -135,6 +137,7 @@ export class PensionController {
 
   @Post('schedules/:id/validate')
   @RequireRoles(...PENSION_ADMIN_ROLES)
+  @RequireEntitlement('pensionRemittance')
   validateSchedule(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
@@ -154,6 +157,7 @@ export class PensionController {
   @Post('schedules/:id/submit')
   @RequireRoles(...PENSION_ADMIN_ROLES)
   @Idempotent({ required: true })
+  @RequireEntitlement('pensionRemittance')
   submitSchedule(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
@@ -164,6 +168,7 @@ export class PensionController {
   @Post('schedules/:id/payment')
   @RequireRoles(...PENSION_ADMIN_ROLES)
   @Idempotent({ required: true })
+  @RequireEntitlement('pensionRemittance')
   initiatePayment(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,

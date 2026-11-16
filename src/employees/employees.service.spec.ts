@@ -8,8 +8,19 @@ import { EmployeesService } from './employees.service';
 import { PrismaService } from '../database/prisma.service';
 import { USER_ROLES, USER_TYPES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { PlanUpgradeRequiredException } from '../billing/plan-upgrade-required.exception';
 
 describe('EmployeesService', () => {
+  const entitlementsMock = {
+    assertCanAddEmployees: jest.fn().mockResolvedValue(undefined),
+  };
+  beforeEach(() => {
+    entitlementsMock.assertCanAddEmployees
+      .mockReset()
+      .mockResolvedValue(undefined);
+  });
+
   let service: EmployeesService;
   let prismaMock: {
     employee: {
@@ -68,6 +79,7 @@ describe('EmployeesService', () => {
           provide: PrismaService,
           useValue: prismaMock,
         },
+        { provide: EntitlementsService, useValue: entitlementsMock },
       ],
     }).compile();
 
@@ -75,6 +87,33 @@ describe('EmployeesService', () => {
   });
 
   describe('createEmployee', () => {
+    it('refuses to create an employee beyond the plan employee limit', async () => {
+      entitlementsMock.assertCanAddEmployees.mockRejectedValue(
+        new PlanUpgradeRequiredException('Your plan allows up to 5 employees', {
+          feature: 'employees',
+          currentPlan: 'FREE',
+          requiredPlan: 'STARTER',
+        }),
+      );
+
+      await expect(
+        service.createEmployee(mockUser, {
+          fullName: 'Sixth Hire',
+          email: 'sixth@acme.com',
+          department: 'Engineering',
+          jobTitle: 'Engineer',
+          employmentType: 'FULL_TIME',
+          salaryAmount: 100000,
+          startDate: '2026-01-01',
+        } as any),
+      ).rejects.toBeInstanceOf(PlanUpgradeRequiredException);
+      expect(entitlementsMock.assertCanAddEmployees).toHaveBeenCalledWith(
+        'org-123',
+        1,
+      );
+      expect(prismaMock.employee.create).not.toHaveBeenCalled();
+    });
+
     it('should create an employee successfully', async () => {
       prismaMock.employee.findFirst.mockResolvedValue(null);
       prismaMock.employee.create.mockResolvedValue({

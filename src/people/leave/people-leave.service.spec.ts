@@ -319,9 +319,11 @@ describe('PeopleLeaveService', () => {
         status: 'approved',
       });
 
-      // Reading a profile never sends email, so no email service is needed.
+      // Reading a profile never sends email or adds seats, so no email or
+      // entitlements service is needed.
       const profile = await new PeopleEmployeesService(
         fake.tenant,
+        {} as never,
         {} as never,
       ).getEmployee(adminUser(), 'emp_ada');
       expect(profile.activity).toEqual([

@@ -17,6 +17,7 @@ import { SetCompensationDto } from './dto/set-compensation.dto';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { FundingCheckDto } from './dto/funding-check.dto';
 import { Idempotent } from '../common/idempotency/idempotency.decorator';
+import { RequireEntitlement } from '../billing/require-entitlement.decorator';
 
 const ADMIN_ROLES = [
   USER_ROLES.BUSINESS_OWNER,
@@ -54,6 +55,7 @@ export class PayrollController {
 
   @Post('runs')
   @RequireRoles(...ADMIN_ROLES)
+  @RequireEntitlement('payroll')
   createRun(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreatePayrollRunDto,
@@ -63,6 +65,7 @@ export class PayrollController {
 
   @Post('runs/:id/calculate')
   @RequireRoles(...ADMIN_ROLES)
+  @RequireEntitlement('payroll')
   calculateRun(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') runId: string,
@@ -72,6 +75,7 @@ export class PayrollController {
 
   @Post('runs/:id/submit')
   @RequireRoles(...ADMIN_ROLES)
+  @RequireEntitlement('payroll')
   submitRunForApproval(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') runId: string,
@@ -81,6 +85,7 @@ export class PayrollController {
 
   @Post('runs/:id/funding-check')
   @RequireRoles(...ADMIN_ROLES)
+  @RequireEntitlement('payroll')
   fundingCheck(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') runId: string,
@@ -92,6 +97,7 @@ export class PayrollController {
   @Post('runs/:id/execute')
   @RequireRoles(...ADMIN_ROLES)
   @Idempotent({ required: true })
+  @RequireEntitlement('disbursement')
   executePayment(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') runId: string,
@@ -101,6 +107,7 @@ export class PayrollController {
 
   @Post('runs/:id/reconcile')
   @RequireRoles(...ADMIN_ROLES)
+  @RequireEntitlement('payroll')
   reconcileRun(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') runId: string,

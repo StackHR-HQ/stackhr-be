@@ -16,10 +16,14 @@ import {
   getOrgPrefix,
   computeNextEmployeeNumber,
 } from '../common/utils/employee-number.util';
+import { EntitlementsService } from '../billing/entitlements.service';
 
 @Injectable()
 export class EmployeesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly entitlements: EntitlementsService,
+  ) {}
 
   private checkOrgContext(user: AuthenticatedUser): string {
     if (!user.organizationId) {
@@ -60,6 +64,7 @@ export class EmployeesService {
 
   async createEmployee(user: AuthenticatedUser, dto: CreateEmployeeDto) {
     const orgId = this.checkOrgContext(user);
+    await this.entitlements.assertCanAddEmployees(orgId, 1);
 
     const existing = await this.prisma.employee.findFirst({
       where: { email: dto.email },

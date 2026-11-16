@@ -21,6 +21,7 @@ import { SpendService } from './spend.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateSalaryAdvanceDto } from './dto/create-salary-advance.dto';
 import { AttachReceiptDto } from './dto/attach-receipt.dto';
+import { RequireEntitlement } from '../billing/require-entitlement.decorator';
 
 const ADMIN_ROLES = [
   USER_ROLES.BUSINESS_OWNER,
@@ -93,6 +94,7 @@ export class SpendController {
 
   @Post('advances/:id/disburse')
   @RequireRoles(...ADMIN_ROLES)
+  @RequireEntitlement('disbursement')
   disburseSalaryAdvance(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
