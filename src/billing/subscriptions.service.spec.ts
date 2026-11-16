@@ -76,6 +76,38 @@ describe('SubscriptionsService', () => {
       );
     });
 
+    it('creates no invoice when Bachs rejects the customer (e.g. missing API scope)', async () => {
+      bachs.createCustomer.mockRejectedValue(
+        new Error('missing scope customers:write'),
+      );
+
+      await expect(
+        service.subscribe('org-1', {
+          planCode: 'STARTER',
+          billingCycle: 'MONTHLY',
+        }),
+      ).rejects.toThrow('missing scope');
+      expect(prisma.billingInvoice.create).not.toHaveBeenCalled();
+    });
+
+    it('voids the invoice when the checkout cannot be created, leaving nothing payable', async () => {
+      bachs.createCheckoutSession.mockRejectedValue(new Error('provider down'));
+
+      await expect(
+        service.subscribe('org-1', {
+          planCode: 'STARTER',
+          billingCycle: 'MONTHLY',
+        }),
+      ).rejects.toThrow('provider down');
+      expect(prisma.billingInvoice.update).toHaveBeenCalledWith({
+        where: { id: 'inv-1' },
+        data: {
+          status: 'VOID',
+          lastFailureReason: 'Checkout creation failed: provider down',
+        },
+      });
+    });
+
     it('refuses Enterprise self-serve (contact sales)', async () => {
       await expect(
         service.subscribe('org-1', {

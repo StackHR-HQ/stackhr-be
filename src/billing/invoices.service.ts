@@ -88,6 +88,9 @@ export class InvoicesService {
   }
 
   async issueWithCheckout(params: IssueInvoiceParams) {
+    // Resolve the Bachs customer first so a provider/config failure leaves no invoice behind.
+    await this.ensureCustomer(params.subscription);
+
     const now = new Date();
     const invoice = await this.prisma.billingInvoice.create({
       data: {
@@ -111,7 +114,24 @@ export class InvoicesService {
       },
     });
 
-    const checkout = await this.attachCheckout(invoice, params.subscription);
+    let checkout: Awaited<ReturnType<InvoicesService['attachCheckout']>>;
+    try {
+      checkout = await this.attachCheckout(invoice, params.subscription);
+    } catch (error: any) {
+      // Nothing payable exists for this invoice; void it so it never surfaces as owed.
+      await this.prisma.billingInvoice.update({
+        where: { id: invoice.id },
+        data: {
+          status: 'VOID',
+          lastFailureReason:
+            `Checkout creation failed: ${String(error?.message ?? error)}`.slice(
+              0,
+              500,
+            ),
+        },
+      });
+      throw error;
+    }
     return {
       invoice: { ...invoice, ...checkout.fields },
       checkoutUrl: checkout.url,
