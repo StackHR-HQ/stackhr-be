@@ -171,8 +171,11 @@ export class InvoicesService {
     subscription: IssueInvoiceParams['subscription'],
   ) {
     const customerId = await this.ensureCustomer(subscription);
+    // Same convention as email links: the app URL, or the first CORS origin.
     const appUrl = (
-      process.env.FRONTEND_URL ?? 'http://localhost:3000'
+      process.env.STACKHR_APP_URL ||
+      process.env.FRONTEND_URL?.split(',')[0]?.trim() ||
+      'https://app.stackhr.app'
     ).replace(/\/+$/, '');
 
     const checkout = await this.bachs.createCheckoutSession({
