@@ -17,6 +17,7 @@ import {
   computeNextEmployeeNumber,
 } from '../common/utils/employee-number.util';
 import { EntitlementsService } from '../billing/entitlements.service';
+import { SEAT_HOLDING_STATUSES } from '../billing/billing-catalog';
 
 @Injectable()
 export class EmployeesService {
@@ -338,6 +339,14 @@ export class EmployeesService {
           `Employee number "${dto.employeeNumber}" is already in use in this organization`,
         );
       }
+    }
+
+    if (
+      dto.status &&
+      SEAT_HOLDING_STATUSES.includes(dto.status as any) &&
+      !SEAT_HOLDING_STATUSES.includes(employee.status as any)
+    ) {
+      await this.entitlements.assertCanAddEmployees(orgId, 1);
     }
 
     const updated = await this.prisma.employee.update({

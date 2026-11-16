@@ -47,4 +47,38 @@ describe('prorateUpgrade', () => {
 
     expect(result.amountKobo).toBe(0n);
   });
+
+  it('safely handles equal periodStart and periodEnd without division by zero', () => {
+    const zeroLengthPeriod = {
+      periodStart: new Date('2026-11-16T00:00:00Z'),
+      periodEnd: new Date('2026-11-16T00:00:00Z'),
+    };
+
+    const result = prorateUpgrade({
+      from: STARTER,
+      to: GROWTH,
+      cycle: 'MONTHLY',
+      activeEmployees: 15,
+      ...zeroLengthPeriod,
+      now: new Date('2026-11-16T00:00:00Z'),
+    });
+
+    expect(result.totalDays).toBe(1);
+    expect(result.remainingDays).toBe(0);
+    expect(result.amountKobo).toBe(0n);
+  });
+
+  it('safely returns 0 when upgraded past periodEnd instead of negative amount', () => {
+    const result = prorateUpgrade({
+      from: STARTER,
+      to: GROWTH,
+      cycle: 'MONTHLY',
+      activeEmployees: 15,
+      ...period,
+      now: new Date('2026-12-05T00:00:00Z'), // 4 days past periodEnd
+    });
+
+    expect(result.remainingDays).toBe(0);
+    expect(result.amountKobo).toBe(0n);
+  });
 });

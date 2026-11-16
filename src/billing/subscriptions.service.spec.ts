@@ -203,6 +203,36 @@ describe('SubscriptionsService', () => {
         service.changePlan('org-1', { planCode: 'STARTER' }),
       ).rejects.toThrow(ConflictException);
     });
+
+    it('cancels a pending downgrade when re-selecting the active plan', async () => {
+      const subWithPending = {
+        ...activeSubscription('GROWTH'),
+        pendingPlanCode: 'STARTER',
+      };
+      prisma.subscription.findUnique.mockResolvedValue(subWithPending);
+
+      const result = await service.changePlan('org-1', { planCode: 'GROWTH' });
+
+      expect(result).toEqual({
+        effective: 'IMMEDIATE',
+        planCode: 'GROWTH',
+        message: 'Pending plan change cancelled',
+      });
+      expect(prisma.subscription.update).toHaveBeenCalledWith({
+        where: { id: 'sub-1' },
+        data: { pendingPlanCode: null, pendingBillingCycle: null },
+      });
+    });
+
+    it('throws BadRequestException if selecting current plan with no pending change', async () => {
+      prisma.subscription.findUnique.mockResolvedValue(
+        activeSubscription('GROWTH'),
+      );
+
+      await expect(
+        service.changePlan('org-1', { planCode: 'GROWTH' }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('cancel', () => {

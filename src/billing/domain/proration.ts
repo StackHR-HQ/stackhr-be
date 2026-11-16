@@ -23,11 +23,15 @@ export interface UpgradeProration {
  * difference between the new and old period price for the days left.
  */
 export function prorateUpgrade(input: UpgradeProrationInput): UpgradeProration {
-  const totalDays = Math.round(
-    (input.periodEnd.getTime() - input.periodStart.getTime()) / DAY_MS,
+  const totalDays = Math.max(
+    1,
+    Math.round(
+      (input.periodEnd.getTime() - input.periodStart.getTime()) / DAY_MS,
+    ),
   );
-  const remainingDays = Math.ceil(
-    (input.periodEnd.getTime() - input.now.getTime()) / DAY_MS,
+  const remainingDays = Math.max(
+    0,
+    Math.ceil((input.periodEnd.getTime() - input.now.getTime()) / DAY_MS),
   );
 
   const oldPrice = priceForPeriod(

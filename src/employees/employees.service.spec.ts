@@ -304,6 +304,73 @@ describe('EmployeesService', () => {
         service.updateEmployee(mockUser, 'emp-1', { managerId: 'emp-1' }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('refuses to reactivate a TERMINATED employee to ACTIVE when beyond seat limit', async () => {
+      const existing = {
+        id: 'emp-1',
+        email: 'jane@acme.com',
+        status: 'TERMINATED',
+      };
+      prismaMock.employee.findFirst.mockResolvedValue(existing);
+      entitlementsMock.assertCanAddEmployees.mockRejectedValue(
+        new PlanUpgradeRequiredException('Your plan allows up to 5 employees', {
+          feature: 'employees',
+          currentPlan: 'FREE',
+          requiredPlan: 'STARTER',
+        }),
+      );
+
+      await expect(
+        service.updateEmployee(mockUser, 'emp-1', { status: 'ACTIVE' }),
+      ).rejects.toBeInstanceOf(PlanUpgradeRequiredException);
+      expect(entitlementsMock.assertCanAddEmployees).toHaveBeenCalledWith(
+        'org-123',
+        1,
+      );
+      expect(prismaMock.employee.update).not.toHaveBeenCalled();
+    });
+
+    it('successfully reactivates a TERMINATED employee to ACTIVE when under seat limit', async () => {
+      const existing = {
+        id: 'emp-1',
+        email: 'jane@acme.com',
+        status: 'TERMINATED',
+      };
+      prismaMock.employee.findFirst.mockResolvedValue(existing);
+      prismaMock.employee.update.mockResolvedValue({
+        ...existing,
+        status: 'ACTIVE',
+      });
+
+      const result = await service.updateEmployee(mockUser, 'emp-1', {
+        status: 'ACTIVE',
+      });
+
+      expect(entitlementsMock.assertCanAddEmployees).toHaveBeenCalledWith(
+        'org-123',
+        1,
+      );
+      expect(result.employee.status).toBe('ACTIVE');
+    });
+
+    it('does not check seat capacity when updating non-status fields on an ACTIVE employee', async () => {
+      const existing = {
+        id: 'emp-1',
+        email: 'jane@acme.com',
+        status: 'ACTIVE',
+      };
+      prismaMock.employee.findFirst.mockResolvedValue(existing);
+      prismaMock.employee.update.mockResolvedValue({
+        ...existing,
+        jobTitle: 'Lead Architect',
+      });
+
+      await service.updateEmployee(mockUser, 'emp-1', {
+        jobTitle: 'Lead Architect',
+      });
+
+      expect(entitlementsMock.assertCanAddEmployees).not.toHaveBeenCalled();
+    });
   });
 
   describe('reassignManager', () => {

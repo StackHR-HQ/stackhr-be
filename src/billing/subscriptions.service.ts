@@ -140,6 +140,21 @@ export class SubscriptionsService {
         : null;
 
     if (input.planCode === sub.planCode) {
+      if (sub.pendingPlanCode || (sub.pendingBillingCycle && !cycleChange)) {
+        await this.prisma.subscription.update({
+          where: { id: sub.id },
+          data: {
+            pendingPlanCode: null,
+            pendingBillingCycle: cycleChange ?? null,
+          },
+        });
+        return {
+          effective: 'IMMEDIATE' as const,
+          planCode: sub.planCode,
+          message: 'Pending plan change cancelled',
+        };
+      }
+
       if (!cycleChange) {
         throw new BadRequestException('You are already on this plan');
       }

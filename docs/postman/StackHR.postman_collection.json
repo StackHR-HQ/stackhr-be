@@ -9654,6 +9654,469 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Billing & Subscriptions",
+      "description": "Self-serve ₦ subscription management, Bachs checkout integration, invoice payments, and plan entitlement enforcement (HTTP 402).",
+      "item": [
+        {
+          "name": "Get Billing Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/api/billing/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "api",
+                "billing",
+                "status"
+              ]
+            },
+            "description": "Returns the organization active plan, seat usage, entitlements, next billing date, and open invoice if any."
+          },
+          "response": [
+            {
+              "name": "200 OK (Active Paid Plan)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"status\": \"ACTIVE\",\n    \"planCode\": \"GROWTH\",\n    \"planName\": \"Growth\",\n    \"billingCycle\": \"MONTHLY\",\n    \"activeEmployeeCount\": 22,\n    \"seatsUsed\": 24,\n    \"includedEmployees\": 30,\n    \"overageCap\": 20,\n    \"seatLimit\": 50,\n    \"nextBillingDate\": \"2026-12-01T00:00:00.000Z\",\n    \"cancelAtPeriodEnd\": false,\n    \"pendingPlanCode\": null,\n    \"pendingBillingCycle\": null,\n    \"graceEndsAt\": null,\n    \"entitlements\": {\n      \"payroll\": true,\n      \"payslips\": true,\n      \"disbursement\": true,\n      \"pensionRemittance\": true,\n      \"payeRemittance\": true,\n      \"leaveManagement\": \"full\",\n      \"selfService\": \"full\",\n      \"expenseApprovals\": \"full\",\n      \"hrReporting\": \"standard\",\n      \"onboardingSupport\": \"standard\"\n    },\n    \"openInvoice\": null\n  }\n}"
+            },
+            {
+              "name": "401 Unauthorized",
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Authentication required\",\n  \"error\": {\n    \"statusCode\": 401,\n    \"error\": \"Unauthorized\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Billing Plans",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/api/billing/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "api",
+                "billing",
+                "plans"
+              ]
+            },
+            "description": "Lists all available subscription tiers with commercial terms in NGN."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"currency\": \"NGN\",\n    \"plans\": [\n      {\n        \"code\": \"FREE\",\n        \"name\": \"Free\",\n        \"includedEmployees\": 5,\n        \"maxEmployees\": 5,\n        \"monthlyPrice\": \"0.00\",\n        \"annualPrice\": \"0.00\",\n        \"overageRatePerEmployee\": \"0.00\",\n        \"selfServe\": true,\n        \"contactSales\": false,\n        \"entitlements\": {\n          \"payroll\": false,\n          \"payslips\": false,\n          \"disbursement\": false\n        }\n      },\n      {\n        \"code\": \"STARTER\",\n        \"name\": \"Starter\",\n        \"includedEmployees\": 15,\n        \"maxEmployees\": 30,\n        \"monthlyPrice\": \"10000.00\",\n        \"annualPrice\": \"108000.00\",\n        \"overageRatePerEmployee\": \"500.00\",\n        \"selfServe\": true,\n        \"contactSales\": false,\n        \"entitlements\": {\n          \"payroll\": true,\n          \"payslips\": true,\n          \"disbursement\": true\n        }\n      },\n      {\n        \"code\": \"ENTERPRISE\",\n        \"name\": \"Enterprise\",\n        \"selfServe\": false,\n        \"contactSales\": true,\n        \"entitlements\": {\n          \"payroll\": true,\n          \"payslips\": true,\n          \"disbursement\": true\n        }\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Subscribe (Free to Paid)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "sub-req-001"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planCode\": \"STARTER\",\n  \"billingCycle\": \"MONTHLY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/api/billing/subscribe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "api",
+                "billing",
+                "subscribe"
+              ]
+            },
+            "description": "Issues an INITIAL invoice and returns a hosted Bachs checkout session URL (supports card and bank transfer)."
+          },
+          "response": [
+            {
+              "name": "201 Created (Bachs Checkout Ready)",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"invoiceId\": \"inv_123\",\n    \"invoiceNumber\": \"INV-20261116-A1B2C3\",\n    \"totalKobo\": 1000000,\n    \"totalNaira\": \"10000.00\",\n    \"checkoutUrl\": \"https://checkout.bachs.io/chk_live_abc123\"\n  }\n}"
+            },
+            {
+              "name": "409 Conflict (Already on paid plan)",
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Already on a paid plan; use change-plan instead\",\n  \"error\": {\n    \"statusCode\": 409,\n    \"error\": \"Conflict\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Change Plan (Upgrade / Downgrade / Cancel Pending)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planCode\": \"GROWTH\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/api/billing/change-plan",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "api",
+                "billing",
+                "change-plan"
+              ]
+            },
+            "description": "Upgrades with day-based prorated invoice, schedules downgrade for period end, or cancels pending plan changes."
+          },
+          "response": [
+            {
+              "name": "200 OK (Upgrade Prorated Checkout)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"effective\": \"ON_PAYMENT\",\n    \"planCode\": \"GROWTH\",\n    \"invoiceId\": \"inv_456\",\n    \"invoiceNumber\": \"INV-20261116-D4E5F6\",\n    \"totalKobo\": 500000,\n    \"totalNaira\": \"5000.00\",\n    \"checkoutUrl\": \"https://checkout.bachs.io/chk_upgrade_proration\"\n  }\n}"
+            },
+            {
+              "name": "200 OK (Downgrade Scheduled at Renewal)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"effective\": \"AT_RENEWAL\",\n    \"planCode\": \"STARTER\",\n    \"billingCycle\": \"MONTHLY\",\n    \"effectiveAt\": \"2026-12-01T00:00:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "200 OK (Cancel Pending Downgrade)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"effective\": \"IMMEDIATE\",\n    \"planCode\": \"GROWTH\",\n    \"message\": \"Pending plan change cancelled\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Cancel Subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/api/billing/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "api",
+                "billing",
+                "cancel"
+              ]
+            },
+            "description": "Marks active subscription to cancel at the end of the paid billing period, returning to Free."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"cancelAtPeriodEnd\": true,\n    \"effectiveAt\": \"2026-12-01T00:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Organization Invoices",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/api/billing/invoices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "api",
+                "billing",
+                "invoices"
+              ]
+            },
+            "description": "Lists all historical and open invoices for the active organization."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": [\n    {\n      \"id\": \"inv_123\",\n      \"number\": \"INV-20261116-A1B2C3\",\n      \"kind\": \"INITIAL\",\n      \"status\": \"PAID\",\n      \"totalKobo\": 1000000,\n      \"dueAt\": \"2026-11-16T12:00:00.000Z\",\n      \"paidAt\": \"2026-11-16T12:05:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Pay Open Invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/api/billing/invoices/:id/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "api",
+                "billing",
+                "invoices",
+                ":id",
+                "pay"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d"
+                }
+              ]
+            },
+            "description": "Returns an active checkout session link to pay an outstanding invoice."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"invoiceId\": \"a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d\",\n    \"checkoutUrl\": \"https://checkout.bachs.io/chk_pay_open\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Bachs Payment Webhook (collection.succeeded)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Bachs-Signature-V2",
+                "value": "t=1763294400,v1=a1b2c3d4e5f67a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"evt_bachs_001\",\n  \"type\": \"collection.succeeded\",\n  \"data\": {\n    \"checkout_id\": \"chk_live_abc123\",\n    \"payment_id\": \"pay_98765\",\n    \"reference\": \"inv_123.km5q2z\",\n    \"amount_paid\": \"10000.00\",\n    \"currency\": \"NGN\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/api/billing/webhooks/bachs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "api",
+                "billing",
+                "webhooks",
+                "bachs"
+              ]
+            },
+            "description": "Ingests signed Bachs payment events, marks invoices PAID, and activates subscription terms."
+          },
+          "response": [
+            {
+              "name": "200 OK (Event Processed)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"received\": true,\n    \"duplicate\": false\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Example: 402 Plan Upgrade Required Error",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"November 2026 Payroll\",\n  \"payPeriodStart\": \"2026-11-01\",\n  \"payPeriodEnd\": \"2026-11-30\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/api/payroll/runs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "api",
+                "payroll",
+                "runs"
+              ]
+            },
+            "description": "Example response when calling a gated feature on a plan that does not include it."
+          },
+          "response": [
+            {
+              "name": "402 Payment Required",
+              "status": "Payment Required",
+              "code": 402,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Payroll is not included in your current plan. Upgrade to continue.\",\n  \"error\": {\n    \"error\": \"Payment Required\",\n    \"statusCode\": 402,\n    \"code\": \"PLAN_UPGRADE_REQUIRED\",\n    \"details\": {\n      \"feature\": \"payroll\",\n      \"currentPlan\": \"FREE\",\n      \"requiredPlan\": \"STARTER\"\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
