@@ -104,7 +104,10 @@ export class BillingSchedulerService
     for (const invoice of overdueInvoices) {
       const sub = invoice.subscription;
       const next = transition(
-        { status: sub.status as SubscriptionStatus, graceEndsAt: sub.graceEndsAt },
+        {
+          status: sub.status as SubscriptionStatus,
+          graceEndsAt: sub.graceEndsAt,
+        },
         { type: 'INVOICE_OVERDUE', dueAt: invoice.dueAt },
       );
 
@@ -149,7 +152,10 @@ export class BillingSchedulerService
 
     for (const sub of expiredGraceSubs) {
       const next = transition(
-        { status: sub.status as SubscriptionStatus, graceEndsAt: sub.graceEndsAt },
+        {
+          status: sub.status as SubscriptionStatus,
+          graceEndsAt: sub.graceEndsAt,
+        },
         { type: 'GRACE_CHECK', now },
       );
 
@@ -189,10 +195,7 @@ export class BillingSchedulerService
       where: {
         status: { in: ['ACTIVE', 'PAST_DUE', 'RESTRICTED'] },
         currentPeriodEnd: { lte: now },
-        OR: [
-          { cancelAtPeriodEnd: true },
-          { pendingPlanCode: { not: null } },
-        ],
+        OR: [{ cancelAtPeriodEnd: true }, { pendingPlanCode: { not: null } }],
       },
     });
 
@@ -243,7 +246,8 @@ export class BillingSchedulerService
         });
 
         if (targetPlan) {
-          const cycle = (sub.pendingBillingCycle ?? sub.billingCycle) as BillingCycle;
+          const cycle = (sub.pendingBillingCycle ??
+            sub.billingCycle) as BillingCycle;
           const terms = termsFromPlan(targetPlan, cycle);
           const newPeriodEnd = addCycle(now, cycle);
 

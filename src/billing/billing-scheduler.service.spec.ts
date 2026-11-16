@@ -41,31 +41,33 @@ describe('BillingSchedulerService', () => {
         update: jest.fn().mockResolvedValue({}),
       },
       billingPlan: {
-        findUnique: jest.fn().mockImplementation(({ where }: { where: { code: string } }) => {
-          if (where.code === 'FREE') {
-            return Promise.resolve({
-              code: 'FREE',
-              name: 'Free',
-              includedEmployees: 5,
-              monthlyFeeKobo: 0n,
-              annualFeeKobo: 0n,
-              overageRateKobo: 0n,
-              maxOverageEmployees: 0,
-            });
-          }
-          if (where.code === 'STARTER') {
-            return Promise.resolve({
-              code: 'STARTER',
-              name: 'Starter',
-              includedEmployees: 15,
-              monthlyFeeKobo: 1_000_000n,
-              annualFeeKobo: 10_800_000n,
-              overageRateKobo: 50_000n,
-              maxOverageEmployees: 15,
-            });
-          }
-          return Promise.resolve(null);
-        }),
+        findUnique: jest
+          .fn()
+          .mockImplementation(({ where }: { where: { code: string } }) => {
+            if (where.code === 'FREE') {
+              return Promise.resolve({
+                code: 'FREE',
+                name: 'Free',
+                includedEmployees: 5,
+                monthlyFeeKobo: 0n,
+                annualFeeKobo: 0n,
+                overageRateKobo: 0n,
+                maxOverageEmployees: 0,
+              });
+            }
+            if (where.code === 'STARTER') {
+              return Promise.resolve({
+                code: 'STARTER',
+                name: 'Starter',
+                includedEmployees: 15,
+                monthlyFeeKobo: 1_000_000n,
+                annualFeeKobo: 10_800_000n,
+                overageRateKobo: 50_000n,
+                maxOverageEmployees: 15,
+              });
+            }
+            return Promise.resolve(null);
+          }),
       },
       employee: {
         count: jest.fn().mockResolvedValue(10),
@@ -115,7 +117,9 @@ describe('BillingSchedulerService', () => {
         where: { id: 'sub-1' },
         data: {
           status: 'PAST_DUE',
-          graceEndsAt: new Date(overdueDueAt.getTime() + 7 * 24 * 60 * 60 * 1000),
+          graceEndsAt: new Date(
+            overdueDueAt.getTime() + 7 * 24 * 60 * 60 * 1000,
+          ),
         },
       });
       expect(prisma.auditEvent.create).toHaveBeenCalledWith({

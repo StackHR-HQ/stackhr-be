@@ -343,8 +343,8 @@ export class EmployeesService {
 
     if (
       dto.status &&
-      SEAT_HOLDING_STATUSES.includes(dto.status as any) &&
-      !SEAT_HOLDING_STATUSES.includes(employee.status as any)
+      SEAT_HOLDING_STATUSES.includes(dto.status) &&
+      !SEAT_HOLDING_STATUSES.includes(employee.status)
     ) {
       await this.entitlements.assertCanAddEmployees(orgId, 1);
     }
