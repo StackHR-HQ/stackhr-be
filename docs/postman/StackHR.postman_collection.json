@@ -3348,7 +3348,7 @@
                 "compensation"
               ]
             },
-            "description": "Set/update versioned effective-dated compensation record for an employee. Automatically closes previous active record and writes a CompensationHistory entry."
+            "description": "Set or update an employee compensation record. All monetary amounts (basicSalary, housingAllowance, transportAllowance, otherAllowances) MUST be sent in KOBO (e.g. ₦300,000 = 30000000). Accessible by BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
           },
           "response": [
             {
@@ -3386,7 +3386,7 @@
                 "compensation"
               ]
             },
-            "description": "Returns all employees active compensation breakdown in the organization."
+            "description": "List all employee compensation records. All returned salary and allowance amounts (basicSalary, housingAllowance, transportAllowance, otherAllowances, grossMonthlySalary, annualSalaryMinor) are in KOBO."
           },
           "response": [
             {
