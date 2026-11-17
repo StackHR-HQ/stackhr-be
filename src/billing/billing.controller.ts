@@ -7,8 +7,10 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { CurrentUser, RequireRoles } from '../auth/auth.decorators';
@@ -70,10 +72,37 @@ export class BillingController {
     return this.subscriptions.cancel(this.orgId(user));
   }
 
+  @Post('resume')
+  @HttpCode(HttpStatus.OK)
+  @RequireRoles(...BILLING_ADMIN_ROLES)
+  resume(@CurrentUser() user: AuthenticatedUser) {
+    return this.subscriptions.resume(this.orgId(user));
+  }
+
   @Get('invoices')
   @RequireRoles(...BILLING_ADMIN_ROLES)
   listInvoices(@CurrentUser() user: AuthenticatedUser) {
     return this.invoices.listForOrg(this.orgId(user));
+  }
+
+  @Get('invoices/:id/pdf')
+  @RequireRoles(...BILLING_ADMIN_ROLES)
+  async downloadInvoicePdf(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() res: Response,
+  ) {
+    const { filename, buffer } = await this.invoices.generatePdf(
+      this.orgId(user),
+      id,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(filename)}"`,
+    );
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   }
 
   @Post('invoices/:id/pay')

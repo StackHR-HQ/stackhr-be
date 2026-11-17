@@ -140,18 +140,26 @@ export class SubscriptionsService {
         : null;
 
     if (input.planCode === sub.planCode) {
-      if (sub.pendingPlanCode || (sub.pendingBillingCycle && !cycleChange)) {
+      if (
+        sub.pendingPlanCode ||
+        sub.cancelAtPeriodEnd ||
+        (sub.pendingBillingCycle && !cycleChange)
+      ) {
         await this.prisma.subscription.update({
           where: { id: sub.id },
           data: {
             pendingPlanCode: null,
             pendingBillingCycle: cycleChange ?? null,
+            cancelAtPeriodEnd: false,
           },
         });
         return {
           effective: 'IMMEDIATE' as const,
           planCode: sub.planCode,
-          message: 'Pending plan change cancelled',
+          cancelAtPeriodEnd: false,
+          message: sub.pendingPlanCode
+            ? 'Pending plan change cancelled'
+            : 'Subscription cancellation undone',
         };
       }
 
@@ -265,6 +273,24 @@ export class SubscriptionsService {
     });
     return {
       cancelAtPeriodEnd: true,
+      effectiveAt: sub.currentPeriodEnd?.toISOString() ?? null,
+    };
+  }
+
+  /** Undo a pending period-end cancellation and re-enable auto-renewal. */
+  async resume(organizationId: string) {
+    const sub = await this.getOrCreateForOrg(organizationId);
+    if (!sub || sub.status === 'FREE') {
+      throw new BadRequestException('There is no paid subscription to resume');
+    }
+    if (sub.cancelAtPeriodEnd) {
+      await this.prisma.subscription.update({
+        where: { id: sub.id },
+        data: { cancelAtPeriodEnd: false },
+      });
+    }
+    return {
+      cancelAtPeriodEnd: false,
       effectiveAt: sub.currentPeriodEnd?.toISOString() ?? null,
     };
   }

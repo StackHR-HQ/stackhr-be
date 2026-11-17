@@ -10167,7 +10167,7 @@
                 "change-plan"
               ]
             },
-            "description": "Upgrades with day-based prorated invoice, schedules downgrade for period end, or cancels pending plan changes."
+            "description": "Upgrade immediately (with prorated invoice), schedule a downgrade for period end, or re-select the current plan to cancel a pending plan change and/or clear cancelAtPeriodEnd. Accessible by BUSINESS_OWNER, BUSINESS_ADMIN."
           },
           "response": [
             {
@@ -10433,6 +10433,120 @@
                 }
               ],
               "body": "{\n  \"success\": false,\n  \"message\": \"Payroll is not included in your current plan. Upgrade to continue.\",\n  \"error\": {\n    \"error\": \"Payment Required\",\n    \"statusCode\": 402,\n    \"code\": \"PLAN_UPGRADE_REQUIRED\",\n    \"details\": {\n      \"feature\": \"payroll\",\n      \"currentPlan\": \"FREE\",\n      \"requiredPlan\": \"STARTER\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Resume Subscription (Undo Cancel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/billing/resume",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "billing",
+                "resume"
+              ]
+            },
+            "description": "Undo a pending period-end cancellation (sets cancelAtPeriodEnd: false) so auto-renewal stays enabled. Accessible by BUSINESS_OWNER, BUSINESS_ADMIN."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"cancelAtPeriodEnd\": false,\n    \"effectiveAt\": \"2026-12-01T00:00:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "400 Bad Request (Free Plan)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"There is no paid subscription to resume\",\n  \"error\": {\n    \"message\": \"There is no paid subscription to resume\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Download Invoice PDF",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/billing/invoices/:id/pdf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "billing",
+                "invoices",
+                ":id",
+                "pdf"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "018f3a5e-1234-7a9b-bcde-000000000002"
+                }
+              ]
+            },
+            "description": "Download a PDF invoice/receipt for an organization invoice. Streams application/pdf with Content-Disposition attachment header. Accessible by BUSINESS_OWNER, BUSINESS_ADMIN."
+          },
+          "response": [
+            {
+              "name": "200 OK (PDF Binary)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "raw",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/pdf"
+                },
+                {
+                  "key": "Content-Disposition",
+                  "value": "attachment; filename=\"INV-20261118-ABC123.pdf\""
+                }
+              ],
+              "body": "%PDF-1.3 (binary PDF stream)"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Invoice not found\",\n  \"error\": {\n    \"message\": \"Invoice not found\"\n  }\n}"
             }
           ]
         }
