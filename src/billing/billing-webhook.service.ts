@@ -84,7 +84,7 @@ export class BillingWebhookService {
 
   private findInvoice(data: Record<string, any>) {
     const byReference =
-      invoiceIdFromReference(data.reference) ??
+      invoiceIdFromReference(data.reference as string | null | undefined) ??
       data.meta?.invoiceId ??
       data.metadata?.invoiceId ??
       null;

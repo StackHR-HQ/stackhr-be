@@ -50,12 +50,13 @@ export function serializeTerms(terms: CommercialTerms) {
   };
 }
 
-export function deserializeTerms(json: any): CommercialTerms {
+export function deserializeTerms(json: unknown): CommercialTerms {
+  const raw = json as Record<string, unknown>;
   return {
-    includedEmployees: Number(json.includedEmployees),
-    baseFeeKobo: BigInt(json.baseFeeKobo),
-    overageRateKobo: BigInt(json.overageRateKobo),
-    maxOverageEmployees: Number(json.maxOverageEmployees),
+    includedEmployees: Number(raw.includedEmployees),
+    baseFeeKobo: BigInt(raw.baseFeeKobo as string | number | bigint),
+    overageRateKobo: BigInt(raw.overageRateKobo as string | number | bigint),
+    maxOverageEmployees: Number(raw.maxOverageEmployees),
   };
 }
 

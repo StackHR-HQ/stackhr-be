@@ -1,6 +1,7 @@
 import { ExecutionContext, HttpStatus } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { EntitlementGuard } from './entitlement.guard';
+import type { EntitlementsService } from './entitlements.service';
 import { RequireEntitlement } from './require-entitlement.decorator';
 import { PlanUpgradeRequiredException } from './plan-upgrade-required.exception';
 
@@ -28,7 +29,10 @@ describe('EntitlementGuard', () => {
 
   beforeEach(() => {
     entitlements = { assertFeature: jest.fn().mockResolvedValue(undefined) };
-    guard = new EntitlementGuard(new Reflector(), entitlements as any);
+    guard = new EntitlementGuard(
+      new Reflector(),
+      entitlements as unknown as EntitlementsService,
+    );
   });
 
   it('lets an entitled org through to a gated route', async () => {

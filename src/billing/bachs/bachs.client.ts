@@ -86,7 +86,7 @@ export class BachsClient {
     return {
       checkoutId: json.checkout_id,
       checkoutUrl: json.checkout_url,
-      expiresAt: new Date(json.expires_at),
+      expiresAt: new Date(json.expires_at as string | number | Date),
     };
   }
 

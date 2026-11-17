@@ -8449,7 +8449,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 1,\n    \"plans\": [],\n    \"subscriptions\": [],\n    \"invoices\": []\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 25,\n    \"totalPages\": 1,\n    \"plans\": [\n      {\n        \"code\": \"FREE\",\n        \"name\": \"Free\",\n        \"includedEmployees\": 5,\n        \"monthlyFeeMajor\": 0,\n        \"annualFeeMajor\": 0,\n        \"overageRateMajor\": 0,\n        \"maxOverageEmployees\": 0,\n        \"selfServe\": true,\n        \"isActive\": true,\n        \"entitlements\": {\n          \"payroll\": false,\n          \"payslips\": false,\n          \"disbursement\": false\n        }\n      },\n      {\n        \"code\": \"STARTER\",\n        \"name\": \"Starter\",\n        \"includedEmployees\": 15,\n        \"monthlyFeeMajor\": 10000,\n        \"annualFeeMajor\": 108000,\n        \"overageRateMajor\": 500,\n        \"maxOverageEmployees\": 15,\n        \"selfServe\": true,\n        \"isActive\": true,\n        \"entitlements\": {\n          \"payroll\": true,\n          \"payslips\": true,\n          \"disbursement\": true\n        }\n      }\n    ],\n    \"subscriptions\": [\n      {\n        \"id\": \"sub_018f3a5e-1234-7a9b-bcde-000000000001\",\n        \"organizationId\": \"org_018f3a5e-1234-7a9b-bcde-000000000001\",\n        \"organizationName\": \"Acme Technologies Ltd\",\n        \"organizationSlug\": \"acme-technologies\",\n        \"owner\": {\n          \"id\": \"usr-1\",\n          \"name\": \"Tunde Adebayo\",\n          \"email\": \"tunde@acme.com\"\n        },\n        \"planCode\": \"GROWTH\",\n        \"planName\": \"Growth\",\n        \"status\": \"ACTIVE\",\n        \"billingCycle\": \"MONTHLY\",\n        \"employeeSeats\": 22,\n        \"includedEmployees\": 30,\n        \"baseFeeMajor\": 20000,\n        \"monthlyAmountMajor\": 20000,\n        \"currency\": \"NGN\",\n        \"currentPeriodStart\": \"2026-11-01T00:00:00.000Z\",\n        \"currentPeriodEnd\": \"2026-12-01T00:00:00.000Z\",\n        \"cancelAtPeriodEnd\": false,\n        \"graceEndsAt\": null,\n        \"customTerms\": false,\n        \"createdAt\": \"2026-09-01T10:00:00.000Z\"\n      }\n    ]\n  }\n}"
             },
             {
               "name": "403 Forbidden (Non-Admin Token)",
@@ -8464,7 +8464,8 @@
               ],
               "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
             }
-          ]
+          ],
+          "description": "List all organization subscriptions, live catalog plans, active seats, and period dates with search and pagination. Accessible by STACKHR_ADMIN and STACKHR_SUPPORT."
         },
         {
           "name": "Update Business Subscription",
@@ -8494,7 +8495,12 @@
             "description": "Update a business subscription plan, billing cycle, or status.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"planId\": \"GROWTH\",\n  \"status\": \"active\",\n  \"billingCycle\": \"MONTHLY\"\n}"
+              "raw": "{\n  \"planCode\": \"ENTERPRISE\",\n  \"billingCycle\": \"ANNUAL\",\n  \"status\": \"ACTIVE\",\n  \"customTerms\": true,\n  \"includedEmployees\": 150,\n  \"baseFeeKobo\": 90000000,\n  \"overageRateKobo\": 35000,\n  \"maxOverageEmployees\": 50,\n  \"cancelAtPeriodEnd\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": [
@@ -8509,12 +8515,12 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Subscription updated successfully\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Subscription updated successfully\",\n    \"subscription\": {\n      \"id\": \"sub_018f3a5e-1234-7a9b-bcde-000000000001\",\n      \"organizationId\": \"org_018f3a5e-1234-7a9b-bcde-000000000001\",\n      \"organizationName\": \"Acme Technologies Ltd\",\n      \"planCode\": \"ENTERPRISE\",\n      \"planName\": \"Enterprise\",\n      \"status\": \"ACTIVE\",\n      \"billingCycle\": \"ANNUAL\",\n      \"includedEmployees\": 150,\n      \"baseFeeMajor\": 900000,\n      \"overageRateMajor\": 350,\n      \"maxOverageEmployees\": 50,\n      \"customTerms\": true,\n      \"cancelAtPeriodEnd\": false,\n      \"currentPeriodStart\": \"2026-11-17T00:00:00.000Z\",\n      \"currentPeriodEnd\": \"2027-11-17T00:00:00.000Z\",\n      \"graceEndsAt\": null\n    }\n  }\n}"
             },
             {
-              "name": "403 Forbidden (Non-Admin Token)",
-              "status": "Forbidden",
-              "code": 403,
+              "name": "400 Bad Request (Invalid Plan Code or Status)",
+              "status": "Bad Request",
+              "code": 400,
               "_postman_previewlanguage": "json",
               "header": [
                 {
@@ -8522,9 +8528,10 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+              "body": "{\n  \"success\": false,\n  \"message\": \"Billing plan \\\"NON_EXISTENT_PLAN\\\" not found\",\n  \"error\": {\n    \"message\": \"Billing plan \\\"NON_EXISTENT_PLAN\\\" not found\"\n  }\n}"
             }
-          ]
+          ],
+          "description": "Directly override an organization subscription plan, status (ACTIVE, PAST_DUE, RESTRICTED, FREE), billing cycle, custom enterprise terms, or extend grace period. Accessible by STACKHR_ADMIN."
         },
         {
           "name": "List KYB Verification Queue",
@@ -9650,6 +9657,319 @@
                 }
               ],
               "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Business Subscription Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/subscriptions/:organizationId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "subscriptions",
+                ":organizationId"
+              ],
+              "variable": [
+                {
+                  "key": "organizationId",
+                  "value": "org_018f3a5e-1234-7a9b-bcde-000000000001"
+                }
+              ]
+            },
+            "description": "Fetch detailed subscription status, entitlements, employee seat usage, and recent invoice history for a specific business. Accessible by STACKHR_ADMIN and STACKHR_SUPPORT."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"sub_018f3a5e-1234-7a9b-bcde-000000000001\",\n    \"organizationId\": \"org_018f3a5e-1234-7a9b-bcde-000000000001\",\n    \"organizationName\": \"Acme Technologies Ltd\",\n    \"organizationSlug\": \"acme-technologies\",\n    \"owner\": {\n      \"id\": \"usr-1\",\n      \"name\": \"Tunde Adebayo\",\n      \"email\": \"tunde@acme.com\"\n    },\n    \"planCode\": \"GROWTH\",\n    \"planName\": \"Growth\",\n    \"status\": \"ACTIVE\",\n    \"billingCycle\": \"MONTHLY\",\n    \"employeeSeats\": 24,\n    \"includedEmployees\": 30,\n    \"baseFeeMajor\": 20000,\n    \"overageRateMajor\": 500,\n    \"maxOverageEmployees\": 20,\n    \"monthlyAmountMajor\": 20000,\n    \"currency\": \"NGN\",\n    \"currentPeriodStart\": \"2026-11-01T00:00:00.000Z\",\n    \"currentPeriodEnd\": \"2026-12-01T00:00:00.000Z\",\n    \"cancelAtPeriodEnd\": false,\n    \"graceEndsAt\": null,\n    \"customTerms\": false,\n    \"entitlements\": {\n      \"payroll\": true,\n      \"payslips\": true,\n      \"disbursement\": true,\n      \"pensionRemittance\": true,\n      \"payeRemittance\": true,\n      \"leaveManagement\": \"full\"\n    },\n    \"invoices\": [\n      {\n        \"id\": \"inv_018f3a5e-1234-7a9b-bcde-000000000002\",\n        \"number\": \"INV-2026-0001\",\n        \"kind\": \"INITIAL\",\n        \"status\": \"PAID\",\n        \"totalKobo\": 2000000,\n        \"totalMajor\": 20000,\n        \"dueAt\": \"2026-11-01T00:00:00.000Z\",\n        \"paidAt\": \"2026-11-01T00:05:00.000Z\",\n        \"periodStart\": \"2026-11-01T00:00:00.000Z\",\n        \"periodEnd\": \"2026-12-01T00:00:00.000Z\",\n        \"createdAt\": \"2026-11-01T00:00:00.000Z\"\n      }\n    ],\n    \"createdAt\": \"2026-09-01T10:00:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Business \\\"non-existent-org\\\" was not found\",\n  \"error\": {\n    \"message\": \"Business \\\"non-existent-org\\\" was not found\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Platform Invoices",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/invoices?status=OPEN&page=1&limit=25",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "invoices"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "OPEN",
+                  "description": "Filter by OPEN, PAID, VOID, or UNCOLLECTIBLE"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "25"
+                }
+              ]
+            },
+            "description": "List platform-wide billing invoices across all businesses, filterable by status or organization. Accessible by STACKHR_ADMIN and STACKHR_SUPPORT."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 25,\n    \"totalPages\": 1,\n    \"invoices\": [\n      {\n        \"id\": \"inv_018f3a5e-1234-7a9b-bcde-000000000002\",\n        \"number\": \"INV-2026-0045\",\n        \"organizationId\": \"org_018f3a5e-1234-7a9b-bcde-000000000001\",\n        \"organizationName\": \"Acme Technologies Ltd\",\n        \"organizationSlug\": \"acme-technologies\",\n        \"kind\": \"RENEWAL\",\n        \"status\": \"OPEN\",\n        \"subtotalKobo\": 2000000,\n        \"totalKobo\": 2000000,\n        \"totalMajor\": 20000,\n        \"dueAt\": \"2026-12-01T00:00:00.000Z\",\n        \"paidAt\": null,\n        \"periodStart\": \"2026-12-01T00:00:00.000Z\",\n        \"periodEnd\": \"2027-01-01T00:00:00.000Z\",\n        \"lines\": [\n          {\n            \"description\": \"Growth Plan (Monthly)\",\n            \"amountKobo\": 2000000\n          }\n        ],\n        \"bachsCheckoutUrl\": \"https://checkout.bachs.com/session-001\",\n        \"createdAt\": \"2026-11-24T00:00:00.000Z\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Platform Invoice Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/invoices/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "invoices",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "inv_018f3a5e-1234-7a9b-bcde-000000000002"
+                }
+              ]
+            },
+            "description": "Get individual invoice details with line items and linked subscription terms. Accessible by STACKHR_ADMIN and STACKHR_SUPPORT."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"id\": \"inv_018f3a5e-1234-7a9b-bcde-000000000002\",\n    \"number\": \"INV-2026-0045\",\n    \"organizationId\": \"org_018f3a5e-1234-7a9b-bcde-000000000001\",\n    \"organizationName\": \"Acme Technologies Ltd\",\n    \"organizationSlug\": \"acme-technologies\",\n    \"kind\": \"RENEWAL\",\n    \"status\": \"OPEN\",\n    \"subtotalKobo\": 2000000,\n    \"totalKobo\": 2000000,\n    \"totalMajor\": 20000,\n    \"dueAt\": \"2026-12-01T00:00:00.000Z\",\n    \"paidAt\": null,\n    \"periodStart\": \"2026-12-01T00:00:00.000Z\",\n    \"periodEnd\": \"2027-01-01T00:00:00.000Z\",\n    \"lines\": [\n      {\n        \"description\": \"Growth Plan (Monthly)\",\n        \"amountKobo\": 2000000\n      }\n    ],\n    \"bachsCheckoutUrl\": \"https://checkout.bachs.com/session-001\",\n    \"subscription\": {\n      \"id\": \"sub_018f3a5e-1234-7a9b-bcde-000000000001\",\n      \"planCode\": \"GROWTH\",\n      \"status\": \"ACTIVE\",\n      \"billingCycle\": \"MONTHLY\"\n    },\n    \"createdAt\": \"2026-11-24T00:00:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Invoice \\\"non-existent-id\\\" not found\",\n  \"error\": {\n    \"message\": \"Invoice \\\"non-existent-id\\\" not found\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Mark Platform Invoice as Paid",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Customer transferred ₦20,000 directly via Zenith Bank wire Ref ZN-882194\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/invoices/:id/mark-paid",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "invoices",
+                ":id",
+                "mark-paid"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "inv_018f3a5e-1234-7a9b-bcde-000000000002"
+                }
+              ]
+            },
+            "description": "Manually marks an invoice as paid (e.g. for offline wire transfer, cheque, or cash payment) and automatically activates/renews the linked subscription. Accessible by STACKHR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Invoice INV-2026-0045 successfully marked as paid\",\n    \"invoice\": {\n      \"id\": \"inv_018f3a5e-1234-7a9b-bcde-000000000002\",\n      \"number\": \"INV-2026-0045\",\n      \"status\": \"PAID\",\n      \"paidAt\": \"2026-11-25T14:30:00.000Z\"\n    }\n  }\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Invoice \\\"non-existent-id\\\" not found\",\n  \"error\": {\n    \"message\": \"Invoice \\\"non-existent-id\\\" not found\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Void Platform Invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Issued in error due to plan tier correction\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/stackhr-admin/invoices/:id/void",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stackhr-admin",
+                "invoices",
+                ":id",
+                "void"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "inv_018f3a5e-1234-7a9b-bcde-000000000002"
+                }
+              ]
+            },
+            "description": "Voids an unpaid open invoice and audits the reason. Cannot void an already paid invoice. Accessible by STACKHR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Invoice INV-2026-0045 successfully voided\",\n    \"invoice\": {\n      \"id\": \"inv_018f3a5e-1234-7a9b-bcde-000000000002\",\n      \"number\": \"INV-2026-0045\",\n      \"status\": \"VOID\"\n    }\n  }\n}"
+            },
+            {
+              "name": "400 Bad Request (Cannot void paid invoice)",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Cannot void an invoice that has already been paid\",\n  \"error\": {\n    \"message\": \"Cannot void an invoice that has already been paid\"\n  }\n}"
             }
           ]
         }

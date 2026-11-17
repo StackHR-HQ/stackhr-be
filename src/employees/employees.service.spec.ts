@@ -105,7 +105,7 @@ describe('EmployeesService', () => {
           employmentType: 'FULL_TIME',
           salaryAmount: 100000,
           startDate: '2026-01-01',
-        } as any),
+        }),
       ).rejects.toBeInstanceOf(PlanUpgradeRequiredException);
       expect(entitlementsMock.assertCanAddEmployees).toHaveBeenCalledWith(
         'org-123',

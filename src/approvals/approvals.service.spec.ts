@@ -311,7 +311,7 @@ describe('ApprovalsService', () => {
       await service.decideRequest(mockAdminUser, 'appr-pay', {
         status: 'REJECTED',
         rejectionReason: 'Not this month',
-      } as any);
+      } as unknown as Parameters<ApprovalsService['decideRequest']>[2]);
 
       expect(entitlementsMock.assertFeature).not.toHaveBeenCalled();
     });
