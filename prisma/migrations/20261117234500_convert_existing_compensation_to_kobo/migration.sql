@@ -88,3 +88,16 @@ WHERE e."salaryAmount" > 0
         + COALESCE(cr."otherAllowances", 0)
       ) * 12 >= (e."annualSalaryMinor" * 50)
   );
+
+-- Convert CompensationHistory rows written in Naira (where annualSalaryMinor is
+-- ~100x smaller than the employee's kobo annualSalaryMinor).
+UPDATE "compensation_history" ch
+SET
+  "annualSalaryMinor" = ch."annualSalaryMinor" * 100,
+  "previousSalary"    = ch."previousSalary" * 100,
+  "newSalary"         = ch."newSalary" * 100
+FROM "employee" e
+WHERE ch."employeeId" = e."id"
+  AND e."annualSalaryMinor" > 0
+  AND ch."annualSalaryMinor" > 0
+  AND ch."annualSalaryMinor" <= (e."annualSalaryMinor" / 50);

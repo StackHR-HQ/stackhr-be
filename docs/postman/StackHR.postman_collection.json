@@ -391,7 +391,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"owner@company.com\",\n  \"password\": \"SecurePass123!\"\n}"
+              "raw": "{\n  \"email\": \"owner@company.com\",\n  \"password\": \"SecurePass123!\",\n  \"rememberMe\": true\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/business/login",
@@ -404,7 +404,7 @@
                 "login"
               ]
             },
-            "description": "Authenticate business user and set HttpOnly session cookie."
+            "description": "Authenticate business user and set HttpOnly session cookie. Optional rememberMe (boolean, default true): when false, issues a browser-session cookie (no Max-Age) with a 12-hour server session TTL."
           },
           "response": [
             {
@@ -580,10 +580,10 @@
                 "login"
               ]
             },
-            "description": "Authenticate a StackHR platform admin (STACKHR_ADMIN or STACKHR_SUPPORT). Sets HttpOnly session cookie (stackhr_session) AND returns the bearer token in data.token.",
+            "description": "Authenticate a StackHR platform admin (STACKHR_ADMIN or STACKHR_SUPPORT). Sets HttpOnly session cookie (stackhr_session) AND returns the bearer token in data.token. Optional rememberMe (boolean, default true): when false, issues a browser-session cookie (no Max-Age) with a 12-hour server session TTL.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"admin@stackhr.app\",\n  \"password\": \"AdminPassword123!\"\n}"
+              "raw": "{\n  \"email\": \"admin@stackhr.app\",\n  \"password\": \"AdminPassword123!\",\n  \"rememberMe\": true\n}"
             }
           },
           "response": [

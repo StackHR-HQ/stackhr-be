@@ -137,7 +137,7 @@ export class EmployeesService {
           organizationId: orgId,
           employeeId: employee.id,
           effectiveFrom: employee.startDate,
-          basicSalary: dto.salaryAmount,
+          basicSalary: dto.salaryAmount * 100,
           housingAllowance: 0,
           transportAllowance: 0,
           otherAllowances: 0,
