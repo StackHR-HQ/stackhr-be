@@ -221,6 +221,7 @@ describe('StackhrAdminService', () => {
         findUnique: jest.fn().mockResolvedValue(null),
         count: jest.fn().mockResolvedValue(0),
         update: jest.fn().mockResolvedValue({ id: 'inv-1', status: 'PAID' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
 
@@ -491,9 +492,9 @@ describe('StackhrAdminService', () => {
     });
 
     expect(result.message).toContain('successfully marked as paid');
-    expect(prismaMock.billingInvoice.update).toHaveBeenCalledWith(
+    expect(prismaMock.billingInvoice.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'inv-1' },
+        where: { id: 'inv-1', status: { not: 'PAID' } },
         data: expect.objectContaining({ status: 'PAID' }),
       }),
     );

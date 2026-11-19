@@ -1372,76 +1372,79 @@ export class StackhrAdminService {
         ? dto.cancelAtPeriodEnd
         : (org.subscription?.cancelAtPeriodEnd ?? false);
 
-    const subscription = await this.prisma.subscription.upsert({
-      where: { organizationId },
-      create: {
-        organizationId,
-        planCode: plan.code,
-        status: nextStatus,
-        billingCycle: targetCycle,
-        includedEmployees,
-        baseFeeKobo,
-        overageRateKobo,
-        maxOverageEmployees,
-        customTerms: isCustom,
-        currentPeriodStart,
-        currentPeriodEnd,
-        cancelAtPeriodEnd,
-        graceEndsAt,
-      },
-      update: {
-        planCode: plan.code,
-        status: nextStatus,
-        billingCycle: targetCycle,
-        includedEmployees,
-        baseFeeKobo,
-        overageRateKobo,
-        maxOverageEmployees,
-        customTerms: isCustom,
-        cancelAtPeriodEnd,
-        graceEndsAt,
-        ...(currentPeriodStart ? { currentPeriodStart } : {}),
-        ...(currentPeriodEnd ? { currentPeriodEnd } : {}),
-      },
-      include: { plan: true },
-    });
-
-    // Mirror to metadata for backward compatibility
-    const meta = parseOrgMetadata(org.metadata);
-    const nextMeta: OrgMetadata = {
-      ...meta,
-      subscription: {
-        planId: plan.code as any,
-        planName: plan.name,
-        status: nextStatus.toLowerCase() as any,
-        billingCycle: targetCycle,
-        pricePerEmployeeMajor: Number(overageRateKobo / 100n),
-        currentPeriodEnd:
-          subscription.currentPeriodEnd?.toISOString() ??
-          new Date().toISOString(),
-      },
-    };
-    await this.prisma.organization.update({
-      where: { id: organizationId },
-      data: { metadata: JSON.stringify(nextMeta) },
-    });
-
-    await this.prisma.auditEvent.create({
-      data: {
-        organizationId,
-        actorUserId: actor.id,
-        action: 'subscription.admin_updated',
-        targetType: 'organization',
-        targetId: organizationId,
-        description: `Subscription updated to ${plan.name} (${nextStatus}) by admin`,
-        changes: {
+    const subscription = await this.prisma.$transaction(async (tx) => {
+      const sub = await tx.subscription.upsert({
+        where: { organizationId },
+        create: {
+          organizationId,
           planCode: plan.code,
           status: nextStatus,
           billingCycle: targetCycle,
+          includedEmployees,
+          baseFeeKobo,
+          overageRateKobo,
+          maxOverageEmployees,
+          customTerms: isCustom,
+          currentPeriodStart,
+          currentPeriodEnd,
+          cancelAtPeriodEnd,
+          graceEndsAt,
+        },
+        update: {
+          planCode: plan.code,
+          status: nextStatus,
+          billingCycle: targetCycle,
+          includedEmployees,
+          baseFeeKobo,
+          overageRateKobo,
+          maxOverageEmployees,
           customTerms: isCustom,
           cancelAtPeriodEnd,
+          graceEndsAt,
+          ...(currentPeriodStart ? { currentPeriodStart } : {}),
+          ...(currentPeriodEnd ? { currentPeriodEnd } : {}),
         },
-      },
+        include: { plan: true },
+      });
+
+      // Mirror to metadata for backward compatibility
+      const meta = parseOrgMetadata(org.metadata);
+      const nextMeta: OrgMetadata = {
+        ...meta,
+        subscription: {
+          planId: plan.code as any,
+          planName: plan.name,
+          status: nextStatus.toLowerCase() as any,
+          billingCycle: targetCycle,
+          pricePerEmployeeMajor: Number(overageRateKobo / 100n),
+          currentPeriodEnd:
+            sub.currentPeriodEnd?.toISOString() ?? new Date().toISOString(),
+        },
+      };
+      await tx.organization.update({
+        where: { id: organizationId },
+        data: { metadata: JSON.stringify(nextMeta) },
+      });
+
+      await tx.auditEvent.create({
+        data: {
+          organizationId,
+          actorUserId: actor.id,
+          action: 'subscription.admin_updated',
+          targetType: 'organization',
+          targetId: organizationId,
+          description: `Subscription updated to ${plan.name} (${nextStatus}) by admin`,
+          changes: {
+            planCode: plan.code,
+            status: nextStatus,
+            billingCycle: targetCycle,
+            customTerms: isCustom,
+            cancelAtPeriodEnd,
+          },
+        },
+      });
+
+      return sub;
     });
 
     return {
@@ -1606,14 +1609,17 @@ export class StackhrAdminService {
     }
 
     const paidAt = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.billingInvoice.update({
-        where: { id: invoiceId },
+    const alreadyPaid = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.billingInvoice.updateMany({
+        where: { id: invoiceId, status: { not: 'PAID' } },
         data: {
           status: 'PAID',
           paidAt,
         },
       });
+      if (updated.count === 0) {
+        return true;
+      }
 
       const targetCycle =
         (invoice.targetBillingCycle as 'MONTHLY' | 'ANNUAL') ??
@@ -1671,7 +1677,21 @@ export class StackhrAdminService {
           },
         },
       });
+
+      return false;
     });
+
+    if (alreadyPaid) {
+      return {
+        message: 'Invoice is already marked as paid',
+        invoice: {
+          id: invoice.id,
+          number: invoice.number,
+          status: 'PAID',
+          paidAt: invoice.paidAt,
+        },
+      };
+    }
 
     return {
       message: `Invoice ${invoice.number} successfully marked as paid`,

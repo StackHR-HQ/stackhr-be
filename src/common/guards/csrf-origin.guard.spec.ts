@@ -78,6 +78,26 @@ describe('CsrfOriginGuard', () => {
     ).toThrow(ForbiddenException);
   });
 
+  it('allows mutating requests carrying an Authorization: Bearer header without Origin', () => {
+    expect(
+      guard.canActivate(
+        mockContext('POST', '/v1/api/billing/cancel', {
+          authorization: 'Bearer tok_test_123',
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects cookie-only mutating requests when both Origin and Referer are missing', () => {
+    expect(() =>
+      guard.canActivate(
+        mockContext('POST', '/v1/api/billing/cancel', {
+          cookie: 'stackhr_session=tok_123',
+        }),
+      ),
+    ).toThrow(ForbiddenException);
+  });
+
   it('excludes signature-verified Anchor and Bachs webhooks', () => {
     expect(guard.canActivate(mockContext('POST', '/banking/webhook'))).toBe(
       true,

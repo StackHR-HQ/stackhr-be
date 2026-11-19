@@ -40,6 +40,16 @@ export class CsrfOriginGuard implements CanActivate {
       return true;
     }
 
+    // Bearer-token requests are not automatically attached by browsers and
+    // aren't exposed to CSRF (Postman, mobile, server-to-server).
+    const authHeader = req.headers.authorization;
+    if (
+      typeof authHeader === 'string' &&
+      authHeader.trimStart().toLowerCase().startsWith('bearer ')
+    ) {
+      return true;
+    }
+
     const originHeader = req.headers.origin;
     const refererHeader = req.headers.referer;
 
