@@ -21,6 +21,7 @@ import { EmailService } from '../notifications/email.service';
 import {
   SESSION_COOKIE_NAME,
   SESSION_DURATION_MS,
+  SHORT_SESSION_DURATION_MS,
   USER_ROLES,
   USER_TYPES,
   type UserRole,
@@ -47,11 +48,13 @@ interface LoginInput {
   email: string;
   password: string;
   orgSlug?: string;
+  rememberMe?: boolean;
 }
 
 interface SessionOptions {
   ipAddress?: string;
   userAgent?: string;
+  rememberMe?: boolean;
 }
 
 interface UserRecord {
@@ -705,23 +708,26 @@ export class AuthService implements OnModuleInit {
     return { sameSite, secure };
   }
 
-  private buildCookie(value: string, maxAgeSeconds: number): string {
+  private buildCookie(value: string, maxAgeSeconds?: number): string {
     const { sameSite, secure } = this.cookieOptions();
     const parts = [
       `${SESSION_COOKIE_NAME}=${value}`,
       'HttpOnly',
       'Path=/v1/api',
-      `Max-Age=${maxAgeSeconds}`,
+      ...(maxAgeSeconds !== undefined ? [`Max-Age=${maxAgeSeconds}`] : []),
       `SameSite=${sameSite}`,
     ];
     if (secure) parts.push('Secure');
     return parts.join('; ');
   }
 
-  setSessionCookie(response: Response, token: string): void {
+  setSessionCookie(response: Response, token: string, rememberMe = true): void {
     response.append(
       'Set-Cookie',
-      this.buildCookie(token, Math.floor(SESSION_DURATION_MS / 1000)),
+      this.buildCookie(
+        token,
+        rememberMe ? Math.floor(SESSION_DURATION_MS / 1000) : undefined,
+      ),
     );
   }
 
@@ -852,7 +858,7 @@ export class AuthService implements OnModuleInit {
     );
     const token = await this.createSession(
       user.id,
-      options,
+      { ...options, rememberMe: input.rememberMe },
       authenticatedUser.organizationId,
     );
     return { user: authenticatedUser, token };
@@ -864,6 +870,10 @@ export class AuthService implements OnModuleInit {
     organizationId: string | null = null,
   ): Promise<string> {
     const token = randomBytes(32).toString('base64url');
+    const durationMs =
+      (options?.rememberMe ?? true)
+        ? SESSION_DURATION_MS
+        : SHORT_SESSION_DURATION_MS;
 
     await this.prisma.session.create({
       data: {
@@ -871,7 +881,7 @@ export class AuthService implements OnModuleInit {
         token: this.hashToken(token),
         userId,
         activeOrganizationId: organizationId,
-        expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
+        expiresAt: new Date(Date.now() + durationMs),
         ipAddress: options?.ipAddress,
         userAgent: options?.userAgent,
       },

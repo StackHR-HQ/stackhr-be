@@ -309,7 +309,7 @@ export class PeopleEmployeesService {
             organizationId,
             employeeId: employee.id,
             effectiveFrom: employee.startDate,
-            basicSalary: Math.trunc(Number(employee.annualSalaryMinor) / 1200),
+            basicSalary: Math.trunc(Number(employee.annualSalaryMinor) / 12),
             housingAllowance: 0,
             transportAllowance: 0,
             otherAllowances: 0,
@@ -628,7 +628,7 @@ export class PeopleEmployeesService {
         });
 
         const basicSalary = Math.trunc(
-          Number(input.compensation.annualSalaryMinor) / 1200,
+          Number(input.compensation.annualSalaryMinor) / 12,
         );
         const existingComp = await client.compensationRecord.findFirst({
           where: { employeeId, organizationId, effectiveTo: null },

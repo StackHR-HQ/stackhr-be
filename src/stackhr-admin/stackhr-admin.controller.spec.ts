@@ -3,6 +3,7 @@ import { StackhrAdminController } from './stackhr-admin.controller';
 import { StackhrAdminService } from './stackhr-admin.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import { OutboxService } from '../common/outbox/outbox.service';
 
 describe('StackhrAdminController', () => {
@@ -94,6 +95,91 @@ describe('StackhrAdminController', () => {
     });
     await expect(controller.getSystemHealth()).resolves.toEqual({
       status: 'healthy',
+    });
+  });
+
+  it('delegates subscription and invoice management to StackhrAdminService', async () => {
+    (mockAdminService as any).listSubscriptions = jest
+      .fn()
+      .mockResolvedValue({ total: 1, subscriptions: [] });
+    (mockAdminService as any).getSubscriptionPlans = jest
+      .fn()
+      .mockResolvedValue({ plans: [] });
+    (mockAdminService as any).getSubscriptionByOrgId = jest
+      .fn()
+      .mockResolvedValue({ id: 'sub-1', planCode: 'STARTER' });
+    (mockAdminService as any).updateSubscription = jest
+      .fn()
+      .mockResolvedValue({ message: 'ok' });
+    (mockAdminService as any).listInvoices = jest
+      .fn()
+      .mockResolvedValue({ total: 0, invoices: [] });
+    (mockAdminService as any).getInvoiceById = jest
+      .fn()
+      .mockResolvedValue({ id: 'inv-1', status: 'OPEN' });
+    (mockAdminService as any).markInvoicePaid = jest
+      .fn()
+      .mockResolvedValue({ message: 'paid' });
+    (mockAdminService as any).voidInvoice = jest
+      .fn()
+      .mockResolvedValue({ message: 'voided' });
+
+    const adminUser = {
+      id: 'admin-1',
+      name: 'Admin User',
+      email: 'admin@stackhr.app',
+      role: 'STACKHR_ADMIN',
+      userType: 'STACKHR_ADMIN',
+      organizationId: null,
+      orgSlug: null,
+      orgName: null,
+    } as unknown as AuthenticatedUser;
+
+    await expect(
+      controller.listSubscriptions('ACTIVE', 'acme', '1', '10'),
+    ).resolves.toEqual({
+      total: 1,
+      subscriptions: [],
+    });
+    expect((mockAdminService as any).listSubscriptions).toHaveBeenCalledWith({
+      status: 'ACTIVE',
+      search: 'acme',
+      page: 1,
+      limit: 10,
+    });
+
+    await expect(controller.getSubscriptionPlans()).resolves.toEqual({
+      plans: [],
+    });
+    await expect(controller.getSubscriptionByOrgId('org-1')).resolves.toEqual({
+      id: 'sub-1',
+      planCode: 'STARTER',
+    });
+    await expect(
+      controller.updateSubscription(adminUser, 'org-1', {
+        planCode: 'STARTER',
+      }),
+    ).resolves.toEqual({ message: 'ok' });
+
+    await expect(
+      controller.listInvoices('org-1', 'OPEN', 'INV', '1', '10'),
+    ).resolves.toEqual({
+      total: 0,
+      invoices: [],
+    });
+    await expect(controller.getInvoiceById('inv-1')).resolves.toEqual({
+      id: 'inv-1',
+      status: 'OPEN',
+    });
+    await expect(
+      controller.markInvoicePaid(adminUser, 'inv-1', { notes: 'Paid' }),
+    ).resolves.toEqual({
+      message: 'paid',
+    });
+    await expect(
+      controller.voidInvoice(adminUser, 'inv-1', { reason: 'Void' }),
+    ).resolves.toEqual({
+      message: 'voided',
     });
   });
 });

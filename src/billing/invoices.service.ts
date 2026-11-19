@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto';
+import PDFDocument from 'pdfkit';
 import {
   BadRequestException,
   Injectable,
@@ -204,6 +205,155 @@ export class InvoicesService {
       data: fields,
     });
     return { url: checkout.checkoutUrl, fields };
+  }
+
+  async generatePdf(
+    organizationId: string,
+    invoiceId: string,
+  ): Promise<{ filename: string; buffer: Buffer }> {
+    const invoice = await this.prisma.billingInvoice.findFirst({
+      where: { id: invoiceId, organizationId },
+      include: {
+        organization: { select: { name: true, taxId: true } },
+        subscription: { select: { planCode: true, billingCycle: true } },
+      },
+    });
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    const formatNaira = (kobo: bigint | string | number): string => {
+      const amount = Number(BigInt(kobo)) / 100;
+      return `NGN ${amount.toLocaleString('en-NG', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    };
+
+    const formatDate = (date: Date): string => date.toISOString().slice(0, 10);
+
+    const lines = Array.isArray(invoice.lines)
+      ? (invoice.lines as Array<{
+          description?: string;
+          quantity?: number;
+          unitAmountKobo?: string | number | bigint;
+          amountKobo?: string | number | bigint;
+        }>)
+      : [];
+
+    const buffer = await new Promise<Buffer>((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      const chunks: Buffer[] = [];
+
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', (err: Error) => reject(err));
+
+      // Header
+      doc.fontSize(20).font('Helvetica-Bold').text('StackHR', 50, 50);
+      doc
+        .fontSize(10)
+        .font('Helvetica')
+        .fillColor('#555555')
+        .text('Subscription Billing Invoice', 50, 74);
+
+      doc
+        .fontSize(12)
+        .font('Helvetica-Bold')
+        .fillColor('#000000')
+        .text(`Invoice ${invoice.number}`, 350, 50, { align: 'right' });
+      doc
+        .fontSize(10)
+        .font('Helvetica')
+        .text(`Status: ${invoice.status}`, 350, 68, { align: 'right' })
+        .text(`Type: ${invoice.kind}`, 350, 82, { align: 'right' });
+
+      doc.moveTo(50, 105).lineTo(545, 105).strokeColor('#dddddd').stroke();
+
+      // Billed To & Period
+      doc
+        .fontSize(10)
+        .font('Helvetica-Bold')
+        .fillColor('#000000')
+        .text('Billed To', 50, 120);
+      doc.font('Helvetica').text(invoice.organization.name, 50, 136);
+      if (invoice.organization.taxId) {
+        doc.text(`TIN: ${invoice.organization.taxId}`, 50, 150);
+      }
+
+      doc.font('Helvetica-Bold').text('Invoice Details', 320, 120);
+      doc
+        .font('Helvetica')
+        .text(
+          `Period: ${formatDate(invoice.periodStart)} to ${formatDate(invoice.periodEnd)}`,
+          320,
+          136,
+        )
+        .text(`Due Date: ${formatDate(invoice.dueAt)}`, 320, 150);
+      if (invoice.paidAt) {
+        doc.text(`Paid Date: ${formatDate(invoice.paidAt)}`, 320, 164);
+      }
+
+      // Line Items Table
+      let y = 205;
+      doc.font('Helvetica-Bold').fontSize(10);
+      doc.text('Description', 50, y);
+      doc.text('Qty', 310, y, { width: 45, align: 'right' });
+      doc.text('Unit Price', 365, y, { width: 85, align: 'right' });
+      doc.text('Amount', 460, y, { width: 85, align: 'right' });
+      y += 16;
+      doc.moveTo(50, y).lineTo(545, y).strokeColor('#cccccc').stroke();
+      y += 10;
+
+      doc.font('Helvetica').fontSize(9.5);
+      for (const line of lines) {
+        const desc = line.description ?? 'Subscription charge';
+        const qty = String(line.quantity ?? 1);
+        const unit = formatNaira(line.unitAmountKobo ?? 0);
+        const amt = formatNaira(line.amountKobo ?? 0);
+
+        doc.text(desc, 50, y, { width: 250 });
+        doc.text(qty, 310, y, { width: 45, align: 'right' });
+        doc.text(unit, 365, y, { width: 85, align: 'right' });
+        doc.text(amt, 460, y, { width: 85, align: 'right' });
+        y += 22;
+      }
+
+      y += 8;
+      doc.moveTo(320, y).lineTo(545, y).strokeColor('#cccccc').stroke();
+      y += 12;
+
+      doc.font('Helvetica').fontSize(10);
+      doc.text('Subtotal', 340, y);
+      doc.text(formatNaira(invoice.subtotalKobo), 440, y, {
+        width: 105,
+        align: 'right',
+      });
+      y += 18;
+
+      doc.font('Helvetica-Bold').fontSize(11);
+      doc.text('Total', 340, y);
+      doc.text(formatNaira(invoice.totalKobo), 440, y, {
+        width: 105,
+        align: 'right',
+      });
+
+      doc
+        .fontSize(9)
+        .font('Helvetica')
+        .fillColor('#777777')
+        .text('Thank you for using StackHR.', 50, 750, {
+          align: 'center',
+          width: 495,
+        });
+
+      doc.end();
+    });
+
+    return {
+      filename: `${invoice.number}.pdf`,
+      buffer,
+    };
   }
 
   private async ensureCustomer(

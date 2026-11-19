@@ -5,6 +5,8 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AppLoggerService } from './common/logger/app-logger.service';
+import { CsrfOriginGuard } from './common/guards/csrf-origin.guard';
+import { getAllowedOrigins } from './common/security/cors-origins';
 
 if (!('toJSON' in BigInt.prototype)) {
   (BigInt.prototype as any).toJSON = function () {
@@ -12,27 +14,10 @@ if (!('toJSON' in BigInt.prototype)) {
   };
 }
 
-const DEV_ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://127.0.0.1:3000',
-  'http://127.0.0.1:5173',
-];
-
-const PROD_DEFAULT_ORIGINS = [
-  'https://stackhr-website.onrender.com',
-  'https://stackhr-webapp-dev.onrender.com',
-  'https://stackhr-admin.onrender.com',
-  'https://stackhr.app',
-  'https://www.stackhr.app',
-  'https://app.stackhr.app',
-  'https://admin.stackhr.app',
-];
-
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
-    rawBody: true,
+    bodyParser: false,
   });
 
   const appLogger = app.get(AppLoggerService);
@@ -70,14 +55,9 @@ async function bootstrap() {
     }),
   );
 
-  const envOrigins =
-    process.env.FRONTEND_URL?.split(',').map((origin) => origin.trim()) ?? [];
-  const baseOrigins =
-    process.env.NODE_ENV === 'production'
-      ? PROD_DEFAULT_ORIGINS
-      : [...DEV_ALLOWED_ORIGINS, ...PROD_DEFAULT_ORIGINS];
+  const allowedOrigins = getAllowedOrigins();
 
-  const allowedOrigins = Array.from(new Set([...baseOrigins, ...envOrigins]));
+  app.useGlobalGuards(new CsrfOriginGuard(allowedOrigins));
 
   app.enableCors({
     origin: allowedOrigins,

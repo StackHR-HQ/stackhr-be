@@ -216,11 +216,39 @@ describe('SubscriptionsService', () => {
       expect(result).toEqual({
         effective: 'IMMEDIATE',
         planCode: 'GROWTH',
+        cancelAtPeriodEnd: false,
         message: 'Pending plan change cancelled',
       });
       expect(prisma.subscription.update).toHaveBeenCalledWith({
         where: { id: 'sub-1' },
-        data: { pendingPlanCode: null, pendingBillingCycle: null },
+        data: {
+          pendingPlanCode: null,
+          pendingBillingCycle: null,
+          cancelAtPeriodEnd: false,
+        },
+      });
+    });
+
+    it('clears cancelAtPeriodEnd when re-selecting the current plan', async () => {
+      prisma.subscription.findUnique.mockResolvedValue(
+        activeSubscription('GROWTH', { cancelAtPeriodEnd: true }),
+      );
+
+      const result = await service.changePlan('org-1', { planCode: 'GROWTH' });
+
+      expect(result).toEqual({
+        effective: 'IMMEDIATE',
+        planCode: 'GROWTH',
+        cancelAtPeriodEnd: false,
+        message: 'Subscription cancellation undone',
+      });
+      expect(prisma.subscription.update).toHaveBeenCalledWith({
+        where: { id: 'sub-1' },
+        data: {
+          pendingPlanCode: null,
+          pendingBillingCycle: null,
+          cancelAtPeriodEnd: false,
+        },
       });
     });
 
@@ -255,6 +283,31 @@ describe('SubscriptionsService', () => {
 
     it('has nothing to cancel on the Free plan', async () => {
       await expect(service.cancel('org-1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe('resume', () => {
+    it('clears cancelAtPeriodEnd to re-enable auto-renewal', async () => {
+      prisma.subscription.findUnique.mockResolvedValue(
+        activeSubscription('GROWTH', { cancelAtPeriodEnd: true }),
+      );
+
+      const result = await service.resume('org-1');
+
+      expect(result).toEqual({
+        cancelAtPeriodEnd: false,
+        effectiveAt: '2026-12-01T00:00:00.000Z',
+      });
+      expect(prisma.subscription.update).toHaveBeenCalledWith({
+        where: { id: 'sub-1' },
+        data: { cancelAtPeriodEnd: false },
+      });
+    });
+
+    it('throws BadRequestException on the Free plan', async () => {
+      await expect(service.resume('org-1')).rejects.toThrow(
         BadRequestException,
       );
     });

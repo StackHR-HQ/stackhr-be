@@ -100,7 +100,7 @@ export class MeService {
 
     const basicSalary = compRecord
       ? compRecord.basicSalary
-      : Math.trunc(Number(employee.annualSalaryMinor) / 1200);
+      : Math.trunc(Number(employee.annualSalaryMinor) / 12);
     const housingAllowance = compRecord?.housingAllowance ?? 0;
     const transportAllowance = compRecord?.transportAllowance ?? 0;
     const otherAllowances = compRecord?.otherAllowances ?? 0;
@@ -392,7 +392,7 @@ export class MeService {
     ]);
 
     if (records.length === 0 && employee.annualSalaryMinor > 0n) {
-      const basicSalary = Math.trunc(Number(employee.annualSalaryMinor) / 1200);
+      const basicSalary = Math.trunc(Number(employee.annualSalaryMinor) / 12);
       const effectiveFrom = employee.startDate ?? new Date();
       const defaultRecord = await this.prisma.compensationRecord.create({
         data: {
