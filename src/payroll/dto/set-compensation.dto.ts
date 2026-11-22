@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 
 export class SetCompensationDto {
-  @IsUUID('4', { message: 'employeeId must be a valid UUID' })
+  @IsUUID('all', { message: 'employeeId must be a valid UUID' })
   @IsNotEmpty({ message: 'employeeId is required' })
   employeeId!: string;
 
