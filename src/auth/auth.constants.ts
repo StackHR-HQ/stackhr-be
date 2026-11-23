@@ -1,5 +1,6 @@
 export const SESSION_COOKIE_NAME = 'stackhr_session';
 export const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+export const SHORT_SESSION_DURATION_MS = 12 * 60 * 60 * 1000;
 
 export const USER_TYPES = {
   BUSINESS: 'BUSINESS',

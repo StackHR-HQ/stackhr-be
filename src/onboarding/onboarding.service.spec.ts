@@ -3,6 +3,8 @@ import { PrismaService } from '../database/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { OnboardingController } from './onboarding.controller';
 import { OnboardingService } from './onboarding.service';
+import type { EntitlementsService } from '../billing/entitlements.service';
+import { PlanUpgradeRequiredException } from '../billing/plan-upgrade-required.exception';
 
 const user: AuthenticatedUser = {
   id: 'owner',
@@ -85,14 +87,19 @@ function setup(existing: StoredEmployee[] = []) {
     async (fn: (tx: Prisma.TransactionClient) => unknown) =>
       await fn(db as unknown as Prisma.TransactionClient),
   );
+  const entitlements = {
+    assertCanAddEmployees: jest.fn().mockResolvedValue(undefined),
+  };
   // Only the transaction client exposes writes: accidental writes outside it fail.
-  const service = new OnboardingService({
-    $transaction: transaction,
-  } as unknown as PrismaService);
+  const service = new OnboardingService(
+    { $transaction: transaction } as unknown as PrismaService,
+    entitlements as unknown as EntitlementsService,
+  );
   return {
     db,
     transaction,
     service,
+    entitlements,
     controller: new OnboardingController(service),
   };
 }
@@ -293,5 +300,27 @@ describe('frontend onboarding contract', () => {
       }),
     ).rejects.toThrow();
     expect(db.organization.update).not.toHaveBeenCalled();
+  });
+
+  it('checks a CSV import against the employee limit as one batch and writes nothing when refused', async () => {
+    const { service, db, entitlements } = setup();
+    entitlements.assertCanAddEmployees.mockRejectedValue(
+      new PlanUpgradeRequiredException('Your plan allows up to 5 employees', {
+        feature: 'employees',
+        currentPlan: 'FREE',
+        requiredPlan: 'STARTER',
+      }),
+    );
+
+    await expect(
+      service.importEmployees(
+        user,
+        'fullName,email,department,jobTitle,employmentType,salary,startDate\n' +
+          'Ada Obi,ada@acme.com,Engineering,Developer,Full-time,450000,2026-08-22\n' +
+          'Bola Ade,bola@acme.com,Engineering,Developer,Full-time,450000,2026-08-22',
+      ),
+    ).rejects.toBeInstanceOf(PlanUpgradeRequiredException);
+    expect(entitlements.assertCanAddEmployees).toHaveBeenCalledWith('org', 2);
+    expect(db.employee.createManyAndReturn).not.toHaveBeenCalled();
   });
 });

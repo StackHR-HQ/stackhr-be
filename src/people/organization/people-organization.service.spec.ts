@@ -12,7 +12,11 @@ describe('PeopleOrganizationService', () => {
   beforeEach(() => {
     fake = createInMemoryTenant();
     service = new PeopleOrganizationService(fake.tenant);
-    employees = new PeopleEmployeesService(fake.tenant, {} as never);
+    employees = new PeopleEmployeesService(
+      fake.tenant,
+      {} as never,
+      {} as never,
+    );
   });
 
   describe('deleteDepartment', () => {

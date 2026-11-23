@@ -33,6 +33,7 @@ import {
   invitationEmail,
   invitationLink,
 } from './employee-invitations';
+import { EntitlementsService } from '../../billing/entitlements.service';
 
 export interface EmployeeSummary {
   id: string;
@@ -75,6 +76,7 @@ export class PeopleEmployeesService {
   constructor(
     private readonly tenant: TenantPrismaService,
     private readonly emailService: EmailService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   listEmployees(
@@ -191,9 +193,10 @@ export class PeopleEmployeesService {
     return normalized || undefined;
   }
 
-  createEmployee(user: AuthenticatedUser, input: CreateEmployeeDto) {
+  async createEmployee(user: AuthenticatedUser, input: CreateEmployeeDto) {
     const organizationId = requirePeopleOrganization(user);
     const { personal, employment, compensation } = input;
+    await this.entitlements.assertCanAddEmployees(organizationId, 1);
 
     return this.tenant
       .run(organizationId, async (client) => {
@@ -306,7 +309,7 @@ export class PeopleEmployeesService {
             organizationId,
             employeeId: employee.id,
             effectiveFrom: employee.startDate,
-            basicSalary: Math.trunc(Number(employee.annualSalaryMinor) / 1200),
+            basicSalary: Math.trunc(Number(employee.annualSalaryMinor) / 12),
             housingAllowance: 0,
             transportAllowance: 0,
             otherAllowances: 0,
@@ -625,7 +628,7 @@ export class PeopleEmployeesService {
         });
 
         const basicSalary = Math.trunc(
-          Number(input.compensation.annualSalaryMinor) / 1200,
+          Number(input.compensation.annualSalaryMinor) / 12,
         );
         const existingComp = await client.compensationRecord.findFirst({
           where: { employeeId, organizationId, effectiveTo: null },

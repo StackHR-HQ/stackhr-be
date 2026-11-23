@@ -5,6 +5,8 @@ import { PrismaService } from '../database/prisma.service';
 import { USER_ROLES, USER_TYPES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { PlanUpgradeRequiredException } from '../billing/plan-upgrade-required.exception';
 
 describe('ApprovalsService', () => {
   let service: ApprovalsService;
@@ -58,6 +60,7 @@ describe('ApprovalsService', () => {
   };
 
   let eventEmitterMock: { emit: jest.Mock };
+  let entitlementsMock: { assertFeature: jest.Mock };
 
   beforeEach(async () => {
     prismaMock = {
@@ -94,6 +97,9 @@ describe('ApprovalsService', () => {
     eventEmitterMock = {
       emit: jest.fn(),
     };
+    entitlementsMock = {
+      assertFeature: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -106,6 +112,7 @@ describe('ApprovalsService', () => {
           provide: EventEmitter2,
           useValue: eventEmitterMock,
         },
+        { provide: EntitlementsService, useValue: entitlementsMock },
       ],
     }).compile();
 
@@ -261,6 +268,54 @@ describe('ApprovalsService', () => {
   });
 
   describe('decideRequest', () => {
+    const pendingPayroll = {
+      id: 'appr-pay',
+      organizationId: 'org-123',
+      requesterId: 'user-employee-1',
+      status: 'PENDING',
+      type: 'PAYROLL',
+      subjectTable: 'payroll_run',
+      subjectId: 'run-1',
+    };
+    const planBlock = () =>
+      new PlanUpgradeRequiredException('Payroll is not included', {
+        feature: 'payroll',
+        currentPlan: 'FREE',
+        requiredPlan: 'STARTER',
+      });
+
+    it('refuses to approve a payroll run when the plan excludes payroll (402), leaving it pending', async () => {
+      prismaMock.approvalRequest.findFirst.mockResolvedValue(pendingPayroll);
+      entitlementsMock.assertFeature.mockRejectedValue(planBlock());
+
+      await expect(
+        service.decideRequest(mockAdminUser, 'appr-pay', {
+          status: 'APPROVED',
+        }),
+      ).rejects.toBeInstanceOf(PlanUpgradeRequiredException);
+      expect(entitlementsMock.assertFeature).toHaveBeenCalledWith(
+        'org-123',
+        'payroll',
+      );
+      expect(prismaMock.approvalRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('still lets a payroll run be rejected on a plan without payroll', async () => {
+      prismaMock.approvalRequest.findFirst.mockResolvedValue(pendingPayroll);
+      prismaMock.approvalRequest.update.mockResolvedValue({
+        ...pendingPayroll,
+        status: 'REJECTED',
+      });
+      entitlementsMock.assertFeature.mockRejectedValue(planBlock());
+
+      await service.decideRequest(mockAdminUser, 'appr-pay', {
+        status: 'REJECTED',
+        rejectionReason: 'Not this month',
+      } as unknown as Parameters<ApprovalsService['decideRequest']>[2]);
+
+      expect(entitlementsMock.assertFeature).not.toHaveBeenCalled();
+    });
+
     it('should allow manager/admin to approve a request', async () => {
       const mockPending = {
         id: 'appr-1',

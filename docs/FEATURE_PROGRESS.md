@@ -93,6 +93,22 @@ Status values: `Not Started` · `In Progress` · `Blocked` · `Awaiting Review` 
 - [x] Step 4: Transactional Outbox Pattern & Dead Letter Queue (DLQ for durable domain events & statutory notifications) — Status: Done
 - [x] Step 5: Production Metrics & Observability Dashboarding (P50/P95/P99 latency, Prometheus metrics, graceful shutdown & connection draining) — Status: Done
 
+### Phase 8 — Subscription Billing, Bachs Payments & Entitlement Enforcement
+*In-house ₦ subscription engine powered by Bachs Payments collection, self-serve plan management, and hard plan entitlement enforcement.*
+
+- [x] Data model: `BillingPlan`, `Subscription`, `BillingInvoice`, and `BillingWebhookEvent` with PostgreSQL CHECK constraints — Status: Done
+- [x] Launch catalog: Free, Starter, Growth, Business, Professional, Enterprise with commercial terms grandfathering — Status: Done
+- [x] Pure pricing domain: kobo BigInt precision, quote calculations, and bounded upgrade proration (zero-division & negative guard) — Status: Done
+- [x] Bachs Payments integration: resilient `BachsClient` with Circuit Breakers, retries, and checkout session issuance (card & NGN bank transfer) — Status: Done
+- [x] Webhook security: `X-Bachs-Signature-V2` HMAC-SHA256 verification against raw body, 5-min replay window, and idempotency dedup log — Status: Done
+- [x] Self-serve billing endpoints: `/v1/api/billing/status`, `/plans`, `/subscribe`, `/change-plan`, `/cancel`, `/invoices/:id/pay` with pending downgrade cancellation — Status: Done
+- [x] Entitlement enforcement: `@RequireEntitlement` on payroll, disbursements, and pension remittance returning `402 PLAN_UPGRADE_REQUIRED` — Status: Done
+- [x] Seat cap enforcement: Headcount limits on employee creation, bulk onboarding, and employee reactivation from terminated state — Status: Done
+- [x] Billing Lifecycle Background Scheduler: Automated overdue checks, grace period tracking, restriction, period end downgrades/cancellations, and renewal invoice issuance — Status: Done
+- [x] Super Admin Billing Governance: Connected `/v1/api/stackhr-admin` to live billing tables with `listSubscriptions`, `getSubscriptionByOrgId`, `getSubscriptionPlans`, `updateSubscription` (direct status/plan overrides, custom enterprise terms, grace period extensions), `listInvoices`, `getInvoiceById`, `markInvoicePaid` (offline wire/cheque reconciliation), and `voidInvoice` — Status: Done
+- [x] Postman: Billing collection folder and StackHR Platform Admin folder updated with example success and error responses — Status: Done
+- User stories: US-001, US-002, US-003
+
 ---
 
 ## P1 — High Priority After Launch *(parked — do not start early)*
@@ -129,6 +145,8 @@ Status values: `Not Started` · `In Progress` · `Blocked` · `Awaiting Review` 
 | 2026-10-22 | Implemented Phase 3 of Anchor BaaS: Automated payroll disbursement via Anchor BaaS bulk transfers (`POST /payroll/runs/:id/execute`), deterministic reference generation (`pyr_<runId>_<empId>_1`), automatic ledger debiting, real-time webhook transfer reconciliation (`transfer.successful`, `bulkTransfer.completed`), ADR-004 dual-track fallback, Postman documentation update, and comprehensive unit tests. |
 | 2026-10-22 | Implemented Phase 4 of Anchor BaaS: Instant spend payouts for Salary Advances and Expense Reimbursements (`POST /spend/advances/:id/disburse` and `POST /reimbursements/:id/pay`) via single NIP transfers, deterministic reference generation (`adv_<advanceId>_1`, `rem_<reimbursementId>_1`), automatic ledger debiting, webhook reconciliation for instant payout state confirmation, Postman documentation updates, and unit tests (536/536 passing). |
 | 2026-10-22 | Implemented Phase 5 of Anchor BaaS: Corporate Spend & Virtual Cards (`POST /banking/cards`, `GET /banking/cards`, `GET /banking/cards/:id`, `PATCH /banking/cards/:id/freeze`, `PATCH /banking/cards/:id/limit`) with programmable spending limits and intervals, masked PAN storage (PCI-DSS compliant), Anchor API card issuance/freeze/limit controls, automated webhook transaction matching (`card.transaction.approved`) auto-creating pending Expense claims in Spend module, Postman documentation, and 53 passing unit tests. |
+| 2026-11-16 | Implemented Phase 8 (Subscription Billing & Bachs Integration): In-house ₦ subscription engine, launch plan catalog with grandfathering, bounded proration math, Bachs checkout sessions & HMAC webhook guard, self-serve billing APIs with pending downgrade cancellation, entitlement gating with HTTP 402 PLAN_UPGRADE_REQUIRED, seat cap enforcement including reactivation guard, and Postman Billing documentation. |
+| 2026-11-17 | Connected StackHR Platform Admin (`/stackhr-admin`) to live billing tables: real subscription listing/filters, detail lookup, direct plan & status overrides, custom Enterprise contract terms, grace extensions, platform invoice browsing, manual wire/cheque payment reconciliation (`mark-paid`), invoice voiding, Postman collection update, and unit tests. |
 
 
 

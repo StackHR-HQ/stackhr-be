@@ -23,12 +23,14 @@ import {
   CreateSupportTicketDto,
   DecideKybDto,
   KybActionDto,
+  MarkInvoicePaidDto,
   ReactivateBusinessDto,
   SuspendBusinessDto,
   UpdateAdminUserDto,
   UpdateBusinessStatusDto,
   UpdateSubscriptionDto,
   UpdateSupportTicketDto,
+  VoidInvoiceDto,
 } from './dto/stackhr-admin.dto';
 
 @Controller('stackhr-admin')
@@ -174,21 +176,29 @@ export class StackhrAdminController {
     return this.adminService!.getFinanceOverview();
   }
 
-  @Get([
-    'subscriptions',
-    'subscriptions/invoices',
-    'subscriptions/payment-failures',
-  ])
+  @Get(['subscriptions', 'subscriptions/payment-failures'])
   listSubscriptions(
     @Query('status') status?: string,
     @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.adminService!.listSubscriptions({ status, search });
+    return this.adminService!.listSubscriptions({
+      status,
+      search,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Get('subscriptions/plans')
   getSubscriptionPlans() {
     return this.adminService!.getSubscriptionPlans();
+  }
+
+  @Get('subscriptions/:organizationId')
+  getSubscriptionByOrgId(@Param('organizationId') organizationId: string) {
+    return this.adminService!.getSubscriptionByOrgId(organizationId);
   }
 
   @Patch('subscriptions/:organizationId')
@@ -199,6 +209,48 @@ export class StackhrAdminController {
     @Body() dto: UpdateSubscriptionDto,
   ) {
     return this.adminService!.updateSubscription(user, organizationId, dto);
+  }
+
+  @Get(['invoices', 'subscriptions/invoices'])
+  listInvoices(
+    @Query('organizationId') organizationId?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService!.listInvoices({
+      organizationId,
+      status,
+      search,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  @Get('invoices/:id')
+  getInvoiceById(@Param('id') id: string) {
+    return this.adminService!.getInvoiceById(id);
+  }
+
+  @Post('invoices/:id/mark-paid')
+  @RequireRoles(USER_ROLES.STACKHR_ADMIN)
+  markInvoicePaid(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto?: MarkInvoicePaidDto,
+  ) {
+    return this.adminService!.markInvoicePaid(user, id, dto);
+  }
+
+  @Post('invoices/:id/void')
+  @RequireRoles(USER_ROLES.STACKHR_ADMIN)
+  voidInvoice(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto?: VoidInvoiceDto,
+  ) {
+    return this.adminService!.voidInvoice(user, id, dto);
   }
 
   @Get(['compliance/kyb', 'compliance/verifications'])

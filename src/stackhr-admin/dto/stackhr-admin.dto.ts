@@ -3,10 +3,12 @@ import {
   IsEmail,
   IsEnum,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
+  Min,
 } from 'class-validator';
 import { USER_ROLES } from '../../auth/auth.constants';
 
@@ -37,16 +39,68 @@ export class UpdateBusinessStatusDto {
 
 export class UpdateSubscriptionDto {
   @IsOptional()
-  @IsEnum(['STARTER', 'GROWTH', 'ENTERPRISE'])
-  planId?: 'STARTER' | 'GROWTH' | 'ENTERPRISE';
+  @IsString()
+  planCode?: string;
+
+  /** Backward-compatible alias for planCode */
+  @IsOptional()
+  @IsString()
+  planId?: string;
 
   @IsOptional()
-  @IsEnum(['trial', 'active', 'past_due', 'cancelled', 'expired'])
-  status?: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+  @IsString()
+  status?: string;
 
   @IsOptional()
   @IsEnum(['MONTHLY', 'ANNUAL'])
   billingCycle?: 'MONTHLY' | 'ANNUAL';
+
+  @IsOptional()
+  @IsBoolean()
+  cancelAtPeriodEnd?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  extendGraceDays?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  customTerms?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  includedEmployees?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  baseFeeKobo?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  overageRateKobo?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxOverageEmployees?: number;
+}
+
+export class MarkInvoicePaidDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notes?: string;
+}
+
+export class VoidInvoiceDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }
 
 export class DecideKybDto {

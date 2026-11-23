@@ -12,17 +12,24 @@ import { ResilientHttpClient } from '../common/resilience/resilient-client';
 import { AuthService } from '../auth/auth.service';
 import { USER_ROLES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import {
+  SEAT_HOLDING_STATUSES,
+  FREE_PLAN_CODE,
+  addCycle,
+} from '../billing/billing-catalog';
 import type {
   CreateAdminUserDto,
   CreateAnnouncementDto,
   CreateSupportTicketDto,
   DecideKybDto,
+  MarkInvoicePaidDto,
   ReactivateBusinessDto,
   SuspendBusinessDto,
   UpdateAdminUserDto,
   UpdateBusinessStatusDto,
   UpdateSubscriptionDto,
   UpdateSupportTicketDto,
+  VoidInvoiceDto,
 } from './dto/stackhr-admin.dto';
 
 export interface OrgMetadata {
@@ -197,6 +204,14 @@ export class StackhrAdminService {
           companySize: true,
           taxId: true,
           metadata: true,
+          subscription: {
+            select: {
+              status: true,
+              baseFeeKobo: true,
+              overageRateKobo: true,
+              includedEmployees: true,
+            },
+          },
           _count: { select: { employees: true, payrollRuns: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -269,12 +284,21 @@ export class StackhrAdminService {
       const st = deriveBusinessStatus(org, empCount);
       statusCounts[st] = (statusCounts[st] ?? 0) + 1;
       if (st === 'active') {
-        const meta = parseOrgMetadata(org.metadata);
-        const plan =
-          PLATFORM_PLANS.find((p) => p.id === meta.subscription?.planId) ??
-          PLATFORM_PLANS[1];
-        estimatedMonthlyRevenueMajor +=
-          plan.baseMonthlyFeeMajor + empCount * plan.pricePerEmployeeMajor;
+        const sub = (org as any).subscription;
+        if (sub && sub.status === 'ACTIVE') {
+          const baseFee = Number((sub.baseFeeKobo ?? 0n) / 100n);
+          const overageRate = Number((sub.overageRateKobo ?? 0n) / 100n);
+          const included = sub.includedEmployees ?? 5;
+          const overageSeats = Math.max(0, empCount - included);
+          estimatedMonthlyRevenueMajor += baseFee + overageSeats * overageRate;
+        } else {
+          const meta = parseOrgMetadata(org.metadata);
+          const plan =
+            PLATFORM_PLANS.find((p) => p.id === meta.subscription?.planId) ??
+            PLATFORM_PLANS[1];
+          estimatedMonthlyRevenueMajor +=
+            plan.baseMonthlyFeeMajor + empCount * plan.pricePerEmployeeMajor;
+        }
       }
     }
 
@@ -1023,87 +1047,235 @@ export class StackhrAdminService {
     };
   }
 
-  async listSubscriptions(filters: { status?: string; search?: string }) {
-    const organizations = await this.prisma.organization.findMany({
-      where: filters.search
-        ? {
-            OR: [
-              { name: { contains: filters.search, mode: 'insensitive' } },
-              { slug: { contains: filters.search, mode: 'insensitive' } },
-            ],
-          }
-        : undefined,
-      include: {
-        owner: { select: { id: true, name: true, email: true } },
-        _count: { select: { employees: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async listSubscriptions(filters: {
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.max(1, Math.min(100, filters.limit ?? 25));
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (filters.search) {
+      where.OR = [
+        { name: { contains: filters.search, mode: 'insensitive' } },
+        { slug: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
+    if (filters.status) {
+      const normalized = filters.status.toUpperCase();
+      where.subscription = {
+        status: normalized,
+      };
+    }
+
+    const [total, organizations, plans] = await Promise.all([
+      this.prisma.organization.count({ where }),
+      this.prisma.organization.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          owner: { select: { id: true, name: true, email: true } },
+          subscription: {
+            include: { plan: true },
+          },
+          _count: {
+            select: {
+              employees: {
+                where: { status: { in: SEAT_HOLDING_STATUSES } },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.billingPlan.findMany({
+        orderBy: { sortOrder: 'asc' },
+      }),
+    ]);
 
     const subscriptions = organizations.map((org) => {
-      const meta = parseOrgMetadata(org.metadata);
-      const empCount = org._count?.employees ?? 0;
+      const sub = org.subscription;
+      const employeeSeats = org._count?.employees ?? 0;
+      const planCode = sub?.planCode ?? FREE_PLAN_CODE;
       const plan =
-        PLATFORM_PLANS.find((p) => p.id === meta.subscription?.planId) ??
-        PLATFORM_PLANS[1];
-      const subStatus =
-        meta.subscription?.status ?? (empCount > 0 ? 'active' : 'trial');
-      const billingCycle = meta.subscription?.billingCycle ?? 'MONTHLY';
+        sub?.plan ??
+        plans.find((p) => p.code === planCode) ??
+        PLATFORM_PLANS.find((p) => p.id === planCode);
+      const status = sub?.status ?? 'FREE';
+      const billingCycle = sub?.billingCycle ?? 'MONTHLY';
+
+      const baseFeeKobo =
+        sub?.baseFeeKobo ??
+        (billingCycle === 'ANNUAL'
+          ? ((plan as any)?.annualFeeKobo ?? 0n)
+          : ((plan as any)?.monthlyFeeKobo ?? 0n));
+      const overageRateKobo =
+        sub?.overageRateKobo ?? (plan as any)?.overageRateKobo ?? 0n;
+      const includedEmployees =
+        sub?.includedEmployees ?? (plan as any)?.includedEmployees ?? 5;
+      const overageSeats = Math.max(0, employeeSeats - includedEmployees);
       const monthlyAmountMajor =
-        plan.baseMonthlyFeeMajor + empCount * plan.pricePerEmployeeMajor;
+        Number(baseFeeKobo / 100n) +
+        overageSeats * Number(overageRateKobo / 100n);
 
       return {
-        id: `sub_${org.id}`,
+        id: sub?.id ?? `sub_${org.id}`,
         organizationId: org.id,
         organizationName: org.name,
         organizationSlug: org.slug,
         owner: org.owner,
-        planId: plan.id,
-        planName: plan.name,
-        status: subStatus,
+        planCode,
+        planName: plan?.name ?? planCode,
+        status,
         billingCycle,
-        employeeSeats: empCount,
+        employeeSeats,
+        includedEmployees,
+        baseFeeMajor: Number(baseFeeKobo / 100n),
         monthlyAmountMajor,
         currency: org.currency ?? 'NGN',
-        currentPeriodEnd:
-          meta.subscription?.currentPeriodEnd ??
-          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        createdAt: org.createdAt,
-        isPlaceholder: true,
+        currentPeriodStart: sub?.currentPeriodStart ?? null,
+        currentPeriodEnd: sub?.currentPeriodEnd ?? null,
+        cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
+        graceEndsAt: sub?.graceEndsAt ?? null,
+        customTerms: sub?.customTerms ?? false,
+        createdAt: sub?.createdAt ?? org.createdAt,
       };
     });
 
-    const filtered = filters.status
-      ? subscriptions.filter(
-          (s) => s.status.toLowerCase() === filters.status!.toLowerCase(),
-        )
-      : subscriptions;
-
     return {
-      isPlaceholder: true,
-      source: 'placeholder',
-      total: filtered.length,
-      plans: PLATFORM_PLANS.map((p) => ({ ...p, isPlaceholder: true })),
-      subscriptions: filtered,
-      invoices: filtered.map((sub) => ({
-        id: `inv_${sub.organizationId}_${new Date().getUTCFullYear()}_${new Date().getUTCMonth() + 1}`,
-        organizationId: sub.organizationId,
-        organizationName: sub.organizationName,
-        planName: sub.planName,
-        amountMajor: sub.monthlyAmountMajor,
-        currency: sub.currency,
-        status: sub.status === 'past_due' ? 'PAST_DUE' : 'PAID',
-        issuedAt: sub.createdAt,
-        isPlaceholder: true,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      plans: plans.map((p) => ({
+        code: p.code,
+        name: p.name,
+        includedEmployees: p.includedEmployees,
+        monthlyFeeMajor: Number(p.monthlyFeeKobo / 100n),
+        annualFeeMajor: Number(p.annualFeeKobo / 100n),
+        overageRateMajor: Number(p.overageRateKobo / 100n),
+        maxOverageEmployees: p.maxOverageEmployees,
+        selfServe: p.selfServe,
+        isActive: p.isActive,
+        entitlements: p.entitlements,
+      })),
+      subscriptions,
+    };
+  }
+
+  async getSubscriptionPlans() {
+    const plans = await this.prisma.billingPlan.findMany({
+      orderBy: { sortOrder: 'asc' },
+    });
+    return {
+      plans: plans.map((p) => ({
+        code: p.code,
+        name: p.name,
+        includedEmployees: p.includedEmployees,
+        monthlyFeeMajor: Number(p.monthlyFeeKobo / 100n),
+        annualFeeMajor: Number(p.annualFeeKobo / 100n),
+        overageRateMajor: Number(p.overageRateKobo / 100n),
+        maxOverageEmployees: p.maxOverageEmployees,
+        selfServe: p.selfServe,
+        isActive: p.isActive,
+        sortOrder: p.sortOrder,
+        entitlements: p.entitlements,
       })),
     };
   }
 
-  getSubscriptionPlans() {
+  async getSubscriptionByOrgId(organizationId: string) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        subscription: {
+          include: {
+            plan: true,
+            invoices: {
+              orderBy: { createdAt: 'desc' },
+              take: 10,
+            },
+          },
+        },
+        _count: {
+          select: {
+            employees: {
+              where: { status: { in: SEAT_HOLDING_STATUSES } },
+            },
+          },
+        },
+      },
+    });
+
+    if (!org) {
+      throw new NotFoundException(`Business "${organizationId}" was not found`);
+    }
+
+    const sub = org.subscription;
+    const employeeSeats = org._count?.employees ?? 0;
+    const planCode = sub?.planCode ?? FREE_PLAN_CODE;
+    const plan =
+      sub?.plan ??
+      (await this.prisma.billingPlan.findUnique({ where: { code: planCode } }));
+    const status = sub?.status ?? 'FREE';
+    const billingCycle = sub?.billingCycle ?? 'MONTHLY';
+
+    const baseFeeKobo =
+      sub?.baseFeeKobo ??
+      (billingCycle === 'ANNUAL'
+        ? (plan?.annualFeeKobo ?? 0n)
+        : (plan?.monthlyFeeKobo ?? 0n));
+    const overageRateKobo = sub?.overageRateKobo ?? plan?.overageRateKobo ?? 0n;
+    const includedEmployees =
+      sub?.includedEmployees ?? plan?.includedEmployees ?? 5;
+    const overageSeats = Math.max(0, employeeSeats - includedEmployees);
+    const monthlyAmountMajor =
+      Number(baseFeeKobo / 100n) +
+      overageSeats * Number(overageRateKobo / 100n);
+
     return {
-      isPlaceholder: true,
-      source: 'placeholder',
-      plans: PLATFORM_PLANS.map((p) => ({ ...p, isPlaceholder: true })),
+      id: sub?.id ?? `sub_${org.id}`,
+      organizationId: org.id,
+      organizationName: org.name,
+      organizationSlug: org.slug,
+      owner: org.owner,
+      planCode,
+      planName: plan?.name ?? planCode,
+      status,
+      billingCycle,
+      employeeSeats,
+      includedEmployees,
+      baseFeeMajor: Number(baseFeeKobo / 100n),
+      overageRateMajor: Number(overageRateKobo / 100n),
+      maxOverageEmployees:
+        sub?.maxOverageEmployees ?? plan?.maxOverageEmployees ?? 0,
+      monthlyAmountMajor,
+      currency: org.currency ?? 'NGN',
+      currentPeriodStart: sub?.currentPeriodStart ?? null,
+      currentPeriodEnd: sub?.currentPeriodEnd ?? null,
+      cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
+      graceEndsAt: sub?.graceEndsAt ?? null,
+      customTerms: sub?.customTerms ?? false,
+      entitlements: plan?.entitlements ?? null,
+      invoices: (sub?.invoices ?? []).map((inv) => ({
+        id: inv.id,
+        number: inv.number,
+        kind: inv.kind,
+        status: inv.status,
+        totalKobo: Number(inv.totalKobo),
+        totalMajor: Number(inv.totalKobo / 100n),
+        dueAt: inv.dueAt,
+        paidAt: inv.paidAt,
+        periodStart: inv.periodStart,
+        periodEnd: inv.periodEnd,
+        createdAt: inv.createdAt,
+      })),
+      createdAt: sub?.createdAt ?? org.createdAt,
     };
   }
 
@@ -1114,57 +1286,470 @@ export class StackhrAdminService {
   ) {
     const org = await this.prisma.organization.findUnique({
       where: { id: organizationId },
+      include: { subscription: true },
     });
     if (!org) {
       throw new NotFoundException(`Business "${organizationId}" was not found`);
     }
 
-    const meta = parseOrgMetadata(org.metadata);
-    const plan =
-      PLATFORM_PLANS.find(
-        (p) => p.id === (dto.planId ?? meta.subscription?.planId ?? 'GROWTH'),
-      ) ?? PLATFORM_PLANS[1];
-
-    const nextSub = {
-      planId: plan.id as 'STARTER' | 'GROWTH' | 'ENTERPRISE',
-      planName: plan.name,
-      status: dto.status ?? meta.subscription?.status ?? 'active',
-      billingCycle:
-        dto.billingCycle ?? meta.subscription?.billingCycle ?? 'MONTHLY',
-      pricePerEmployeeMajor: plan.pricePerEmployeeMajor,
-      currentPeriodEnd:
-        meta.subscription?.currentPeriodEnd ??
-        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    };
-
-    const nextMeta: OrgMetadata = {
-      ...meta,
-      subscription: nextSub,
-    };
-
-    await this.prisma.organization.update({
-      where: { id: organizationId },
-      data: { metadata: JSON.stringify(nextMeta) },
+    const targetPlanCode =
+      dto.planCode ??
+      dto.planId ??
+      org.subscription?.planCode ??
+      FREE_PLAN_CODE;
+    const plan = await this.prisma.billingPlan.findUnique({
+      where: { code: targetPlanCode },
     });
+    if (!plan) {
+      throw new BadRequestException(
+        `Billing plan "${targetPlanCode}" not found`,
+      );
+    }
 
-    await this.prisma.auditEvent.create({
-      data: {
-        organizationId,
-        actorUserId: actor.id,
-        action: 'subscription.updated',
-        targetType: 'organization',
-        targetId: organizationId,
-        description: `Subscription updated to ${nextSub.planName} (${nextSub.status})`,
-        changes: nextSub,
-      },
+    const targetCycle =
+      dto.billingCycle ??
+      (org.subscription?.billingCycle as 'MONTHLY' | 'ANNUAL') ??
+      'MONTHLY';
+    let nextStatus =
+      org.subscription?.status ??
+      (plan.code === FREE_PLAN_CODE ? 'FREE' : 'ACTIVE');
+    if (dto.status) {
+      const s = dto.status.toUpperCase();
+      if (['FREE', 'ACTIVE', 'PAST_DUE', 'RESTRICTED'].includes(s)) {
+        nextStatus = s;
+      } else if (s === 'TRIAL' || s === 'CANCELLED' || s === 'EXPIRED') {
+        nextStatus = 'FREE';
+      } else {
+        throw new BadRequestException(
+          `Invalid subscription status "${dto.status}". Must be FREE, ACTIVE, PAST_DUE, or RESTRICTED`,
+        );
+      }
+    }
+
+    const isCustom = dto.customTerms ?? org.subscription?.customTerms ?? false;
+    const includedEmployees =
+      dto.includedEmployees ??
+      org.subscription?.includedEmployees ??
+      plan.includedEmployees;
+    const baseFeeKobo =
+      dto.baseFeeKobo !== undefined
+        ? BigInt(dto.baseFeeKobo)
+        : isCustom && org.subscription
+          ? org.subscription.baseFeeKobo
+          : targetCycle === 'ANNUAL'
+            ? plan.annualFeeKobo
+            : plan.monthlyFeeKobo;
+    const overageRateKobo =
+      dto.overageRateKobo !== undefined
+        ? BigInt(dto.overageRateKobo)
+        : isCustom && org.subscription
+          ? org.subscription.overageRateKobo
+          : plan.overageRateKobo;
+    const maxOverageEmployees =
+      dto.maxOverageEmployees ??
+      org.subscription?.maxOverageEmployees ??
+      plan.maxOverageEmployees;
+
+    let currentPeriodStart = org.subscription?.currentPeriodStart ?? null;
+    let currentPeriodEnd = org.subscription?.currentPeriodEnd ?? null;
+    if (nextStatus === 'ACTIVE' && (!currentPeriodStart || !currentPeriodEnd)) {
+      currentPeriodStart = new Date();
+      currentPeriodEnd = addCycle(currentPeriodStart, targetCycle);
+    }
+
+    let graceEndsAt =
+      nextStatus === 'ACTIVE' ? null : (org.subscription?.graceEndsAt ?? null);
+    if (dto.extendGraceDays) {
+      const baseDate = graceEndsAt ?? new Date();
+      graceEndsAt = new Date(
+        baseDate.getTime() + dto.extendGraceDays * 24 * 60 * 60 * 1000,
+      );
+      nextStatus = 'PAST_DUE';
+    }
+
+    const cancelAtPeriodEnd =
+      dto.cancelAtPeriodEnd !== undefined
+        ? dto.cancelAtPeriodEnd
+        : (org.subscription?.cancelAtPeriodEnd ?? false);
+
+    const subscription = await this.prisma.$transaction(async (tx) => {
+      const sub = await tx.subscription.upsert({
+        where: { organizationId },
+        create: {
+          organizationId,
+          planCode: plan.code,
+          status: nextStatus,
+          billingCycle: targetCycle,
+          includedEmployees,
+          baseFeeKobo,
+          overageRateKobo,
+          maxOverageEmployees,
+          customTerms: isCustom,
+          currentPeriodStart,
+          currentPeriodEnd,
+          cancelAtPeriodEnd,
+          graceEndsAt,
+        },
+        update: {
+          planCode: plan.code,
+          status: nextStatus,
+          billingCycle: targetCycle,
+          includedEmployees,
+          baseFeeKobo,
+          overageRateKobo,
+          maxOverageEmployees,
+          customTerms: isCustom,
+          cancelAtPeriodEnd,
+          graceEndsAt,
+          ...(currentPeriodStart ? { currentPeriodStart } : {}),
+          ...(currentPeriodEnd ? { currentPeriodEnd } : {}),
+        },
+        include: { plan: true },
+      });
+
+      // Mirror to metadata for backward compatibility
+      const meta = parseOrgMetadata(org.metadata);
+      const nextMeta: OrgMetadata = {
+        ...meta,
+        subscription: {
+          planId: plan.code as any,
+          planName: plan.name,
+          status: nextStatus.toLowerCase() as any,
+          billingCycle: targetCycle,
+          pricePerEmployeeMajor: Number(overageRateKobo / 100n),
+          currentPeriodEnd:
+            sub.currentPeriodEnd?.toISOString() ?? new Date().toISOString(),
+        },
+      };
+      await tx.organization.update({
+        where: { id: organizationId },
+        data: { metadata: JSON.stringify(nextMeta) },
+      });
+
+      await tx.auditEvent.create({
+        data: {
+          organizationId,
+          actorUserId: actor.id,
+          action: 'subscription.admin_updated',
+          targetType: 'organization',
+          targetId: organizationId,
+          description: `Subscription updated to ${plan.name} (${nextStatus}) by admin`,
+          changes: {
+            planCode: plan.code,
+            status: nextStatus,
+            billingCycle: targetCycle,
+            customTerms: isCustom,
+            cancelAtPeriodEnd,
+          },
+        },
+      });
+
+      return sub;
     });
 
     return {
       message: 'Subscription updated successfully',
       subscription: {
+        id: subscription.id,
         organizationId,
         organizationName: org.name,
-        ...nextSub,
+        planCode: subscription.planCode,
+        planName: plan.name,
+        status: subscription.status,
+        billingCycle: subscription.billingCycle,
+        includedEmployees: subscription.includedEmployees,
+        baseFeeMajor: Number(subscription.baseFeeKobo / 100n),
+        overageRateMajor: Number(subscription.overageRateKobo / 100n),
+        maxOverageEmployees: subscription.maxOverageEmployees,
+        customTerms: subscription.customTerms,
+        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+        currentPeriodStart: subscription.currentPeriodStart,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        graceEndsAt: subscription.graceEndsAt,
+      },
+    };
+  }
+
+  async listInvoices(filters: {
+    organizationId?: string;
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.max(1, Math.min(100, filters.limit ?? 25));
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (filters.organizationId) {
+      where.organizationId = filters.organizationId;
+    }
+    if (filters.status) {
+      where.status = filters.status.toUpperCase();
+    }
+    if (filters.search) {
+      where.OR = [
+        { number: { contains: filters.search, mode: 'insensitive' } },
+        {
+          organization: {
+            name: { contains: filters.search, mode: 'insensitive' },
+          },
+        },
+      ];
+    }
+
+    const [total, invoices] = await Promise.all([
+      this.prisma.billingInvoice.count({ where }),
+      this.prisma.billingInvoice.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          organization: { select: { id: true, name: true, slug: true } },
+        },
+      }),
+    ]);
+
+    return {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      invoices: invoices.map((inv) => ({
+        id: inv.id,
+        number: inv.number,
+        organizationId: inv.organizationId,
+        organizationName: inv.organization.name,
+        organizationSlug: inv.organization.slug,
+        kind: inv.kind,
+        status: inv.status,
+        subtotalKobo: Number(inv.subtotalKobo),
+        totalKobo: Number(inv.totalKobo),
+        totalMajor: Number(inv.totalKobo / 100n),
+        dueAt: inv.dueAt,
+        paidAt: inv.paidAt,
+        periodStart: inv.periodStart,
+        periodEnd: inv.periodEnd,
+        lines: inv.lines,
+        bachsCheckoutUrl: inv.bachsCheckoutUrl,
+        createdAt: inv.createdAt,
+      })),
+    };
+  }
+
+  async getInvoiceById(invoiceId: string) {
+    const inv = await this.prisma.billingInvoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        organization: { select: { id: true, name: true, slug: true } },
+        subscription: true,
+      },
+    });
+
+    if (!inv) {
+      throw new NotFoundException(`Invoice "${invoiceId}" not found`);
+    }
+
+    return {
+      id: inv.id,
+      number: inv.number,
+      organizationId: inv.organizationId,
+      organizationName: inv.organization.name,
+      organizationSlug: inv.organization.slug,
+      kind: inv.kind,
+      status: inv.status,
+      subtotalKobo: Number(inv.subtotalKobo),
+      totalKobo: Number(inv.totalKobo),
+      totalMajor: Number(inv.totalKobo / 100n),
+      dueAt: inv.dueAt,
+      paidAt: inv.paidAt,
+      periodStart: inv.periodStart,
+      periodEnd: inv.periodEnd,
+      lines: inv.lines,
+      bachsCheckoutUrl: inv.bachsCheckoutUrl,
+      subscription: {
+        id: inv.subscription.id,
+        planCode: inv.subscription.planCode,
+        status: inv.subscription.status,
+        billingCycle: inv.subscription.billingCycle,
+      },
+      createdAt: inv.createdAt,
+    };
+  }
+
+  async markInvoicePaid(
+    actor: AuthenticatedUser,
+    invoiceId: string,
+    dto?: MarkInvoicePaidDto,
+  ) {
+    const invoice = await this.prisma.billingInvoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        subscription: true,
+        organization: { select: { name: true } },
+      },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException(`Invoice "${invoiceId}" not found`);
+    }
+
+    if (invoice.status === 'PAID') {
+      return {
+        message: 'Invoice is already marked as paid',
+        invoice: {
+          id: invoice.id,
+          number: invoice.number,
+          status: invoice.status,
+          paidAt: invoice.paidAt,
+        },
+      };
+    }
+
+    const paidAt = new Date();
+    const alreadyPaid = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.billingInvoice.updateMany({
+        where: { id: invoiceId, status: { not: 'PAID' } },
+        data: {
+          status: 'PAID',
+          paidAt,
+        },
+      });
+      if (updated.count === 0) {
+        return true;
+      }
+
+      const targetCycle =
+        (invoice.targetBillingCycle as 'MONTHLY' | 'ANNUAL') ??
+        (invoice.subscription.billingCycle as 'MONTHLY' | 'ANNUAL');
+      const targetPlanCode =
+        invoice.targetPlanCode ?? invoice.subscription.planCode;
+      const targetTerms = invoice.targetTerms as any;
+
+      await tx.subscription.update({
+        where: { id: invoice.subscriptionId },
+        data: {
+          status: 'ACTIVE',
+          graceEndsAt: null,
+          currentPeriodStart: invoice.periodStart,
+          currentPeriodEnd: invoice.periodEnd,
+          planCode: targetPlanCode,
+          billingCycle: targetCycle,
+          ...(targetTerms
+            ? {
+                includedEmployees: Number(
+                  (targetTerms as Record<string, unknown>).includedEmployees,
+                ),
+                baseFeeKobo: BigInt(
+                  String((targetTerms as Record<string, unknown>).baseFeeKobo),
+                ),
+                overageRateKobo: BigInt(
+                  String(
+                    (targetTerms as Record<string, unknown>).overageRateKobo,
+                  ),
+                ),
+                maxOverageEmployees: Number(
+                  (targetTerms as Record<string, unknown>).maxOverageEmployees,
+                ),
+              }
+            : {}),
+          ...(invoice.billedEmployeeCount !== null
+            ? { billedEmployeeCount: invoice.billedEmployeeCount }
+            : {}),
+        },
+      });
+
+      await tx.auditEvent.create({
+        data: {
+          organizationId: invoice.organizationId,
+          actorUserId: actor.id,
+          action: 'billing_invoice.manually_paid',
+          targetType: 'billing_invoice',
+          targetId: invoiceId,
+          description: `Invoice ${invoice.number} marked as paid manually by admin: ${dto?.notes ?? 'Offline payment confirmed'}`,
+          changes: {
+            previousStatus: invoice.status,
+            status: 'PAID',
+            paidAt,
+            notes: dto?.notes,
+          },
+        },
+      });
+
+      return false;
+    });
+
+    if (alreadyPaid) {
+      return {
+        message: 'Invoice is already marked as paid',
+        invoice: {
+          id: invoice.id,
+          number: invoice.number,
+          status: 'PAID',
+          paidAt: invoice.paidAt,
+        },
+      };
+    }
+
+    return {
+      message: `Invoice ${invoice.number} successfully marked as paid`,
+      invoice: {
+        id: invoice.id,
+        number: invoice.number,
+        status: 'PAID',
+        paidAt,
+      },
+    };
+  }
+
+  async voidInvoice(
+    actor: AuthenticatedUser,
+    invoiceId: string,
+    dto?: VoidInvoiceDto,
+  ) {
+    const invoice = await this.prisma.billingInvoice.findUnique({
+      where: { id: invoiceId },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException(`Invoice "${invoiceId}" not found`);
+    }
+
+    if (invoice.status === 'PAID') {
+      throw new BadRequestException(
+        'Cannot void an invoice that has already been paid',
+      );
+    }
+
+    await this.prisma.billingInvoice.update({
+      where: { id: invoiceId },
+      data: { status: 'VOID' },
+    });
+
+    await this.prisma.auditEvent.create({
+      data: {
+        organizationId: invoice.organizationId,
+        actorUserId: actor.id,
+        action: 'billing_invoice.voided',
+        targetType: 'billing_invoice',
+        targetId: invoiceId,
+        description: `Invoice ${invoice.number} voided by admin: ${dto?.reason ?? 'No reason provided'}`,
+        changes: {
+          previousStatus: invoice.status,
+          status: 'VOID',
+          reason: dto?.reason,
+        },
+      },
+    });
+
+    return {
+      message: `Invoice ${invoice.number} successfully voided`,
+      invoice: {
+        id: invoice.id,
+        number: invoice.number,
+        status: 'VOID',
       },
     };
   }

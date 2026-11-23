@@ -134,6 +134,8 @@ model Organization {
   pensionRemittanceSchedules    PensionRemittanceSchedule[]
   depositAccount                OrganizationDepositAccount?
   corporateCards                CorporateCard[]
+  subscription                  Subscription?
+  billingInvoices               BillingInvoice[]
 
   @@index([ownerId])
   @@map("organization")
@@ -217,14 +219,14 @@ model Team {
 }
 
 model TeamMember {
-  id             String    @id @default(dbgenerated("(uuidv7())::text"))
+  id             String   @id @default(dbgenerated("(uuidv7())::text"))
   organizationId String
   teamId         String
-  team           Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team           Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
   employeeId     String
-  employee       Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@unique([teamId, employeeId])
   @@index([organizationId])
@@ -248,11 +250,11 @@ model PositionLevel {
 }
 
 model Employee {
-  id                           String                         @id @default(dbgenerated("(uuidv7())::text"))
+  id                           String                @id @default(dbgenerated("(uuidv7())::text"))
   employeeNumber               String?
   organizationId               String
-  organization                 Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  userId                       String?                        @unique
+  organization                 Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId                       String?               @unique
   firstName                    String?
   lastName                     String?
   fullName                     String
@@ -260,14 +262,14 @@ model Employee {
   workEmail                    String?
   personalEmail                String?
   phone                        String?
-  dateOfBirth                  DateTime?                      @db.Date
+  dateOfBirth                  DateTime?             @db.Date
   gender                       String?
   maritalStatus                String?
   address                      String?
   workLocation                 String?
   nationality                  String?
-  currency                     String?                        @default("NGN")
-  payFrequency                 String?                        @default("MONTHLY")
+  currency                     String?               @default("NGN")
+  payFrequency                 String?               @default("MONTHLY")
   bankAccountLast4             String?
   emergencyContactName         String?
   emergencyContactRelationship String?
@@ -280,25 +282,25 @@ model Employee {
   pensionRsaNumber             String?
   pfaCode                      String?
   avatarUrl                    String?
-  employmentType               String                         @default("FULL_TIME")
+  employmentType               String                @default("FULL_TIME")
   jobTitle                     String
   departmentId                 String?
-  departmentRef                Department?                    @relation(fields: [organizationId, departmentId], references: [organizationId, id], onDelete: SetNull)
+  departmentRef                Department?           @relation(fields: [organizationId, departmentId], references: [organizationId, id], onDelete: SetNull)
   department                   String?
   positionLevelId              String?
-  positionLevel                PositionLevel?                 @relation(fields: [positionLevelId], references: [id], onDelete: SetNull)
-  status                       String                         @default("PENDING_INVITATION")
+  positionLevel                PositionLevel?        @relation(fields: [positionLevelId], references: [id], onDelete: SetNull)
+  status                       String                @default("PENDING_INVITATION")
   startDate                    DateTime
-  probationEndDate             DateTime?                      @db.Date
-  terminationDate              DateTime?                      @db.Date
-  annualSalaryMinor            BigInt                         @default(0)
-  salaryAmount                 Int                            @default(0)
-  declaredRent                 Int                            @default(0)
-  nhfOptIn                     Boolean                        @default(false)
+  probationEndDate             DateTime?             @db.Date
+  terminationDate              DateTime?             @db.Date
+  annualSalaryMinor            BigInt                @default(0)
+  salaryAmount                 Int                   @default(0)
+  declaredRent                 Int                   @default(0)
+  nhfOptIn                     Boolean               @default(false)
   managerId                    String?
-  manager                      Employee?                      @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
-  directReports                Employee[]                     @relation("EmployeeManager")
-  invitationToken              String?                        @unique
+  manager                      Employee?             @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
+  directReports                Employee[]            @relation("EmployeeManager")
+  invitationToken              String?               @unique
   invitationSentAt             DateTime?
   invitationAcceptedAt         DateTime?
   invitations                  Invitation[]
@@ -306,8 +308,8 @@ model Employee {
   leaveRequests                LeaveRequest[]
   documents                    Document[]
   onboarding                   EmployeeOnboarding?
-  departmentHeadOf             Department[]                   @relation("DepartmentHead")
-  teamHeadOf                   Team[]                         @relation("TeamHead")
+  departmentHeadOf             Department[]          @relation("DepartmentHead")
+  teamHeadOf                   Team[]                @relation("TeamHead")
   teamMemberships              TeamMember[]
   expenses                     Expense[]
   reimbursements               Reimbursement[]
@@ -317,8 +319,8 @@ model Employee {
   payrollItems                 PayrollItem[]
   payslips                     Payslip[]
   corporateCards               CorporateCard[]
-  createdAt                    DateTime                       @default(now())
-  updatedAt                    DateTime                       @updatedAt
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
 
   @@unique([organizationId, id])
   @@unique([organizationId, email])
@@ -697,26 +699,26 @@ model CompensationRecord {
 }
 
 model PayrollRun {
-  id                     String        @id
-  organizationId         String
-  organization           Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  periodMonth            Int
-  periodYear             Int
-  title                  String
-  status                 String        @default("DRAFT")
-  totalGross             Int           @default(0)
-  totalTax               Int           @default(0)
-  totalPension           Int           @default(0)
-  totalNet               Int           @default(0)
-  approvedAt             DateTime?
-  executedAt             DateTime?
-  reconciledAt           DateTime?
-  bulkTransferJson       Json?
-  paymentExportBatchJson Json?
-  createdAt              DateTime      @default(now())
-  updatedAt              DateTime      @updatedAt
-  items                  PayrollItem[]
-  payslips               Payslip[]
+  id                        String                     @id
+  organizationId            String
+  organization              Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  periodMonth               Int
+  periodYear                Int
+  title                     String
+  status                    String                     @default("DRAFT")
+  totalGross                Int                        @default(0)
+  totalTax                  Int                        @default(0)
+  totalPension              Int                        @default(0)
+  totalNet                  Int                        @default(0)
+  approvedAt                DateTime?
+  executedAt                DateTime?
+  reconciledAt              DateTime?
+  bulkTransferJson          Json?
+  paymentExportBatchJson    Json?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  items                     PayrollItem[]
+  payslips                  Payslip[]
   pensionRemittanceSchedule PensionRemittanceSchedule?
 
   @@unique([organizationId, periodYear, periodMonth])
@@ -833,8 +835,8 @@ model PensionRemittanceSchedule {
   payrollRun             PayrollRun   @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   penCentralValidationId String?
   penCentralScheduleId   String?
-  periodMonth            String       // Full English month name, e.g. "September"
-  periodYear             Int          // e.g. 2026
+  periodMonth            String // Full English month name, e.g. "September"
+  periodYear             Int // e.g. 2026
   employerCode           String
   totalEmployeePension   Int          @default(0)
   totalEmployerPension   Int          @default(0)
@@ -918,7 +920,7 @@ model OutboxEvent {
 }
 
 model DeadLetterEvent {
-  id             String    @id
+  id             String   @id
   organizationId String
   originalId     String
   eventType      String
@@ -928,7 +930,7 @@ model DeadLetterEvent {
   failureReason  String
   stackTrace     String?
   retryCount     Int
-  createdAt      DateTime  @default(now())
+  createdAt      DateTime @default(now())
 
   @@index([organizationId])
   @@index([eventType])
@@ -979,3 +981,112 @@ model CorporateCard {
   @@map("corporate_card")
 }
 
+// ─── Billing ────────────────────────────────────────────────────────────────
+// StackHR owns the subscription engine; Bachs Payments only collects each
+// invoice via a one-time NGN checkout. All money is integer kobo (BigInt).
+// Status/kind/cycle values are constrained by CHECKs in the migration SQL.
+
+/// Global plan catalog (not tenant-scoped). Prices are data, not code.
+model BillingPlan {
+  code                String         @id
+  name                String
+  includedEmployees   Int
+  monthlyFeeKobo      BigInt
+  annualFeeKobo       BigInt
+  overageRateKobo     BigInt
+  maxOverageEmployees Int
+  entitlements        Json
+  selfServe           Boolean        @default(true)
+  isActive            Boolean        @default(true)
+  sortOrder           Int
+  version             Int            @default(1)
+  createdAt           DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime       @updatedAt @db.Timestamptz(3)
+  subscriptions       Subscription[]
+
+  @@map("billing_plan")
+}
+
+/// One per organization. Commercial terms are snapshotted at subscribe time so
+/// catalog price changes never silently reprice an existing customer.
+model Subscription {
+  id                   String           @id @default(dbgenerated("(uuidv7())::text"))
+  organizationId       String           @unique
+  planCode             String
+  status               String           @default("FREE")
+  billingCycle         String           @default("MONTHLY")
+  includedEmployees    Int
+  baseFeeKobo          BigInt
+  overageRateKobo      BigInt
+  maxOverageEmployees  Int
+  customTerms          Boolean          @default(false)
+  billedEmployeeCount  Int              @default(0)
+  currentPeriodStart   DateTime?        @db.Timestamptz(3)
+  currentPeriodEnd     DateTime?        @db.Timestamptz(3)
+  pendingPlanCode      String?
+  pendingBillingCycle  String?
+  cancelAtPeriodEnd    Boolean          @default(false)
+  graceEndsAt          DateTime?        @db.Timestamptz(3)
+  bachsCustomerId      String?
+  bachsPaymentMethodId String?
+  createdAt            DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime         @updatedAt @db.Timestamptz(3)
+  organization         Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan                 BillingPlan      @relation(fields: [planCode], references: [code], onUpdate: Cascade)
+  invoices             BillingInvoice[]
+
+  @@index([planCode])
+  @@index([status, currentPeriodEnd])
+  @@map("subscription")
+}
+
+model BillingInvoice {
+  id                     String       @id @default(dbgenerated("(uuidv7())::text"))
+  organizationId         String
+  subscriptionId         String
+  number                 String       @unique
+  kind                   String
+  status                 String       @default("OPEN")
+  periodStart            DateTime     @db.Timestamptz(3)
+  periodEnd              DateTime     @db.Timestamptz(3)
+  lines                  Json
+  subtotalKobo           BigInt
+  totalKobo              BigInt
+  dueAt                  DateTime     @db.Timestamptz(3)
+  paidAt                 DateTime?    @db.Timestamptz(3)
+  bachsCheckoutId        String?      @unique
+  bachsCheckoutUrl       String?
+  bachsCheckoutExpiresAt DateTime?    @db.Timestamptz(3)
+  bachsChargeId          String?
+  /// What paying this invoice applies to the subscription (snapshot at issue time).
+  targetPlanCode         String?
+  targetBillingCycle     String?
+  targetTerms            Json?
+  billedEmployeeCount    Int?
+  failedAttempts         Int          @default(0)
+  lastFailureReason      String?
+  createdAt              DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime     @updatedAt @db.Timestamptz(3)
+  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription           Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([subscriptionId])
+  @@index([status, dueAt])
+  @@map("billing_invoice")
+}
+
+/// Global webhook dedup log (Bachs delivers at-least-once).
+model BillingWebhookEvent {
+  id          String    @id @default(dbgenerated("(uuidv7())::text"))
+  provider    String
+  eventId     String
+  type        String
+  payload     Json
+  receivedAt  DateTime  @default(now()) @db.Timestamptz(3)
+  processedAt DateTime? @db.Timestamptz(3)
+  error       String?
+
+  @@unique([provider, eventId])
+  @@map("billing_webhook_event")
+}

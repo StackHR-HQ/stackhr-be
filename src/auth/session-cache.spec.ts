@@ -197,4 +197,21 @@ describe('AuthService — session cache', () => {
     expect(second).toBeNull();
     expect(prismaMock.session.findUnique).toHaveBeenCalledTimes(2);
   });
+
+  it('sets Max-Age when rememberMe is true and omits Max-Age when false', () => {
+    const append = jest.fn();
+    const res = { append } as unknown as import('express').Response;
+
+    service.setSessionCookie(res, 'tok-1', true);
+    expect(append).toHaveBeenCalledWith(
+      'Set-Cookie',
+      expect.stringContaining('Max-Age=2592000'),
+    );
+
+    append.mockClear();
+    service.setSessionCookie(res, 'tok-2', false);
+    const cookieHeader = append.mock.calls[0][1] as string;
+    expect(cookieHeader).toContain('stackhr_session=tok-2');
+    expect(cookieHeader).not.toContain('Max-Age=');
+  });
 });

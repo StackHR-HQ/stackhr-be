@@ -110,11 +110,16 @@ export class AuthController {
         email: dto.email,
         password: dto.password,
         orgSlug: dto.orgSlug,
+        rememberMe: dto.rememberMe,
       },
       this.sessionOptions(request),
     );
 
-    this.authService.setSessionCookie(response, result.token);
+    this.authService.setSessionCookie(
+      response,
+      result.token,
+      dto.rememberMe ?? true,
+    );
     return {
       user: this.authService.toFrontendUser(result.user),
       token: result.token,
@@ -132,11 +137,16 @@ export class AuthController {
       {
         email: dto.email,
         password: dto.password,
+        rememberMe: dto.rememberMe,
       },
       this.sessionOptions(request),
     );
 
-    this.authService.setSessionCookie(response, result.token);
+    this.authService.setSessionCookie(
+      response,
+      result.token,
+      dto.rememberMe ?? true,
+    );
     return {
       user: this.authService.toFrontendUser(result.user),
       token: result.token,

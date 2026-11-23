@@ -93,6 +93,16 @@ describe('Auth DTOs', () => {
       expect(errors.length).toBe(1);
       expect(errors[0].property).toBe('password');
     });
+
+    it('should accept optional boolean rememberMe', async () => {
+      const dto = new LoginDto();
+      dto.email = 'user@example.com';
+      dto.password = 'validpassword123';
+      dto.rememberMe = false;
+
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+    });
   });
 
   describe('SwitchOrganizationDto', () => {

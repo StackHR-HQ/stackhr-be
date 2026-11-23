@@ -16,10 +16,15 @@ import {
   getOrgPrefix,
   computeNextEmployeeNumber,
 } from '../common/utils/employee-number.util';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { SEAT_HOLDING_STATUSES } from '../billing/billing-catalog';
 
 @Injectable()
 export class EmployeesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly entitlements: EntitlementsService,
+  ) {}
 
   private checkOrgContext(user: AuthenticatedUser): string {
     if (!user.organizationId) {
@@ -60,6 +65,7 @@ export class EmployeesService {
 
   async createEmployee(user: AuthenticatedUser, dto: CreateEmployeeDto) {
     const orgId = this.checkOrgContext(user);
+    await this.entitlements.assertCanAddEmployees(orgId, 1);
 
     const existing = await this.prisma.employee.findFirst({
       where: { email: dto.email },
@@ -131,7 +137,7 @@ export class EmployeesService {
           organizationId: orgId,
           employeeId: employee.id,
           effectiveFrom: employee.startDate,
-          basicSalary: dto.salaryAmount,
+          basicSalary: dto.salaryAmount * 100,
           housingAllowance: 0,
           transportAllowance: 0,
           otherAllowances: 0,
@@ -333,6 +339,14 @@ export class EmployeesService {
           `Employee number "${dto.employeeNumber}" is already in use in this organization`,
         );
       }
+    }
+
+    if (
+      dto.status &&
+      SEAT_HOLDING_STATUSES.includes(dto.status) &&
+      !SEAT_HOLDING_STATUSES.includes(employee.status)
+    ) {
+      await this.entitlements.assertCanAddEmployees(orgId, 1);
     }
 
     const updated = await this.prisma.employee.update({
