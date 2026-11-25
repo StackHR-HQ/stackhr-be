@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SpendService } from './spend.service';
 import { PrismaService } from '../database/prisma.service';
@@ -456,6 +456,87 @@ describe('SpendService', () => {
       );
       expect(result.transfer).toBeDefined();
       expect(result.transfer?.reference).toBe('rem_rmb-1_1');
+    });
+
+    it('should refuse to pay a reimbursement that is not APPROVED', async () => {
+      prismaMock.reimbursement.findFirst.mockResolvedValue({
+        id: 'rmb-pending',
+        amount: 50000,
+        status: 'PENDING',
+        employee: {
+          fullName: 'Jane Doe',
+          accountNumber: '0123456789',
+          bankName: 'ACCESS BANK',
+        },
+      });
+
+      await expect(
+        service.payReimbursement(mockUser, 'rmb-pending'),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.reimbursement.update).not.toHaveBeenCalled();
+    });
+
+    it('should refuse to pay when employee has no bank details', async () => {
+      const bankingMock = {
+        getBanks: jest.fn().mockResolvedValue([]),
+        executeSingleTransfer: jest.fn(),
+      };
+      const serviceWithBanking = new SpendService(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        prismaMock,
+        approvalsServiceMock as unknown as ApprovalsService,
+        bankingMock as unknown as BankingService,
+      );
+
+      prismaMock.reimbursement.findFirst.mockResolvedValue({
+        id: 'rmb-nobank',
+        amount: 50000,
+        status: 'APPROVED',
+        employee: {
+          fullName: 'Jane Doe',
+          accountNumber: null,
+          bankName: null,
+        },
+      });
+
+      await expect(
+        serviceWithBanking.payReimbursement(mockUser, 'rmb-nobank'),
+      ).rejects.toThrow(BadRequestException);
+      expect(bankingMock.executeSingleTransfer).not.toHaveBeenCalled();
+      expect(prismaMock.reimbursement.update).not.toHaveBeenCalled();
+    });
+
+    it('should not mark reimbursement PAID if transfer fails', async () => {
+      const bankingMock = {
+        getBanks: jest
+          .fn()
+          .mockResolvedValue([{ name: 'Access Bank', nipCode: '000014' }]),
+        executeSingleTransfer: jest
+          .fn()
+          .mockRejectedValue(new BadRequestException('Insufficient funds')),
+      };
+      const serviceWithBanking = new SpendService(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        prismaMock,
+        approvalsServiceMock as unknown as ApprovalsService,
+        bankingMock as unknown as BankingService,
+      );
+
+      prismaMock.reimbursement.findFirst.mockResolvedValue({
+        id: 'rmb-fail',
+        amount: 50000,
+        status: 'APPROVED',
+        employee: {
+          fullName: 'Jane Doe',
+          accountNumber: '0123456789',
+          bankName: 'Access Bank',
+        },
+      });
+
+      await expect(
+        serviceWithBanking.payReimbursement(mockUser, 'rmb-fail'),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.reimbursement.update).not.toHaveBeenCalled();
     });
   });
 

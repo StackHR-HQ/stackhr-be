@@ -10,6 +10,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { WaitlistService } from './waitlist.service';
 import { JoinWaitlistDto } from './dto/join-waitlist.dto';
+import { SendWaitlistLaunchEmailDto } from './dto/send-waitlist-launch-email.dto';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { RequireRoles } from '../auth/auth.decorators';
@@ -31,5 +32,20 @@ export class WaitlistController {
   @RequireRoles(USER_ROLES.STACKHR_ADMIN, USER_ROLES.STACKHR_SUPPORT)
   async getWaitlistEntries() {
     return this.waitlistService.getWaitlistEntries();
+  }
+
+  @Get('pending')
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireRoles(USER_ROLES.STACKHR_ADMIN, USER_ROLES.STACKHR_SUPPORT)
+  async getPendingWaitlistEntries() {
+    return this.waitlistService.getPendingWaitlistEntries();
+  }
+
+  @Post('launch-email')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireRoles(USER_ROLES.STACKHR_ADMIN)
+  async sendLaunchEmails(@Body() dto: SendWaitlistLaunchEmailDto) {
+    return this.waitlistService.sendLaunchEmails(dto);
   }
 }

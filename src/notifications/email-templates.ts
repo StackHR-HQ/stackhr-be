@@ -381,6 +381,69 @@ https://stackhr.app`;
 }
 
 // ---------------------------------------------------------------------------
+// Email: Waitlist launch invitation (to businesses yet to sign up)
+// ---------------------------------------------------------------------------
+export function waitlistLaunchEmail(input: {
+  fullName: string;
+  businessName: string;
+  signupUrl: string;
+  subject?: string;
+  customMessage?: string;
+}): TransactionalEmail {
+  const rawFirstName = input.fullName.trim().split(' ')[0] || 'there';
+  const firstName = escapeHtml(rawFirstName);
+  const safeBusiness = escapeHtml(input.businessName || 'your team');
+  const subject =
+    input.subject?.trim() || "StackHR is live — let's get your team onboarded";
+  const customNote = input.customMessage?.trim();
+
+  const text = `Hi ${rawFirstName},
+
+It's Mubarak from StackHR. Thank you for joining our waitlist for ${input.businessName || 'your business'} — we're excited to let you know that StackHR is now live!
+${customNote ? `\n${customNote}\n` : ''}
+You can now create your workspace and start managing:
+• Employee onboarding & records
+• Automated Nigerian payroll, PAYE, NHF & PenCom pension compliance
+• Leave, approvals, expenses, reimbursements & payouts
+
+Create your StackHR workspace here: ${input.signupUrl}
+
+If you'd like a quick walkthrough or help migrating your team, just reply directly to this email.
+
+Best,
+Mubarak from StackHR
+HR. Payroll. Spend. One platform.`;
+
+  return {
+    subject,
+    text,
+    html: layout({
+      subject,
+      preheader: `${input.businessName || 'Your business'} is invited — StackHR is now live.`,
+      eyebrow: 'StackHR Launch',
+      headline: `We're live, ${firstName}!`,
+      intro: `It's Mubarak from StackHR. Thank you for waiting — ${safeBusiness} is invited to get started on StackHR today.`,
+      bodyHtml: `
+        ${
+          customNote
+            ? `<p style="margin:0 0 18px 0;font-size:15px;line-height:25px;color:${COLORS.muted};">${escapeHtml(customNote)}</p>`
+            : ''
+        }
+        <p style="margin:0 0 12px 0;font-size:15px;line-height:25px;font-weight:700;color:${COLORS.heading};">With your workspace ready, you can immediately:</p>
+        <ul style="margin:0 0 20px 0;padding-left:22px;font-size:15px;line-height:26px;color:${COLORS.muted};">
+          <li style="margin-bottom:6px;">Onboard employees and manage your company directory</li>
+          <li style="margin-bottom:6px;">Run Nigerian payroll with automated PAYE, NHF &amp; PenCom pension</li>
+          <li style="margin-bottom:6px;">Handle leave, approvals, expenses &amp; reimbursements in one place</li>
+        </ul>
+        <p style="margin:0;font-size:15px;line-height:25px;color:${COLORS.muted};">If you'd like a quick walkthrough or help getting ${safeBusiness} set up, simply reply to this email.<br/><br/>Best,<br/><strong>Mubarak from StackHR</strong></p>
+      `,
+      ctaUrl: input.signupUrl,
+      ctaText: 'Create Your Workspace',
+    }),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Email: Password reset link
 // ---------------------------------------------------------------------------
 export function passwordResetEmail(resetUrl: string): TransactionalEmail {

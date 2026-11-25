@@ -432,36 +432,41 @@ export class SpendService {
     let transferResult: AnchorSingleTransferResult | null = null;
     if (this.bankingService) {
       const emp = advance.employee;
+      if (!emp?.accountNumber || !emp?.bankName) {
+        throw new BadRequestException(
+          'Employee bank details (bankName and accountNumber) are required before disbursing a salary advance',
+        );
+      }
+
       const supportedBanks = await this.bankingService
         .getBanks()
         .catch(() => []);
       const matchedBank = supportedBanks.find(
         (b) =>
-          b.name.toLowerCase() === emp?.bankName?.toLowerCase() ||
-          b.nipCode === emp?.bankName,
+          b.name.toLowerCase() === emp.bankName?.toLowerCase() ||
+          b.nipCode === emp.bankName,
       );
-      const bankCode = matchedBank?.nipCode ?? '000014';
-      const accountNumber = emp?.accountNumber ?? '0123456789';
-      const accountName = emp?.accountName ?? emp?.fullName ?? 'Employee';
+      if (!matchedBank?.nipCode) {
+        throw new BadRequestException(
+          `Employee bank "${emp.bankName}" could not be resolved to a supported bank code`,
+        );
+      }
+
+      const bankCode = matchedBank.nipCode;
+      const accountNumber = emp.accountNumber;
+      const accountName = emp.accountName ?? emp.fullName ?? 'Employee';
       const amountKobo = Math.round(Number(advance.amount) * 100);
 
-      transferResult = await this.bankingService
-        .executeSingleTransfer(orgId, {
-          amountKobo,
-          reference: `adv_${advance.id}_1`,
-          destination: {
-            accountNumber,
-            bankCode,
-            accountName,
-          },
-          reason: `Salary Advance Disbursement - ${emp?.fullName ?? 'Employee'}`,
-        })
-        .catch((err) => {
-          this.logger.warn(
-            `Anchor transfer for salary advance ${advance.id} failed or was skipped: ${err?.message}`,
-          );
-          return null;
-        });
+      transferResult = await this.bankingService.executeSingleTransfer(orgId, {
+        amountKobo,
+        reference: `adv_${advance.id}_1`,
+        destination: {
+          accountNumber,
+          bankCode,
+          accountName,
+        },
+        reason: `Salary Advance Disbursement - ${emp.fullName ?? 'Employee'}`,
+      });
     }
 
     const updated = await this.prisma.salaryAdvance.update({
@@ -749,39 +754,50 @@ export class SpendService {
       throw new BadRequestException('Reimbursement claim is already paid');
     }
 
+    if (reimbursement.status !== 'APPROVED') {
+      throw new BadRequestException(
+        `Cannot pay reimbursement claim with status ${reimbursement.status}. It must be APPROVED first.`,
+      );
+    }
+
     let transferResult: AnchorSingleTransferResult | null = null;
     if (this.bankingService) {
       const emp = reimbursement.employee;
+      if (!emp?.accountNumber || !emp?.bankName) {
+        throw new BadRequestException(
+          'Employee bank details (bankName and accountNumber) are required before paying a reimbursement',
+        );
+      }
+
       const supportedBanks = await this.bankingService
         .getBanks()
         .catch(() => []);
       const matchedBank = supportedBanks.find(
         (b) =>
-          b.name.toLowerCase() === emp?.bankName?.toLowerCase() ||
-          b.nipCode === emp?.bankName,
+          b.name.toLowerCase() === emp.bankName?.toLowerCase() ||
+          b.nipCode === emp.bankName,
       );
-      const bankCode = matchedBank?.nipCode ?? '000014';
-      const accountNumber = emp?.accountNumber ?? '0123456789';
-      const accountName = emp?.accountName ?? emp?.fullName ?? 'Employee';
+      if (!matchedBank?.nipCode) {
+        throw new BadRequestException(
+          `Employee bank "${emp.bankName}" could not be resolved to a supported bank code`,
+        );
+      }
+
+      const bankCode = matchedBank.nipCode;
+      const accountNumber = emp.accountNumber;
+      const accountName = emp.accountName ?? emp.fullName ?? 'Employee';
       const amountKobo = Math.round(Number(reimbursement.amount) * 100);
 
-      transferResult = await this.bankingService
-        .executeSingleTransfer(orgId, {
-          amountKobo,
-          reference: `rem_${reimbursement.id}_1`,
-          destination: {
-            accountNumber,
-            bankCode,
-            accountName,
-          },
-          reason: `Expense Reimbursement Payment - ${emp?.fullName ?? 'Employee'}`,
-        })
-        .catch((err) => {
-          this.logger.warn(
-            `Anchor transfer for reimbursement ${reimbursement.id} failed or was skipped: ${err?.message}`,
-          );
-          return null;
-        });
+      transferResult = await this.bankingService.executeSingleTransfer(orgId, {
+        amountKobo,
+        reference: `rem_${reimbursement.id}_1`,
+        destination: {
+          accountNumber,
+          bankCode,
+          accountName,
+        },
+        reason: `Expense Reimbursement Payment - ${emp.fullName ?? 'Employee'}`,
+      });
     }
 
     const updated = await this.prisma.reimbursement.update({

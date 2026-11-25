@@ -9,6 +9,7 @@ export interface SendEmailInput {
   subject: string;
   html: string;
   text?: string;
+  from?: string;
   idempotencyKey?: string;
 }
 
@@ -32,7 +33,8 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly endpoint = 'https://api.sendbyte.africa/v1/emails';
   private readonly from =
-    process.env.SENDBYTE_FROM_EMAIL ?? 'StackHR <noreply@stackhr.app>';
+    process.env.SENDBYTE_FROM_EMAIL ??
+    'Mubarak from StackHR <noreply@stackhr.app>';
 
   async send(input: SendEmailInput): Promise<SendEmailResult> {
     const apiKey = process.env.SENDBYTE_API_KEY ?? process.env.SENDBYTE_KEY;
@@ -48,7 +50,7 @@ export class EmailService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: this.from,
+        from: input.from ?? this.from,
         to: input.to,
         subject: input.subject,
         html: input.html,

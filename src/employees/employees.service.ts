@@ -475,37 +475,95 @@ export class EmployeesService {
   }
 
   async getDepartmentSummary(user: AuthenticatedUser) {
-    this.checkOrgContext(user);
+    const orgId = this.checkOrgContext(user);
 
-    const employees = await this.prisma.employee.findMany({
-      orderBy: [{ department: 'asc' }, { fullName: 'asc' }],
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        department: true,
-        jobTitle: true,
-        status: true,
-      },
-    });
-
-    const deptMap = new Map<string, any[]>();
-
-    employees.forEach((emp) => {
-      const dept = emp.department || 'Unassigned';
-      if (!deptMap.has(dept)) {
-        deptMap.set(dept, []);
-      }
-      deptMap.get(dept)!.push(emp);
-    });
-
-    const departments = Array.from(deptMap.entries()).map(
-      ([department, memberList]) => ({
-        department,
-        count: memberList.length,
-        employees: memberList,
+    const [orgDepartments, employees] = await Promise.all([
+      this.prisma.department
+        ? this.prisma.department.findMany({
+            where: { organizationId: orgId },
+            orderBy: { name: 'asc' },
+            include: {
+              headEmployee: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                  jobTitle: true,
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+      this.prisma.employee.findMany({
+        orderBy: [{ department: 'asc' }, { fullName: 'asc' }],
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          departmentId: true,
+          department: true,
+          jobTitle: true,
+          status: true,
+        },
       }),
-    );
+    ]);
+
+    const deptBuckets = new Map<
+      string,
+      {
+        id: string | null;
+        name: string;
+        department: string;
+        headEmployeeId: string | null;
+        head: {
+          id: string;
+          fullName: string;
+          email: string;
+          jobTitle: string;
+        } | null;
+        employees: typeof employees;
+      }
+    >();
+
+    for (const dept of orgDepartments) {
+      deptBuckets.set(dept.id, {
+        id: dept.id,
+        name: dept.name,
+        department: dept.name,
+        headEmployeeId: dept.headEmployeeId ?? null,
+        head: dept.headEmployee ?? null,
+        employees: [],
+      });
+    }
+
+    for (const emp of employees) {
+      const bucketKey =
+        emp.departmentId && deptBuckets.has(emp.departmentId)
+          ? emp.departmentId
+          : `name:${emp.department || 'Unassigned'}`;
+      if (!deptBuckets.has(bucketKey)) {
+        const label = emp.department || 'Unassigned';
+        deptBuckets.set(bucketKey, {
+          id: emp.departmentId ?? null,
+          name: label,
+          department: label,
+          headEmployeeId: null,
+          head: null,
+          employees: [],
+        });
+      }
+      deptBuckets.get(bucketKey)!.employees.push(emp);
+    }
+
+    const departments = Array.from(deptBuckets.values()).map((bucket) => ({
+      id: bucket.id,
+      name: bucket.name,
+      department: bucket.department,
+      headEmployeeId: bucket.headEmployeeId,
+      head: bucket.head,
+      count: bucket.employees.length,
+      employees: bucket.employees,
+    }));
 
     return {
       departments,
@@ -519,7 +577,7 @@ export class EmployeesService {
     id: string,
     dto: OffboardEmployeeDto,
   ) {
-    this.checkOrgContext(user);
+    const orgId = this.checkOrgContext(user);
     const employee = await this.prisma.employee.findFirst({
       where: { id },
     });
@@ -532,19 +590,57 @@ export class EmployeesService {
       throw new BadRequestException('Employee is already offboarded');
     }
 
+    const offboardDate = dto.offboardDate
+      ? new Date(dto.offboardDate)
+      : new Date();
+    if (Number.isNaN(offboardDate.getTime())) {
+      throw new BadRequestException('Invalid offboardDate');
+    }
+
+    const endOfTodayUtc = new Date();
+    endOfTodayUtc.setUTCHours(23, 59, 59, 999);
+    const nextStatus =
+      offboardDate.getTime() > endOfTodayUtc.getTime()
+        ? 'OFFBOARDING'
+        : 'OFFBOARDED';
+    const reason = dto.reason ?? 'Standard offboarding';
+
     const updated = await this.prisma.employee.update({
       where: { id },
       data: {
-        status: 'OFFBOARDED',
+        status: nextStatus,
+        terminationDate: offboardDate,
       },
     });
 
+    if (this.prisma.auditEvent) {
+      await this.prisma.auditEvent.create({
+        data: {
+          organizationId: orgId,
+          actorUserId: user.id,
+          action: 'employee.offboarded',
+          targetType: 'employee',
+          targetId: id,
+          description: `Employee ${employee.fullName} marked ${nextStatus} (${reason})`,
+          changes: {
+            previousStatus: employee.status,
+            status: nextStatus,
+            terminationDate: offboardDate.toISOString(),
+            reason,
+          },
+        },
+      });
+    }
+
     return {
-      message: 'Employee offboarded successfully',
+      message:
+        nextStatus === 'OFFBOARDING'
+          ? 'Employee offboarding scheduled successfully'
+          : 'Employee offboarded successfully',
       employee: updated,
       offboardDetails: {
-        offboardDate: dto.offboardDate ?? new Date().toISOString(),
-        reason: dto.reason ?? 'Standard offboarding',
+        offboardDate: offboardDate.toISOString(),
+        reason,
       },
     };
   }

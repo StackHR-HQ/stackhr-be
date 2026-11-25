@@ -9,7 +9,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
-import { CurrentUser } from '../auth/auth.decorators';
+import { CurrentUser, RequireRoles } from '../auth/auth.decorators';
+import { USER_ROLES } from '../auth/auth.constants';
 import { RolesGuard } from '../auth/roles.guard';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { EmployeesService } from './employees.service';
@@ -21,6 +22,11 @@ import { ReassignManagerDto } from './dto/reassign-manager.dto';
 
 @Controller('employees')
 @UseGuards(AuthGuard, RolesGuard)
+@RequireRoles(
+  USER_ROLES.BUSINESS_OWNER,
+  USER_ROLES.BUSINESS_ADMIN,
+  USER_ROLES.HR_ADMIN,
+)
 export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}
 

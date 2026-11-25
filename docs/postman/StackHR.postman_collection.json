@@ -260,6 +260,121 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": [\n    {\n      \"id\": \"w_8f9a2b1c\",\n      \"name\": \"Jane Doe\",\n      \"position\": \"Head of HR\",\n      \"businessName\": \"Acme Technologies\",\n      \"businessEmail\": \"jane@acmetech.com\",\n      \"createdAt\": \"2026-09-21T12:00:00.000Z\"\n    }\n  ]\n}"
             }
           ]
+        },
+        {
+          "name": "List Pending Waitlist (Yet to Sign Up)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/waitlist/pending",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "waitlist",
+                "pending"
+              ]
+            },
+            "description": "List waitlist entries whose businessEmail does not yet have a registered StackHR user account. Accessible by STACKHR_ADMIN and STACKHR_SUPPORT."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": [\n    {\n      \"id\": \"w_018f3a5e-1234-7a9b-bcde-000000000001\",\n      \"name\": \"Bola Ade\",\n      \"position\": \"HR Lead\",\n      \"businessName\": \"Pending Co\",\n      \"businessEmail\": \"bola@pending.com\",\n      \"createdAt\": \"2026-10-01T10:00:00.000Z\"\n    }\n  ]\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Send Waitlist Launch Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dryRun\": true,\n  \"signupUrl\": \"https://app.stackhr.app/signup\",\n  \"subject\": \"StackHR is live — let's get your team onboarded\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/waitlist/launch-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "waitlist",
+                "launch-email"
+              ]
+            },
+            "description": "Send the launch invitation email (from Mubarak from StackHR) to all waitlist businesses that have not signed up yet. Supports dryRun: true to preview recipients and testEmail to send a single test email first. Accessible by STACKHR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"dryRun\": false,\n    \"testMode\": false,\n    \"totalPending\": 12,\n    \"sentCount\": 12,\n    \"failedCount\": 0,\n    \"recipients\": [\n      {\n        \"id\": \"w_018f3a5e-1234-7a9b-bcde-000000000001\",\n        \"email\": \"bola@pending.com\",\n        \"name\": \"Bola Ade\",\n        \"businessName\": \"Pending Co\"\n      }\n    ],\n    \"failures\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -1522,7 +1637,7 @@
                 "summary"
               ]
             },
-            "description": "Retrieve summary breakdown of employees grouped by department."
+            "description": "Group employees by departmentId (joining Department with headEmployeeId and head), falling back to Unassigned. Accessible by BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
           },
           "response": [
             {
@@ -1616,7 +1731,7 @@
                 "offboard"
               ]
             },
-            "description": "Offboard an employee and mark status as OFFBOARDED."
+            "description": "Offboard an employee. Persists terminationDate, schedules status OFFBOARDING if offboardDate is in the future (or OFFBOARDED immediately), and logs reason in AuditEvent. Accessible by BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
           },
           "response": [
             {
