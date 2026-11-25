@@ -6104,9 +6104,17 @@
                     "people",
                     "onboarding",
                     "employees"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "all",
+                      "disabled": true,
+                      "description": "Optional status filter: all, active, onboarding, pending_invitation"
+                    }
                   ]
                 },
-                "description": "List employee onboarding progress."
+                "description": "List all non-offboarded employees with an onboarding assignment (including ACTIVE employees with open checklist items) and their completedItemIds. Pass optional ?status=all|active|onboarding|pending_invitation to filter. Accessible by BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
               },
               "response": []
             },

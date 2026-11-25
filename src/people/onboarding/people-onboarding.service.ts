@@ -392,14 +392,22 @@ export class PeopleOnboardingService {
     return Array.from(ids);
   }
 
-  listEmployees(user: AuthenticatedUser) {
+  listEmployees(user: AuthenticatedUser, statusFilter?: string) {
     const organizationId = requirePeopleOrganization(user);
+    const normalizedFilter = statusFilter?.trim().toLowerCase();
+    const statusWhere =
+      normalizedFilter === 'all'
+        ? undefined
+        : normalizedFilter
+          ? normalizedFilter.toUpperCase()
+          : { not: 'OFFBOARDED' };
+
     return this.tenant.run(organizationId, async (client) => {
       const [employees, assignments, completions] = await Promise.all([
         client.employee.findMany({
           where: {
             organizationId,
-            status: { in: ['ONBOARDING', 'PENDING_INVITATION'] },
+            ...(statusWhere !== undefined ? { status: statusWhere } : {}),
           },
           orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
         }),
