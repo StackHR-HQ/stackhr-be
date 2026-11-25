@@ -91,6 +91,8 @@ model Organization {
   logo                          String?
   industry                      String?
   companySize                   String?
+  address                       String?
+  rcNumber                      String?
   currency                      String                         @default("NGN")
   payrollFrequency              String                         @default("MONTHLY")
   payDate                       Int                            @default(25)

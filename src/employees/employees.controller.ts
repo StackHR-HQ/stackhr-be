@@ -51,6 +51,11 @@ export class EmployeesController {
     return this.employeesService.getHierarchyTree(user);
   }
 
+  @Get('managers')
+  listManagers(@CurrentUser() user: AuthenticatedUser) {
+    return this.employeesService.listManagers(user);
+  }
+
   @Get('departments/summary')
   getDepartmentSummary(@CurrentUser() user: AuthenticatedUser) {
     return this.employeesService.getDepartmentSummary(user);

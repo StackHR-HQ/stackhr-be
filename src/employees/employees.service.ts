@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service';
+import { USER_ROLES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
@@ -435,6 +436,74 @@ export class EmployeesService {
       message: 'Manager reassigned successfully',
       employee: updated,
     };
+  }
+
+  async listManagers(user: AuthenticatedUser) {
+    this.checkOrgContext(user);
+
+    const [allEmployees, managerMembers] = await Promise.all([
+      this.prisma.employee.findMany({
+        orderBy: { fullName: 'asc' },
+        select: {
+          id: true,
+          userId: true,
+          fullName: true,
+          email: true,
+          department: true,
+          jobTitle: true,
+          status: true,
+          managerId: true,
+        },
+      }),
+      this.prisma.tenantClient.member.findMany({
+        where: { role: USER_ROLES.MANAGER },
+        select: { userId: true },
+      }),
+    ]);
+
+    const managerUserIds = new Set(
+      (managerMembers as { userId: string }[]).map((m) => m.userId),
+    );
+    const reportsByManager = new Map<string, typeof allEmployees>();
+
+    for (const emp of allEmployees) {
+      if (emp.managerId) {
+        const list = reportsByManager.get(emp.managerId) ?? [];
+        list.push(emp);
+        reportsByManager.set(emp.managerId, list);
+      }
+    }
+
+    const managers = allEmployees
+      .filter(
+        (emp) =>
+          reportsByManager.has(emp.id) ||
+          (emp.userId ? managerUserIds.has(emp.userId) : false),
+      )
+      .map((emp) => {
+        const directReports = (reportsByManager.get(emp.id) ?? []).map((r) => ({
+          id: r.id,
+          fullName: r.fullName,
+          email: r.email,
+          department: r.department,
+          jobTitle: r.jobTitle,
+          status: r.status,
+        }));
+        return {
+          id: emp.id,
+          userId: emp.userId,
+          fullName: emp.fullName,
+          email: emp.email,
+          department: emp.department,
+          jobTitle: emp.jobTitle,
+          status: emp.status,
+          isManagerRole: emp.userId ? managerUserIds.has(emp.userId) : false,
+          directReportsCount: directReports.length,
+          directReports,
+        };
+      });
+
+    return { managers };
   }
 
   async getHierarchyTree(user: AuthenticatedUser) {
