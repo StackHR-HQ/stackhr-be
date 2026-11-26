@@ -20,6 +20,7 @@ import { MAX_DOCUMENT_BYTES } from '../people/documents/document-file-validation
 import { SpendService } from './spend.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateSalaryAdvanceDto } from './dto/create-salary-advance.dto';
+import { SettlePayoutDto } from './dto/settle-payout.dto';
 import { AttachReceiptDto } from './dto/attach-receipt.dto';
 import { RequireEntitlement } from '../billing/require-entitlement.decorator';
 
@@ -98,8 +99,9 @@ export class SpendController {
   disburseSalaryAdvance(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
+    @Body() dto?: SettlePayoutDto,
   ) {
-    return this.spendService.disburseSalaryAdvance(user, id);
+    return this.spendService.disburseSalaryAdvance(user, id, dto);
   }
 
   @Patch('advances/:id/cancel')

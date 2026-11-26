@@ -345,7 +345,7 @@
                 "launch-email"
               ]
             },
-            "description": "Send the launch invitation email (from Mubarak from StackHR) to all waitlist businesses that have not signed up yet. Supports dryRun: true to preview recipients and testEmail to send a single test email first. Accessible by STACKHR_ADMIN."
+            "description": "Sends the launch email from Mubarak from StackHR to pending waitlist businesses. Defaults to dryRun: true for safety; pass dryRun: false to send live."
           },
           "response": [
             {
@@ -11265,7 +11265,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/audit?page=1&limit=20",
+              "raw": "{{baseUrl}}/audit?source=events&page=1&limit=20",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -11283,7 +11283,7 @@
                 }
               ]
             },
-            "description": "Lists paginated security and mutation audit logs for the current organization. Supports optional action, resource, actorId, from, and to filters. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+            "description": "Lists paginated security and domain audit events for the current organization (defaults to source=events for AuditEvent; pass source=requests for raw HTTP AuditLog). Supports action, resource, actorId, from, and to filters. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
           },
           "response": [
             {

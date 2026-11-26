@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -16,6 +17,7 @@ import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateSalaryAdvanceDto } from './dto/create-salary-advance.dto';
 import { AttachReceiptDto } from './dto/attach-receipt.dto';
 import { CreateReimbursementDto } from './dto/create-reimbursement.dto';
+import { SettlePayoutDto } from './dto/settle-payout.dto';
 import { USER_ROLES } from '../auth/auth.constants';
 import { BankingService } from '../banking/banking.service';
 import { AnchorSingleTransferResult } from '../banking/anchor/anchor.types';
@@ -406,8 +408,59 @@ export class SpendService {
     return { advance: updated, salaryAdvance: updated };
   }
 
-  async disburseSalaryAdvance(user: AuthenticatedUser, id: string) {
+  private async resolveEmployeeBankForPayout(
+    employee: {
+      accountNumber?: string | null;
+      bankName?: string | null;
+      accountName?: string | null;
+      fullName?: string | null;
+    } | null,
+    actionLabel: string,
+  ): Promise<{
+    accountNumber: string;
+    bankCode: string;
+    accountName: string;
+  }> {
+    if (!employee?.accountNumber || !employee?.bankName) {
+      throw new BadRequestException(
+        `Employee bank details (bankName and accountNumber) are required before ${actionLabel}`,
+      );
+    }
+
+    if (!this.bankingService) {
+      throw new ServiceUnavailableException(
+        'Banking service is not configured for automated payouts. Pass manualSettlement: true to record a manual payout.',
+      );
+    }
+
+    const supportedBanks = await this.bankingService
+      .getBanks()
+      .catch(() => [] as Array<{ name: string; nipCode: string }>);
+    const matchedBank = supportedBanks.find(
+      (b) =>
+        b.name.toLowerCase() === employee.bankName?.toLowerCase() ||
+        b.nipCode === employee.bankName,
+    );
+    if (!matchedBank?.nipCode) {
+      throw new BadRequestException(
+        `Employee bank "${employee.bankName}" could not be resolved to a supported bank code`,
+      );
+    }
+
+    return {
+      accountNumber: employee.accountNumber,
+      bankCode: matchedBank.nipCode,
+      accountName: employee.accountName ?? employee.fullName ?? 'Employee',
+    };
+  }
+
+  async disburseSalaryAdvance(
+    user: AuthenticatedUser,
+    id: string,
+    dto?: SettlePayoutDto,
+  ) {
     const orgId = this.checkOrgContext(user);
+    const manualSettlement = dto?.manualSettlement === true;
     const advance = await this.prisma.salaryAdvance.findFirst({
       where: { id, organizationId: orgId },
       include: { employee: true },
@@ -429,44 +482,43 @@ export class SpendService {
       );
     }
 
-    let transferResult: AnchorSingleTransferResult | null = null;
-    if (this.bankingService) {
-      const emp = advance.employee;
-      if (!emp?.accountNumber || !emp?.bankName) {
-        throw new BadRequestException(
-          'Employee bank details (bankName and accountNumber) are required before disbursing a salary advance',
+    const destination = manualSettlement
+      ? null
+      : await this.resolveEmployeeBankForPayout(
+          advance.employee,
+          'disbursing a salary advance',
         );
-      }
 
-      const supportedBanks = await this.bankingService
-        .getBanks()
-        .catch(() => []);
-      const matchedBank = supportedBanks.find(
-        (b) =>
-          b.name.toLowerCase() === emp.bankName?.toLowerCase() ||
-          b.nipCode === emp.bankName,
+    const claimed = await this.prisma.salaryAdvance.updateMany({
+      where: { id, organizationId: orgId, status: 'APPROVED' },
+      data: { status: 'PAYING' },
+    });
+    if (claimed.count === 0) {
+      throw new ConflictException(
+        'Salary advance is already being processed or has been disbursed',
       );
-      if (!matchedBank?.nipCode) {
-        throw new BadRequestException(
-          `Employee bank "${emp.bankName}" could not be resolved to a supported bank code`,
+    }
+
+    let transferResult: AnchorSingleTransferResult | null = null;
+    if (destination && this.bankingService) {
+      try {
+        const amountKobo = Math.round(Number(advance.amount) * 100);
+        transferResult = await this.bankingService.executeSingleTransfer(
+          orgId,
+          {
+            amountKobo,
+            reference: `adv_${advance.id}_1`,
+            destination,
+            reason: `Salary Advance Disbursement - ${advance.employee?.fullName ?? 'Employee'}`,
+          },
         );
+      } catch (err) {
+        await this.prisma.salaryAdvance.updateMany({
+          where: { id, organizationId: orgId, status: 'PAYING' },
+          data: { status: 'APPROVED' },
+        });
+        throw err;
       }
-
-      const bankCode = matchedBank.nipCode;
-      const accountNumber = emp.accountNumber;
-      const accountName = emp.accountName ?? emp.fullName ?? 'Employee';
-      const amountKobo = Math.round(Number(advance.amount) * 100);
-
-      transferResult = await this.bankingService.executeSingleTransfer(orgId, {
-        amountKobo,
-        reference: `adv_${advance.id}_1`,
-        destination: {
-          accountNumber,
-          bankCode,
-          accountName,
-        },
-        reason: `Salary Advance Disbursement - ${emp.fullName ?? 'Employee'}`,
-      });
     }
 
     const updated = await this.prisma.salaryAdvance.update({
@@ -476,6 +528,21 @@ export class SpendService {
         disbursedAt: new Date(),
       },
     });
+
+    if (manualSettlement) {
+      await this.prisma.auditEvent.create({
+        data: {
+          organizationId: orgId,
+          actorUserId: user.id,
+          action: 'spend.advance_manual_settlement',
+          targetType: 'salary_advance',
+          targetId: id,
+          employeeId: advance.employeeId,
+          description: `Salary advance ${id} marked DISBURSED via manual settlement`,
+          changes: { manualSettlement: true, status: 'DISBURSED' },
+        },
+      });
+    }
 
     return {
       message: 'Salary advance marked as disbursed successfully',
@@ -736,8 +803,13 @@ export class SpendService {
     };
   }
 
-  async payReimbursement(user: AuthenticatedUser, id: string) {
+  async payReimbursement(
+    user: AuthenticatedUser,
+    id: string,
+    dto?: SettlePayoutDto,
+  ) {
     const orgId = this.checkOrgContext(user);
+    const manualSettlement = dto?.manualSettlement === true;
 
     const reimbursement = await this.prisma.reimbursement.findFirst({
       where: { id, organizationId: orgId },
@@ -760,44 +832,43 @@ export class SpendService {
       );
     }
 
-    let transferResult: AnchorSingleTransferResult | null = null;
-    if (this.bankingService) {
-      const emp = reimbursement.employee;
-      if (!emp?.accountNumber || !emp?.bankName) {
-        throw new BadRequestException(
-          'Employee bank details (bankName and accountNumber) are required before paying a reimbursement',
+    const destination = manualSettlement
+      ? null
+      : await this.resolveEmployeeBankForPayout(
+          reimbursement.employee,
+          'paying a reimbursement',
         );
-      }
 
-      const supportedBanks = await this.bankingService
-        .getBanks()
-        .catch(() => []);
-      const matchedBank = supportedBanks.find(
-        (b) =>
-          b.name.toLowerCase() === emp.bankName?.toLowerCase() ||
-          b.nipCode === emp.bankName,
+    const claimed = await this.prisma.reimbursement.updateMany({
+      where: { id, organizationId: orgId, status: 'APPROVED' },
+      data: { status: 'PAYING' },
+    });
+    if (claimed.count === 0) {
+      throw new ConflictException(
+        'Reimbursement claim is already being processed or has been paid',
       );
-      if (!matchedBank?.nipCode) {
-        throw new BadRequestException(
-          `Employee bank "${emp.bankName}" could not be resolved to a supported bank code`,
+    }
+
+    let transferResult: AnchorSingleTransferResult | null = null;
+    if (destination && this.bankingService) {
+      try {
+        const amountKobo = Math.round(Number(reimbursement.amount) * 100);
+        transferResult = await this.bankingService.executeSingleTransfer(
+          orgId,
+          {
+            amountKobo,
+            reference: `rem_${reimbursement.id}_1`,
+            destination,
+            reason: `Expense Reimbursement Payment - ${reimbursement.employee?.fullName ?? 'Employee'}`,
+          },
         );
+      } catch (err) {
+        await this.prisma.reimbursement.updateMany({
+          where: { id, organizationId: orgId, status: 'PAYING' },
+          data: { status: 'APPROVED' },
+        });
+        throw err;
       }
-
-      const bankCode = matchedBank.nipCode;
-      const accountNumber = emp.accountNumber;
-      const accountName = emp.accountName ?? emp.fullName ?? 'Employee';
-      const amountKobo = Math.round(Number(reimbursement.amount) * 100);
-
-      transferResult = await this.bankingService.executeSingleTransfer(orgId, {
-        amountKobo,
-        reference: `rem_${reimbursement.id}_1`,
-        destination: {
-          accountNumber,
-          bankCode,
-          accountName,
-        },
-        reason: `Expense Reimbursement Payment - ${emp.fullName ?? 'Employee'}`,
-      });
     }
 
     const updated = await this.prisma.reimbursement.update({
@@ -807,6 +878,21 @@ export class SpendService {
         paidAt: new Date(),
       },
     });
+
+    if (manualSettlement) {
+      await this.prisma.auditEvent.create({
+        data: {
+          organizationId: orgId,
+          actorUserId: user.id,
+          action: 'spend.reimbursement_manual_settlement',
+          targetType: 'reimbursement',
+          targetId: id,
+          employeeId: reimbursement.employeeId,
+          description: `Reimbursement ${id} marked PAID via manual settlement`,
+          changes: { manualSettlement: true, status: 'PAID' },
+        },
+      });
+    }
 
     return {
       reimbursement: updated,

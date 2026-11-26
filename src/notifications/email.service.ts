@@ -33,8 +33,7 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly endpoint = 'https://api.sendbyte.africa/v1/emails';
   private readonly from =
-    process.env.SENDBYTE_FROM_EMAIL ??
-    'Mubarak from StackHR <noreply@stackhr.app>';
+    process.env.SENDBYTE_FROM_EMAIL ?? 'StackHR <noreply@stackhr.app>';
 
   async send(input: SendEmailInput): Promise<SendEmailResult> {
     const apiKey = process.env.SENDBYTE_API_KEY ?? process.env.SENDBYTE_KEY;

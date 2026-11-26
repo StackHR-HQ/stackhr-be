@@ -14,6 +14,7 @@ describe('WaitlistController', () => {
       findUnique: jest.fn(),
       create: jest.fn(),
       findMany: jest.fn(),
+      update: jest.fn().mockResolvedValue({}),
     },
     user: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -133,21 +134,26 @@ describe('WaitlistController', () => {
     ]);
     mockPrismaService.user.findMany.mockResolvedValue([]);
 
-    const preview = await controller.sendLaunchEmails({ dryRun: true });
+    const preview = await controller.sendLaunchEmails({});
     expect(preview.dryRun).toBe(true);
     expect(preview.totalPending).toBe(1);
     expect(preview.sentCount).toBe(0);
     expect(mockEmailService.send).not.toHaveBeenCalled();
 
-    const sent = await controller.sendLaunchEmails({});
+    const sent = await controller.sendLaunchEmails({ dryRun: false });
     expect(sent.dryRun).toBe(false);
     expect(sent.sentCount).toBe(1);
     expect(sent.failedCount).toBe(0);
     expect(mockEmailService.send).toHaveBeenCalledWith(
       expect.objectContaining({
+        from: 'Mubarak from StackHR <noreply@stackhr.app>',
         to: 'bola@pending.com',
         idempotencyKey: 'waitlist-launch-w-2',
       }),
     );
+    expect(mockPrismaService.waitlistEntry.update).toHaveBeenCalledWith({
+      where: { id: 'w-2' },
+      data: { launchEmailSentAt: expect.any(Date) },
+    });
   });
 });

@@ -36,6 +36,7 @@ describe('OrganizationsService', () => {
     authServiceMock = {
       evictUserSessions: jest.fn(),
       revokeSessionsForUser: jest.fn().mockResolvedValue(undefined),
+      revokeUserSessionsForOrganization: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -280,7 +281,7 @@ describe('OrganizationsService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('removes member and revokes their sessions', async () => {
+    it('removes member and revokes only their org-scoped sessions', async () => {
       prismaMock.tenantClient.member.findFirst.mockResolvedValue({
         id: 'mem-2',
         userId: 'user-2',
@@ -292,9 +293,30 @@ describe('OrganizationsService', () => {
 
       const result = await service.removeMember(adminUser, 'mem-2');
       expect(result).toEqual({ success: true, removedMemberId: 'mem-2' });
-      expect(authServiceMock.revokeSessionsForUser).toHaveBeenCalledWith(
-        'user-2',
-      );
+      expect(
+        authServiceMock.revokeUserSessionsForOrganization,
+      ).toHaveBeenCalledWith('user-2', 'org-1');
+    });
+
+    it('prevents a BUSINESS_ADMIN from demoting or removing another BUSINESS_ADMIN', async () => {
+      prismaMock.tenantClient.member.findFirst.mockResolvedValue({
+        id: 'mem-admin-2',
+        userId: 'user-admin-2',
+        role: USER_ROLES.BUSINESS_ADMIN,
+      });
+      prismaMock.organization.findUnique.mockResolvedValue({
+        ownerId: 'owner-1',
+      });
+
+      await expect(
+        service.updateMemberRole(adminUser, 'mem-admin-2', {
+          role: USER_ROLES.EMPLOYEE,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        service.removeMember(adminUser, 'mem-admin-2'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('returns the system role catalog', () => {

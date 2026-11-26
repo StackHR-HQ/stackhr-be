@@ -821,8 +821,9 @@ model WaitlistEntry {
   name          String
   position      String
   businessName  String
-  businessEmail String   @unique
-  createdAt     DateTime @default(now())
+  businessEmail     String    @unique
+  launchEmailSentAt DateTime?
+  createdAt         DateTime  @default(now())
   updatedAt     DateTime @updatedAt
 
   @@index([businessEmail])

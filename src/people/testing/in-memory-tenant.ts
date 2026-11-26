@@ -73,6 +73,11 @@ function matches(row: Row, where: Where = {}): boolean {
     if (isPlainObject(condition) && 'in' in condition) {
       return (condition.in as unknown[]).some((value) => same(row[key], value));
     }
+    if (isPlainObject(condition) && 'notIn' in condition) {
+      return !(condition.notIn as unknown[]).some((value) =>
+        same(row[key], value),
+      );
+    }
     if (isPlainObject(condition) && 'not' in condition) {
       return !same(row[key], condition.not);
     }

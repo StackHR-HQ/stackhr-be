@@ -9,6 +9,7 @@ describe('AuditService', () => {
   let service: AuditService;
   let prismaMock: {
     auditLog: { create: jest.Mock; findMany: jest.Mock; count: jest.Mock };
+    auditEvent: { findMany: jest.Mock; count: jest.Mock };
     user: { findMany: jest.Mock };
   };
 
@@ -16,6 +17,10 @@ describe('AuditService', () => {
     prismaMock = {
       auditLog: {
         create: jest.fn().mockResolvedValue({ id: 'audit-123' }),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      auditEvent: {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
       },
@@ -98,7 +103,55 @@ describe('AuditService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('returns paginated logs with batched actor metadata and parsed payload', async () => {
+    it('returns paginated domain events by default and expands date-only `to` to end-of-day UTC', async () => {
+      prismaMock.auditEvent.findMany.mockResolvedValue([
+        {
+          id: 'evt-1',
+          organizationId: 'org-1',
+          actorUserId: 'admin-1',
+          action: 'employee.offboarded',
+          targetType: 'employee',
+          targetId: 'emp-1',
+          description: 'Employee Ada marked OFFBOARDED',
+          changes: { status: 'OFFBOARDED' },
+          createdAt: new Date('2026-11-25T15:00:00Z'),
+        },
+      ]);
+      prismaMock.auditEvent.count.mockResolvedValue(1);
+      prismaMock.user.findMany.mockResolvedValue([
+        { id: 'admin-1', name: 'Admin User', email: 'admin@acme.com' },
+      ]);
+
+      const result = await service.listForOrganization(adminUser, {
+        page: 1,
+        limit: 10,
+        to: '2026-11-25',
+      });
+
+      expect(prismaMock.auditEvent.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: 'org-1',
+            createdAt: { lte: new Date('2026-11-25T23:59:59.999Z') },
+          }),
+        }),
+      );
+      expect(result.meta).toEqual({
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
+      expect(result.data[0].source).toBe('events');
+      expect(result.data[0].actor).toEqual({
+        id: 'admin-1',
+        name: 'Admin User',
+        email: 'admin@acme.com',
+      });
+      expect(result.data[0].payload).toEqual({ status: 'OFFBOARDED' });
+    });
+
+    it('returns paginated HTTP logs when source=requests', async () => {
       prismaMock.auditLog.findMany.mockResolvedValue([
         {
           id: 'log-1',
@@ -119,21 +172,12 @@ describe('AuditService', () => {
       ]);
 
       const result = await service.listForOrganization(adminUser, {
+        source: 'requests',
         page: 1,
         limit: 10,
       });
 
-      expect(result.meta).toEqual({
-        total: 1,
-        page: 1,
-        limit: 10,
-        totalPages: 1,
-      });
-      expect(result.data[0].actor).toEqual({
-        id: 'admin-1',
-        name: 'Admin User',
-        email: 'admin@acme.com',
-      });
+      expect(result.data[0].source).toBe('requests');
       expect(result.data[0].payload).toEqual({ address: '12 Broad St' });
     });
   });

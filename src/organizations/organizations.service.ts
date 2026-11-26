@@ -62,9 +62,10 @@ export class OrganizationsService {
 
   private async getEditableMember(
     organizationId: string,
-    actorUserId: string,
+    actor: AuthenticatedUser,
     memberId: string,
     actionLabel: string,
+    targetRole?: string,
   ): Promise<EditableMemberRow> {
     const [member, organization] = await Promise.all([
       this.prisma.tenantClient.member.findFirst({
@@ -79,7 +80,7 @@ export class OrganizationsService {
     if (!member) {
       throw new NotFoundException('Team member not found');
     }
-    if (member.userId === actorUserId) {
+    if (member.userId === actor.id) {
       throw new BadRequestException(`You cannot ${actionLabel} yourself`);
     }
     if (
@@ -88,6 +89,23 @@ export class OrganizationsService {
     ) {
       throw new ForbiddenException(`Cannot ${actionLabel} the business owner`);
     }
+
+    const isActorOwner =
+      actor.role === USER_ROLES.BUSINESS_OWNER ||
+      (organization?.ownerId !== null &&
+        organization?.ownerId !== undefined &&
+        actor.id === organization.ownerId);
+
+    if (
+      !isActorOwner &&
+      (member.role === USER_ROLES.BUSINESS_ADMIN ||
+        targetRole === USER_ROLES.BUSINESS_ADMIN)
+    ) {
+      throw new ForbiddenException(
+        'Only the business owner can manage business admins',
+      );
+    }
+
     return member;
   }
 
@@ -214,9 +232,10 @@ export class OrganizationsService {
     const organizationId = this.requireBusinessOrgId(user);
     const member = await this.getEditableMember(
       organizationId,
-      user.id,
+      user,
       memberId,
       'change the role of',
+      dto.role,
     );
 
     const updated = await this.prisma.tenantClient.member.update({
@@ -237,7 +256,7 @@ export class OrganizationsService {
     const organizationId = this.requireBusinessOrgId(user);
     const member = await this.getEditableMember(
       organizationId,
-      user.id,
+      user,
       memberId,
       'remove',
     );
@@ -246,7 +265,10 @@ export class OrganizationsService {
       where: { id: member.id },
     });
 
-    await this.authService.revokeSessionsForUser(member.userId);
+    await this.authService.revokeUserSessionsForOrganization(
+      member.userId,
+      organizationId,
+    );
     return { success: true, removedMemberId: member.id };
   }
 

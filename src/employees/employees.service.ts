@@ -547,22 +547,20 @@ export class EmployeesService {
     const orgId = this.checkOrgContext(user);
 
     const [orgDepartments, employees] = await Promise.all([
-      this.prisma.department
-        ? this.prisma.department.findMany({
-            where: { organizationId: orgId },
-            orderBy: { name: 'asc' },
-            include: {
-              headEmployee: {
-                select: {
-                  id: true,
-                  fullName: true,
-                  email: true,
-                  jobTitle: true,
-                },
-              },
+      this.prisma.department.findMany({
+        where: { organizationId: orgId },
+        orderBy: { name: 'asc' },
+        include: {
+          headEmployee: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              jobTitle: true,
             },
-          })
-        : Promise.resolve([]),
+          },
+        },
+      }),
       this.prisma.employee.findMany({
         orderBy: [{ department: 'asc' }, { fullName: 'asc' }],
         select: {
@@ -594,7 +592,9 @@ export class EmployeesService {
       }
     >();
 
+    const deptIdByName = new Map<string, string>();
     for (const dept of orgDepartments) {
+      deptIdByName.set(dept.name.trim().toLowerCase(), dept.id);
       deptBuckets.set(dept.id, {
         id: dept.id,
         name: dept.name,
@@ -606,10 +606,14 @@ export class EmployeesService {
     }
 
     for (const emp of employees) {
-      const bucketKey =
+      const matchedDeptId =
         emp.departmentId && deptBuckets.has(emp.departmentId)
           ? emp.departmentId
-          : `name:${emp.department || 'Unassigned'}`;
+          : emp.department
+            ? deptIdByName.get(emp.department.trim().toLowerCase())
+            : undefined;
+      const bucketKey =
+        matchedDeptId ?? `name:${emp.department || 'Unassigned'}`;
       if (!deptBuckets.has(bucketKey)) {
         const label = emp.department || 'Unassigned';
         deptBuckets.set(bucketKey, {
@@ -682,24 +686,22 @@ export class EmployeesService {
       },
     });
 
-    if (this.prisma.auditEvent) {
-      await this.prisma.auditEvent.create({
-        data: {
-          organizationId: orgId,
-          actorUserId: user.id,
-          action: 'employee.offboarded',
-          targetType: 'employee',
-          targetId: id,
-          description: `Employee ${employee.fullName} marked ${nextStatus} (${reason})`,
-          changes: {
-            previousStatus: employee.status,
-            status: nextStatus,
-            terminationDate: offboardDate.toISOString(),
-            reason,
-          },
+    await this.prisma.auditEvent.create({
+      data: {
+        organizationId: orgId,
+        actorUserId: user.id,
+        action: 'employee.offboarded',
+        targetType: 'employee',
+        targetId: id,
+        description: `Employee ${employee.fullName} marked ${nextStatus} (${reason})`,
+        changes: {
+          previousStatus: employee.status,
+          status: nextStatus,
+          terminationDate: offboardDate.toISOString(),
+          reason,
         },
-      });
-    }
+      },
+    });
 
     return {
       message:

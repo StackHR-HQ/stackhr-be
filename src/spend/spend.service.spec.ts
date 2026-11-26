@@ -37,13 +37,18 @@ describe('SpendService', () => {
         findFirst: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       reimbursement: {
         create: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         aggregate: jest.fn(),
+      },
+      auditEvent: {
+        create: jest.fn().mockResolvedValue({}),
       },
       approvalRequest: {
         updateMany: jest.fn(),
@@ -388,9 +393,10 @@ describe('SpendService', () => {
   });
 
   describe('payReimbursement', () => {
-    it('should mark reimbursement as paid', async () => {
+    it('should mark reimbursement as paid with explicit manualSettlement', async () => {
       prismaMock.reimbursement.findFirst.mockResolvedValue({
         id: 'rmb-1',
+        employeeId: 'emp-123',
         status: 'APPROVED',
       });
       prismaMock.reimbursement.update.mockResolvedValue({
@@ -398,8 +404,11 @@ describe('SpendService', () => {
         status: 'PAID',
       });
 
-      const result = await service.payReimbursement(mockUser, 'rmb-1');
+      const result = await service.payReimbursement(mockUser, 'rmb-1', {
+        manualSettlement: true,
+      });
       expect(result.reimbursement.status).toBe('PAID');
+      expect(prismaMock.auditEvent.create).toHaveBeenCalled();
     });
 
     it('should dispatch single transfer via bankingService when available', async () => {
@@ -596,9 +605,21 @@ describe('SpendService', () => {
   });
 
   describe('disburseSalaryAdvance', () => {
-    it('should disburse approved salary advance', async () => {
+    it('should require bank details or explicit manualSettlement when bankingService is absent', async () => {
       prismaMock.salaryAdvance.findFirst.mockResolvedValue({
         id: 'adv-1',
+        status: 'APPROVED',
+      });
+
+      await expect(
+        service.disburseSalaryAdvance(mockUser, 'adv-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should disburse approved salary advance via explicit manualSettlement', async () => {
+      prismaMock.salaryAdvance.findFirst.mockResolvedValue({
+        id: 'adv-1',
+        employeeId: 'emp-123',
         status: 'APPROVED',
       });
       prismaMock.salaryAdvance.update.mockResolvedValue({
@@ -607,8 +628,11 @@ describe('SpendService', () => {
         disbursedAt: new Date(),
       });
 
-      const result = await service.disburseSalaryAdvance(mockUser, 'adv-1');
+      const result = await service.disburseSalaryAdvance(mockUser, 'adv-1', {
+        manualSettlement: true,
+      });
       expect(result.advance.status).toBe('DISBURSED');
+      expect(prismaMock.auditEvent.create).toHaveBeenCalled();
     });
 
     it('should dispatch single transfer via bankingService when available', async () => {

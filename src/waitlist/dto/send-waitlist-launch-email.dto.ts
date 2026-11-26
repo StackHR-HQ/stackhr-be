@@ -17,6 +17,11 @@ export class SendWaitlistLaunchEmailDto {
   testEmail?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  testName?: string;
+
+  @IsOptional()
   @IsUrl({ require_tld: false })
   signupUrl?: string;
 

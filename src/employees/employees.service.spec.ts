@@ -39,6 +39,12 @@ describe('EmployeesService', () => {
     organization: {
       findUnique: jest.Mock;
     };
+    department: {
+      findMany: jest.Mock;
+    };
+    auditEvent: {
+      create: jest.Mock;
+    };
   };
 
   const mockUser: AuthenticatedUser = {
@@ -69,6 +75,12 @@ describe('EmployeesService', () => {
         findUnique: jest
           .fn()
           .mockResolvedValue({ id: 'org-123', name: 'Acme', slug: 'acme' }),
+      },
+      department: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      auditEvent: {
+        create: jest.fn().mockResolvedValue({}),
       },
     };
 
@@ -516,6 +528,39 @@ describe('EmployeesService', () => {
         count: 1,
         employees: [allEmps[0]],
       });
+    });
+
+    it('merges legacy employees with departmentId: null into matching Department by case-insensitive name', async () => {
+      prismaMock.department.findMany.mockResolvedValue([
+        {
+          id: 'dept-1',
+          name: 'Engineering',
+          headEmployeeId: null,
+          headEmployee: null,
+        },
+      ]);
+      const allEmps = [
+        {
+          id: 'emp-1',
+          fullName: 'Alice',
+          departmentId: 'dept-1',
+          department: 'Engineering',
+        },
+        {
+          id: 'emp-2',
+          fullName: 'Bob',
+          departmentId: null,
+          department: 'engineering',
+        },
+      ];
+      prismaMock.employee.findMany.mockResolvedValue(allEmps);
+
+      const result = await service.getDepartmentSummary(mockUser);
+
+      expect(result.totalDepartments).toBe(1);
+      expect(result.departments[0].id).toBe('dept-1');
+      expect(result.departments[0].count).toBe(2);
+      expect(result.departments[0].employees).toHaveLength(2);
     });
   });
 

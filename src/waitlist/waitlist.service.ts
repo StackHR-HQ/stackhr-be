@@ -1,4 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
+
+const WAITLIST_LAUNCH_FROM = 'Mubarak from StackHR <noreply@stackhr.app>';
 import { PrismaService } from '../database/prisma.service';
 import { JoinWaitlistDto } from './dto/join-waitlist.dto';
 import { SendWaitlistLaunchEmailDto } from './dto/send-waitlist-launch-email.dto';
@@ -110,14 +112,27 @@ export class WaitlistService {
   }
 
   async getPendingWaitlistEntries() {
-    const [entries, users] = await Promise.all([
-      this.prisma.waitlistEntry.findMany({
-        orderBy: { createdAt: 'asc' },
-      }),
-      this.prisma.user.findMany({
-        select: { email: true },
-      }),
-    ]);
+    const entries = await this.prisma.waitlistEntry.findMany({
+      where: { launchEmailSentAt: null },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (entries.length === 0) {
+      return [];
+    }
+
+    const candidateEmails = Array.from(
+      new Set(entries.map((entry) => entry.businessEmail.trim().toLowerCase())),
+    );
+    const users = await this.prisma.user.findMany({
+      where: {
+        email: {
+          in: candidateEmails,
+          mode: 'insensitive',
+        },
+      },
+      select: { email: true },
+    });
 
     const signedUpEmails = new Set(
       users.map((u) => u.email.trim().toLowerCase()),
@@ -135,19 +150,32 @@ export class WaitlistService {
     const signupUrl = dto.signupUrl ?? `${appBase}/signup`;
 
     if (dto.testEmail) {
+      const testName = dto.testName?.trim() || 'StackHR Team';
       const content = waitlistLaunchEmail({
-        fullName: 'Mubarak Test',
+        fullName: testName,
         businessName: 'StackHR Demo',
         signupUrl,
         subject: dto.subject,
         customMessage: dto.customMessage,
       });
-      await this.emailService.send({
-        to: dto.testEmail,
-        subject: content.subject,
-        html: content.html,
-        text: content.text,
-      });
+      try {
+        await this.emailService.send({
+          from: WAITLIST_LAUNCH_FROM,
+          to: dto.testEmail,
+          subject: content.subject,
+          html: content.html,
+          text: content.text,
+        });
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : 'Unknown email error';
+        this.logger.error(
+          `Failed to send test launch email to ${dto.testEmail}: ${message}`,
+        );
+        throw new BadGatewayException(
+          `Failed to send test launch email: ${message}`,
+        );
+      }
       return {
         dryRun: false,
         testMode: true,
@@ -157,7 +185,7 @@ export class WaitlistService {
         recipients: [
           {
             email: dto.testEmail,
-            name: 'Mubarak Test',
+            name: testName,
             businessName: 'StackHR Demo',
           },
         ],
@@ -165,6 +193,7 @@ export class WaitlistService {
       };
     }
 
+    const dryRun = dto.dryRun ?? true;
     const pending = await this.getPendingWaitlistEntries();
     const recipients = pending.map((entry) => ({
       id: entry.id,
@@ -173,7 +202,7 @@ export class WaitlistService {
       businessName: entry.businessName,
     }));
 
-    if (dto.dryRun) {
+    if (dryRun) {
       return {
         dryRun: true,
         testMode: false,
@@ -199,11 +228,16 @@ export class WaitlistService {
 
       try {
         await this.emailService.send({
+          from: WAITLIST_LAUNCH_FROM,
           to: entry.businessEmail,
           subject: content.subject,
           html: content.html,
           text: content.text,
           idempotencyKey: `waitlist-launch-${entry.id}`,
+        });
+        await this.prisma.waitlistEntry.update({
+          where: { id: entry.id },
+          data: { launchEmailSentAt: new Date() },
         });
         sentCount += 1;
       } catch (err: unknown) {

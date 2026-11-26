@@ -1182,6 +1182,33 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
+   * Revokes all active sessions for a user that are scoped to a specific organization
+   * without logging them out of other organizations they belong to.
+   */
+  async revokeUserSessionsForOrganization(
+    userId: string,
+    organizationId: string,
+  ): Promise<void> {
+    await this.prisma.session.updateMany({
+      where: {
+        userId,
+        activeOrganizationId: organizationId,
+        revokedAt: null,
+      },
+      data: { revokedAt: new Date() },
+    });
+
+    for (const [tokenHash, entry] of this.sessionCache.entries()) {
+      if (
+        entry.user.id === userId &&
+        entry.user.organizationId === organizationId
+      ) {
+        this.sessionCache.delete(tokenHash);
+      }
+    }
+  }
+
+  /**
    * Revokes all active sessions for members of an organization (and any session active in this org)
    * in the database and evicts them from the memory cache immediately.
    */

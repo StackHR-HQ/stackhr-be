@@ -194,6 +194,10 @@ describe('PeopleOnboardingService', () => {
 
       const activeOnly = await service.listEmployees(adminUser(), 'active');
       expect(activeOnly.map((r) => r.employeeId)).toEqual(['emp_ada']);
+
+      expect(() => service.listEmployees(adminUser(), 'activ')).toThrow(
+        'Invalid status filter',
+      );
     });
   });
 

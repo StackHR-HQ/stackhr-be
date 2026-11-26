@@ -1,9 +1,17 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+
+const VALID_ONBOARDING_STATUS_FILTERS = [
+  'all',
+  'active',
+  'onboarding',
+  'pending_invitation',
+] as const;
 import { randomUUID } from 'node:crypto';
 import type { AuthenticatedUser } from '../../auth/auth.types';
 import { requirePeopleOrganization } from '../common/people-access';
@@ -395,12 +403,23 @@ export class PeopleOnboardingService {
   listEmployees(user: AuthenticatedUser, statusFilter?: string) {
     const organizationId = requirePeopleOrganization(user);
     const normalizedFilter = statusFilter?.trim().toLowerCase();
+    if (
+      normalizedFilter &&
+      !(VALID_ONBOARDING_STATUS_FILTERS as readonly string[]).includes(
+        normalizedFilter,
+      )
+    ) {
+      throw new BadRequestException(
+        `Invalid status filter "${statusFilter}". Allowed values: ${VALID_ONBOARDING_STATUS_FILTERS.join(', ')}`,
+      );
+    }
+
     const statusWhere =
       normalizedFilter === 'all'
         ? undefined
         : normalizedFilter
           ? normalizedFilter.toUpperCase()
-          : { not: 'OFFBOARDED' };
+          : { notIn: ['OFFBOARDED', 'OFFBOARDING'] };
 
     return this.tenant.run(organizationId, async (client) => {
       const [employees, assignments, completions] = await Promise.all([
