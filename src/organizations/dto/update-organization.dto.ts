@@ -21,6 +21,14 @@ export class UpdateOrganizationDto {
 
   @IsOptional()
   @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  rcNumber?: string;
+
+  @IsOptional()
+  @IsString()
   currency?: string;
 
   @IsOptional()

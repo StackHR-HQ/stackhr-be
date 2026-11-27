@@ -133,7 +133,71 @@ describe('PeopleOnboardingService', () => {
           templateId: 'tpl_eng',
           completedItemIds: ['item_contract'],
         },
+        {
+          employeeId: 'emp_bola',
+          employeeName: 'Bola Ade',
+          avatarInitials: 'BA',
+          jobTitle: 'Software Engineer',
+          startDate: '2026-01-05',
+          templateId: 'tpl_eng',
+          completedItemIds: [],
+        },
       ]);
+    });
+
+    it('includes ACTIVE employees with an onboarding assignment and supports ?status filtering', async () => {
+      fake.seed('employee', [
+        employeeRow({ id: 'emp_ada', status: 'ACTIVE' }),
+        employeeRow({
+          id: 'emp_bola',
+          fullName: 'Bola Ade',
+          email: 'bola@acme.test',
+          status: 'ONBOARDING',
+        }),
+        employeeRow({
+          id: 'emp_off',
+          fullName: 'Offboarded User',
+          email: 'off@acme.test',
+          status: 'OFFBOARDED',
+        }),
+      ]);
+      fake.seed('employeeOnboarding', [
+        {
+          employeeId: 'emp_ada',
+          organizationId: ORG_A,
+          templateId: 'tpl_eng',
+        },
+        {
+          employeeId: 'emp_bola',
+          organizationId: ORG_A,
+          templateId: 'tpl_eng',
+        },
+        {
+          employeeId: 'emp_off',
+          organizationId: ORG_A,
+          templateId: 'tpl_eng',
+        },
+      ]);
+
+      const defaultList = await service.listEmployees(adminUser());
+      expect(defaultList.map((r) => r.employeeId)).toEqual([
+        'emp_ada',
+        'emp_bola',
+      ]);
+
+      const allList = await service.listEmployees(adminUser(), 'all');
+      expect(allList.map((r) => r.employeeId)).toEqual([
+        'emp_ada',
+        'emp_bola',
+        'emp_off',
+      ]);
+
+      const activeOnly = await service.listEmployees(adminUser(), 'active');
+      expect(activeOnly.map((r) => r.employeeId)).toEqual(['emp_ada']);
+
+      expect(() => service.listEmployees(adminUser(), 'activ')).toThrow(
+        'Invalid status filter',
+      );
     });
   });
 

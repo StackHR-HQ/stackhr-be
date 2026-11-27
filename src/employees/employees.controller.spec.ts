@@ -4,6 +4,7 @@ import { EmployeesService } from './employees.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { AUTH_ROLES_KEY } from '../auth/auth.decorators';
 import { USER_ROLES, USER_TYPES } from '../auth/auth.constants';
 
 describe('EmployeesController', () => {
@@ -60,6 +61,44 @@ describe('EmployeesController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('enforces admin-only roles on write/directory routes and allows MANAGER on hierarchy/detail reads', () => {
+    const adminRoles = [
+      USER_ROLES.BUSINESS_OWNER,
+      USER_ROLES.BUSINESS_ADMIN,
+      USER_ROLES.HR_ADMIN,
+    ];
+    const managerReadRoles = [...adminRoles, USER_ROLES.MANAGER];
+
+    for (const method of [
+      'createEmployee',
+      'findAll',
+      'updateEmployee',
+      'reassignManager',
+      'offboardEmployee',
+    ] as const) {
+      const target = Object.getOwnPropertyDescriptor(
+        EmployeesController.prototype,
+        method,
+      )?.value as object;
+      expect(Reflect.getMetadata(AUTH_ROLES_KEY, target)).toEqual(adminRoles);
+    }
+
+    for (const method of [
+      'getHierarchyTree',
+      'listManagers',
+      'getDepartmentSummary',
+      'findOne',
+    ] as const) {
+      const target = Object.getOwnPropertyDescriptor(
+        EmployeesController.prototype,
+        method,
+      )?.value as object;
+      expect(Reflect.getMetadata(AUTH_ROLES_KEY, target)).toEqual(
+        managerReadRoles,
+      );
+    }
   });
 
   it('should delegate createEmployee to service', async () => {

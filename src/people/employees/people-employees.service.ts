@@ -69,6 +69,7 @@ const EMPLOYMENT_STATUSES = new Set([
   'pending_invitation',
   'onboarding',
   'offboarding',
+  'offboarded',
 ]);
 
 @Injectable()
@@ -151,7 +152,7 @@ export class PeopleEmployeesService {
 
     if (employmentStatus && !EMPLOYMENT_STATUSES.has(employmentStatus)) {
       throw new BadRequestException(
-        'employmentStatus must be one of: active, pending_invitation, onboarding, offboarding',
+        'employmentStatus must be one of: active, pending_invitation, onboarding, offboarding, offboarded',
       );
     }
 

@@ -39,6 +39,12 @@ describe('EmployeesService', () => {
     organization: {
       findUnique: jest.Mock;
     };
+    department: {
+      findMany: jest.Mock;
+    };
+    auditEvent: {
+      create: jest.Mock;
+    };
   };
 
   const mockUser: AuthenticatedUser = {
@@ -69,6 +75,12 @@ describe('EmployeesService', () => {
         findUnique: jest
           .fn()
           .mockResolvedValue({ id: 'org-123', name: 'Acme', slug: 'acme' }),
+      },
+      department: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      auditEvent: {
+        create: jest.fn().mockResolvedValue({}),
       },
     };
 
@@ -453,22 +465,108 @@ describe('EmployeesService', () => {
       expect(result.totalEmployees).toBe(3);
       expect(result.departments).toEqual([
         {
+          id: null,
+          name: 'Engineering',
           department: 'Engineering',
+          headEmployeeId: null,
+          head: null,
           count: 2,
           employees: [allEmps[0], allEmps[1]],
         },
         {
+          id: null,
+          name: 'Finance',
           department: 'Finance',
+          headEmployeeId: null,
+          head: null,
           count: 1,
           employees: [allEmps[2]],
         },
       ]);
     });
+
+    it('should group by departmentId and include head when Department records exist', async () => {
+      (prismaMock as any).department = {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'dept-1',
+            name: 'Engineering',
+            headEmployeeId: 'emp-1',
+            headEmployee: {
+              id: 'emp-1',
+              fullName: 'Alice',
+              email: 'alice@acme.com',
+              jobTitle: 'VP Engineering',
+            },
+          },
+        ]),
+      };
+      const allEmps = [
+        {
+          id: 'emp-1',
+          fullName: 'Alice',
+          departmentId: 'dept-1',
+          department: 'Old Text',
+        },
+      ];
+      prismaMock.employee.findMany.mockResolvedValue(allEmps);
+
+      const result = await service.getDepartmentSummary(mockUser);
+
+      expect(result.totalDepartments).toBe(1);
+      expect(result.departments[0]).toEqual({
+        id: 'dept-1',
+        name: 'Engineering',
+        department: 'Engineering',
+        headEmployeeId: 'emp-1',
+        head: {
+          id: 'emp-1',
+          fullName: 'Alice',
+          email: 'alice@acme.com',
+          jobTitle: 'VP Engineering',
+        },
+        count: 1,
+        employees: [allEmps[0]],
+      });
+    });
+
+    it('merges legacy employees with departmentId: null into matching Department by case-insensitive name', async () => {
+      prismaMock.department.findMany.mockResolvedValue([
+        {
+          id: 'dept-1',
+          name: 'Engineering',
+          headEmployeeId: null,
+          headEmployee: null,
+        },
+      ]);
+      const allEmps = [
+        {
+          id: 'emp-1',
+          fullName: 'Alice',
+          departmentId: 'dept-1',
+          department: 'Engineering',
+        },
+        {
+          id: 'emp-2',
+          fullName: 'Bob',
+          departmentId: null,
+          department: 'engineering',
+        },
+      ];
+      prismaMock.employee.findMany.mockResolvedValue(allEmps);
+
+      const result = await service.getDepartmentSummary(mockUser);
+
+      expect(result.totalDepartments).toBe(1);
+      expect(result.departments[0].id).toBe('dept-1');
+      expect(result.departments[0].count).toBe(2);
+      expect(result.departments[0].employees).toHaveLength(2);
+    });
   });
 
   describe('offboardEmployee', () => {
     it('should set employee status to OFFBOARDED', async () => {
-      const existing = { id: 'emp-1', status: 'ACTIVE' };
+      const existing = { id: 'emp-1', fullName: 'Alice', status: 'ACTIVE' };
       prismaMock.employee.findFirst.mockResolvedValue(existing);
       prismaMock.employee.update.mockResolvedValue({
         ...existing,
@@ -481,6 +579,38 @@ describe('EmployeesService', () => {
 
       expect(result.employee.status).toBe('OFFBOARDED');
       expect(result.offboardDetails.reason).toBe('Career change');
+      expect(prismaMock.employee.update).toHaveBeenCalledWith({
+        where: { id: 'emp-1' },
+        data: expect.objectContaining({
+          status: 'OFFBOARDED',
+          terminationDate: expect.any(Date),
+        }),
+      });
+    });
+
+    it('should schedule OFFBOARDING when offboardDate is in the future', async () => {
+      const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const existing = { id: 'emp-1', fullName: 'Alice', status: 'ACTIVE' };
+      prismaMock.employee.findFirst.mockResolvedValue(existing);
+      prismaMock.employee.update.mockResolvedValue({
+        ...existing,
+        status: 'OFFBOARDING',
+        terminationDate: futureDate,
+      });
+
+      const result = await service.offboardEmployee(mockUser, 'emp-1', {
+        offboardDate: futureDate.toISOString(),
+        reason: 'Resignation notice',
+      });
+
+      expect(result.employee.status).toBe('OFFBOARDING');
+      expect(prismaMock.employee.update).toHaveBeenCalledWith({
+        where: { id: 'emp-1' },
+        data: {
+          status: 'OFFBOARDING',
+          terminationDate: futureDate,
+        },
+      });
     });
 
     it('should throw BadRequestException if already offboarded', async () => {

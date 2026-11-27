@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
@@ -64,8 +65,11 @@ export class PeopleOnboardingController {
   }
 
   @Get('employees')
-  listEmployees(@CurrentUser() user: AuthenticatedUser) {
-    return this.onboardingService.listEmployees(user);
+  listEmployees(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('status') status?: string,
+  ) {
+    return this.onboardingService.listEmployees(user, status);
   }
 
   @Get('employees/:employeeId')

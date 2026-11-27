@@ -1075,12 +1075,99 @@ export class AuthService implements OnModuleInit {
   }
 
   /** Removes all cached session entries for a specific user ID. */
-  private evictUserSessions(userId: string): void {
+  public evictUserSessions(userId: string): void {
     for (const [tokenHash, entry] of this.sessionCache.entries()) {
       if (entry.user.id === userId) {
         this.sessionCache.delete(tokenHash);
       }
     }
+  }
+
+  /**
+   * Lists active (non-revoked, non-expired) sessions for a user, marking the current session.
+   */
+  async listUserSessions(userId: string, currentToken?: string | null) {
+    const currentTokenHash = currentToken ? this.hashToken(currentToken) : null;
+
+    const sessions = await this.prisma.session.findMany({
+      where: {
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        ipAddress: true,
+        userAgent: true,
+        activeOrganizationId: true,
+        createdAt: true,
+        updatedAt: true,
+        expiresAt: true,
+        token: true,
+      },
+    });
+
+    return sessions.map(({ token, ...session }) => ({
+      ...session,
+      isCurrent: currentTokenHash !== null && token === currentTokenHash,
+    }));
+  }
+
+  /**
+   * Revokes a single active session owned by the given user.
+   */
+  async revokeUserSession(userId: string, sessionId: string) {
+    const session = await this.prisma.session.findFirst({
+      where: { id: sessionId, userId, revokedAt: null },
+      select: { id: true },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Active session not found');
+    }
+
+    await this.revokeSessionById(session.id);
+    return { success: true, revokedSessionId: session.id };
+  }
+
+  /**
+   * Revokes all active sessions for a user, optionally keeping the current session alive.
+   */
+  async revokeAllUserSessions(
+    userId: string,
+    options?: { excludeCurrent?: boolean; currentToken?: string | null },
+  ) {
+    const currentTokenHash =
+      options?.excludeCurrent && options?.currentToken
+        ? this.hashToken(options.currentToken)
+        : null;
+
+    if (currentTokenHash) {
+      const result = await this.prisma.session.updateMany({
+        where: {
+          userId,
+          revokedAt: null,
+          token: { not: currentTokenHash },
+        },
+        data: { revokedAt: new Date() },
+      });
+
+      for (const [tokenHash, entry] of this.sessionCache.entries()) {
+        if (entry.user.id === userId && tokenHash !== currentTokenHash) {
+          this.sessionCache.delete(tokenHash);
+        }
+      }
+
+      return { success: true, revokedCount: result.count };
+    }
+
+    const result = await this.prisma.session.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    this.evictUserSessions(userId);
+    return { success: true, revokedCount: result.count };
   }
 
   /**
@@ -1092,6 +1179,33 @@ export class AuthService implements OnModuleInit {
       data: { revokedAt: new Date() },
     });
     this.evictUserSessions(userId);
+  }
+
+  /**
+   * Revokes all active sessions for a user that are scoped to a specific organization
+   * without logging them out of other organizations they belong to.
+   */
+  async revokeUserSessionsForOrganization(
+    userId: string,
+    organizationId: string,
+  ): Promise<void> {
+    await this.prisma.session.updateMany({
+      where: {
+        userId,
+        activeOrganizationId: organizationId,
+        revokedAt: null,
+      },
+      data: { revokedAt: new Date() },
+    });
+
+    for (const [tokenHash, entry] of this.sessionCache.entries()) {
+      if (
+        entry.user.id === userId &&
+        entry.user.organizationId === organizationId
+      ) {
+        this.sessionCache.delete(tokenHash);
+      }
+    }
   }
 
   /**

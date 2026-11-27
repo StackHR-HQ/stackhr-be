@@ -9,6 +9,7 @@ export interface SendEmailInput {
   subject: string;
   html: string;
   text?: string;
+  from?: string;
   idempotencyKey?: string;
 }
 
@@ -48,7 +49,7 @@ export class EmailService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: this.from,
+        from: input.from ?? this.from,
         to: input.to,
         subject: input.subject,
         html: input.html,

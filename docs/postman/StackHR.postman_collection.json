@@ -260,6 +260,121 @@
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": [\n    {\n      \"id\": \"w_8f9a2b1c\",\n      \"name\": \"Jane Doe\",\n      \"position\": \"Head of HR\",\n      \"businessName\": \"Acme Technologies\",\n      \"businessEmail\": \"jane@acmetech.com\",\n      \"createdAt\": \"2026-09-21T12:00:00.000Z\"\n    }\n  ]\n}"
             }
           ]
+        },
+        {
+          "name": "List Pending Waitlist (Yet to Sign Up)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/waitlist/pending",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "waitlist",
+                "pending"
+              ]
+            },
+            "description": "List waitlist entries whose businessEmail does not yet have a registered StackHR user account. Accessible by STACKHR_ADMIN and STACKHR_SUPPORT."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": [\n    {\n      \"id\": \"w_018f3a5e-1234-7a9b-bcde-000000000001\",\n      \"name\": \"Bola Ade\",\n      \"position\": \"HR Lead\",\n      \"businessName\": \"Pending Co\",\n      \"businessEmail\": \"bola@pending.com\",\n      \"createdAt\": \"2026-10-01T10:00:00.000Z\"\n    }\n  ]\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Send Waitlist Launch Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sessionToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dryRun\": true,\n  \"signupUrl\": \"https://app.stackhr.app/signup\",\n  \"subject\": \"StackHR is live — let's get your team onboarded\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/waitlist/launch-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "waitlist",
+                "launch-email"
+              ]
+            },
+            "description": "Sends the launch email from Mubarak from StackHR to pending waitlist businesses. Defaults to dryRun: true for safety; pass dryRun: false to send live."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"dryRun\": false,\n    \"testMode\": false,\n    \"totalPending\": 12,\n    \"sentCount\": 12,\n    \"failedCount\": 0,\n    \"recipients\": [\n      {\n        \"id\": \"w_018f3a5e-1234-7a9b-bcde-000000000001\",\n        \"email\": \"bola@pending.com\",\n        \"name\": \"Bola Ade\",\n        \"businessName\": \"Pending Co\"\n      }\n    ],\n    \"failures\": []\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient role permissions\",\n  \"error\": {\n    \"message\": \"Insufficient role permissions\"\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -873,6 +988,219 @@
                 }
               ],
               "body": "{\n  \"success\": true\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Active Sessions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "sessions"
+              ]
+            },
+            "description": "Lists all active (non-revoked, non-expired) sessions for the authenticated user, marking the current session with isCurrent: true. Allowed roles: any authenticated user."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/sessions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "sessions"
+                  ]
+                },
+                "description": "Lists all active (non-revoked, non-expired) sessions for the authenticated user, marking the current session with isCurrent: true. Allowed roles: any authenticated user."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "[\n  {\n    \"id\": \"sess-1\",\n    \"ipAddress\": \"102.89.1.1\",\n    \"userAgent\": \"Chrome\",\n    \"activeOrganizationId\": \"org-1\",\n    \"createdAt\": \"2026-11-25T00:00:00.000Z\",\n    \"updatedAt\": \"2026-11-25T01:00:00.000Z\",\n    \"expiresAt\": \"2026-12-25T00:00:00.000Z\",\n    \"isCurrent\": true\n  }\n]"
+            },
+            {
+              "name": "401 Unauthorized",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/sessions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "sessions"
+                  ]
+                },
+                "description": "Lists all active (non-revoked, non-expired) sessions for the authenticated user, marking the current session with isCurrent: true. Allowed roles: any authenticated user."
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"statusCode\": 401,\n  \"message\": \"Unauthorized\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Revoke Session",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/sessions/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "sessions",
+                ":id"
+              ]
+            },
+            "description": "Revokes a specific active session owned by the authenticated user. Allowed roles: any authenticated user."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/sessions/:id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "sessions",
+                    ":id"
+                  ]
+                },
+                "description": "Revokes a specific active session owned by the authenticated user. Allowed roles: any authenticated user."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"revokedSessionId\": \"sess-2\"\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/sessions/:id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "sessions",
+                    ":id"
+                  ]
+                },
+                "description": "Revokes a specific active session owned by the authenticated user. Allowed roles: any authenticated user."
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"statusCode\": 404,\n  \"message\": \"Active session not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Revoke All Sessions",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/sessions?excludeCurrent=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "excludeCurrent",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Revokes all active sessions for the authenticated user. Pass excludeCurrent=true to keep the current session alive. Allowed roles: any authenticated user."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/sessions?excludeCurrent=true",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "sessions"
+                  ],
+                  "query": [
+                    {
+                      "key": "excludeCurrent",
+                      "value": "true"
+                    }
+                  ]
+                },
+                "description": "Revokes all active sessions for the authenticated user. Pass excludeCurrent=true to keep the current session alive. Allowed roles: any authenticated user."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"revokedCount\": 2\n}"
+            },
+            {
+              "name": "401 Unauthorized",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/sessions?excludeCurrent=true",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "sessions"
+                  ],
+                  "query": [
+                    {
+                      "key": "excludeCurrent",
+                      "value": "true"
+                    }
+                  ]
+                },
+                "description": "Revokes all active sessions for the authenticated user. Pass excludeCurrent=true to keep the current session alive. Allowed roles: any authenticated user."
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"statusCode\": 401,\n  \"message\": \"Unauthorized\"\n}"
             }
           ]
         }
@@ -1522,7 +1850,7 @@
                 "summary"
               ]
             },
-            "description": "Retrieve summary breakdown of employees grouped by department."
+            "description": "Group employees by departmentId (joining Department with headEmployeeId and head), falling back to Unassigned. Accessible by BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
           },
           "response": [
             {
@@ -1616,7 +1944,7 @@
                 "offboard"
               ]
             },
-            "description": "Offboard an employee and mark status as OFFBOARDED."
+            "description": "Offboard an employee. Persists terminationDate, schedules status OFFBOARDING if offboardDate is in the future (or OFFBOARDED immediately), and logs reason in AuditEvent. Accessible by BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
           },
           "response": [
             {
@@ -1631,6 +1959,70 @@
                 }
               ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Request successful\",\n  \"data\": {\n    \"message\": \"Employee offboarded successfully\",\n    \"employee\": {\n      \"id\": \"emp-123\",\n      \"status\": \"OFFBOARDED\"\n    },\n    \"offboardDetails\": {\n      \"offboardDate\": \"2026-12-31\",\n      \"reason\": \"Resigned for personal reasons\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Managers & Direct Reports",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/employees/managers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employees",
+                "managers"
+              ]
+            },
+            "description": "Lists employees who hold the MANAGER role or have direct reports, along with their directReports list. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/employees/managers",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "employees",
+                    "managers"
+                  ]
+                },
+                "description": "Lists employees who hold the MANAGER role or have direct reports, along with their directReports list. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"managers\": [\n    {\n      \"id\": \"emp-1\",\n      \"fullName\": \"Chidi Eze\",\n      \"email\": \"chidi@acme.ng\",\n      \"isManagerRole\": true,\n      \"directReportsCount\": 2,\n      \"directReports\": []\n    }\n  ]\n}"
+            },
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/employees/managers",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "employees",
+                    "managers"
+                  ]
+                },
+                "description": "Lists employees who hold the MANAGER role or have direct reports, along with their directReports list. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"statusCode\": 403,\n  \"message\": \"Forbidden resource\"\n}"
             }
           ]
         }
@@ -4911,7 +5303,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"pensionEmployeeRateOverride\": 0.08,\n  \"pensionEmployerRateOverride\": 0.10,\n  \"pensionBasisOverride\": \"BASIC,HOUSING,TRANSPORT\"\n}"
+              "raw": "{\n  \"pensionEmployeeRateOverride\": 0.08,\n  \"pensionEmployerRateOverride\": 0.1,\n  \"pensionBasisOverride\": \"BASIC,HOUSING,TRANSPORT\",\n  \"address\": \"14 Adeola Odeku St, Victoria Island, Lagos\",\n  \"rcNumber\": \"RC-1234567\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/organizations/current",
@@ -5048,6 +5440,310 @@
                 }
               ],
               "body": "{\n  \"statusCode\": 400,\n  \"message\": [\n    \"Employee pension rate cannot be less than statutory minimum of 8% (0.08)\"\n  ],\n  \"error\": \"Bad Request\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Team Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/organizations/current/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organizations",
+                "current",
+                "members"
+              ]
+            },
+            "description": "Lists all users with app access in the current organization, including role, lastActiveAt, user profile, and linked employee summary. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/organizations/current/members",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "organizations",
+                    "current",
+                    "members"
+                  ]
+                },
+                "description": "Lists all users with app access in the current organization, including role, lastActiveAt, user profile, and linked employee summary. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "[\n  {\n    \"id\": \"mem-1\",\n    \"userId\": \"usr-1\",\n    \"role\": \"BUSINESS_OWNER\",\n    \"createdAt\": \"2026-10-01T00:00:00.000Z\",\n    \"lastActiveAt\": \"2026-11-25T01:00:00.000Z\",\n    \"user\": {\n      \"id\": \"usr-1\",\n      \"name\": \"Ada Obi\",\n      \"email\": \"ada@acme.ng\"\n    },\n    \"employee\": null\n  }\n]"
+            },
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/organizations/current/members",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "organizations",
+                    "current",
+                    "members"
+                  ]
+                },
+                "description": "Lists all users with app access in the current organization, including role, lastActiveAt, user profile, and linked employee summary. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"statusCode\": 403,\n  \"message\": \"Forbidden resource\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Team Member Role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/organizations/current/members/:memberId/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organizations",
+                "current",
+                "members",
+                ":memberId",
+                "role"
+              ]
+            },
+            "description": "Updates a team member role (BUSINESS_ADMIN, HR_ADMIN, MANAGER, EMPLOYEE). Cannot change BUSINESS_OWNER or self. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"MANAGER\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/organizations/current/members/:memberId/role",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "organizations",
+                    "current",
+                    "members",
+                    ":memberId",
+                    "role"
+                  ]
+                },
+                "description": "Updates a team member role (BUSINESS_ADMIN, HR_ADMIN, MANAGER, EMPLOYEE). Cannot change BUSINESS_OWNER or self. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"role\": \"MANAGER\"\n}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"id\": \"mem-2\",\n  \"userId\": \"usr-2\",\n  \"role\": \"MANAGER\",\n  \"user\": {\n    \"id\": \"usr-2\",\n    \"name\": \"Chidi Eze\",\n    \"email\": \"chidi@acme.ng\"\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/organizations/current/members/:memberId/role",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "organizations",
+                    "current",
+                    "members",
+                    ":memberId",
+                    "role"
+                  ]
+                },
+                "description": "Updates a team member role (BUSINESS_ADMIN, HR_ADMIN, MANAGER, EMPLOYEE). Cannot change BUSINESS_OWNER or self. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"role\": \"MANAGER\"\n}"
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"statusCode\": 403,\n  \"message\": \"Cannot change the role of the business owner\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Remove Team Member",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/organizations/current/members/:memberId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organizations",
+                "current",
+                "members",
+                ":memberId"
+              ]
+            },
+            "description": "Removes a team member from the organization and revokes their active sessions. Cannot remove BUSINESS_OWNER or self. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/organizations/current/members/:memberId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "organizations",
+                    "current",
+                    "members",
+                    ":memberId"
+                  ]
+                },
+                "description": "Removes a team member from the organization and revokes their active sessions. Cannot remove BUSINESS_OWNER or self. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"removedMemberId\": \"mem-2\"\n}"
+            },
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/organizations/current/members/:memberId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "organizations",
+                    "current",
+                    "members",
+                    ":memberId"
+                  ]
+                },
+                "description": "Removes a team member from the organization and revokes their active sessions. Cannot remove BUSINESS_OWNER or self. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN."
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"statusCode\": 403,\n  \"message\": \"Cannot remove the business owner\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Roles & Permissions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/organizations/current/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organizations",
+                "current",
+                "roles"
+              ]
+            },
+            "description": "Lists system roles and their permissions for the organization. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/organizations/current/roles",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "organizations",
+                    "current",
+                    "roles"
+                  ]
+                },
+                "description": "Lists system roles and their permissions for the organization. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "[\n  {\n    \"role\": \"MANAGER\",\n    \"label\": \"Manager\",\n    \"description\": \"Reviews and approves leave, expense, and reimbursement requests for direct reports.\",\n    \"assignable\": true,\n    \"permissions\": [\n      \"team:view_reports\",\n      \"approvals:decide\",\n      \"self_service:use\"\n    ]\n  }\n]"
+            },
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/organizations/current/roles",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "organizations",
+                    "current",
+                    "roles"
+                  ]
+                },
+                "description": "Lists system roles and their permissions for the organization. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"statusCode\": 403,\n  \"message\": \"Forbidden resource\"\n}"
             }
           ]
         }
@@ -5989,9 +6685,17 @@
                     "people",
                     "onboarding",
                     "employees"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "all",
+                      "disabled": true,
+                      "description": "Optional status filter: all, active, onboarding, pending_invitation"
+                    }
                   ]
                 },
-                "description": "List employee onboarding progress."
+                "description": "List all non-offboarded employees with an onboarding assignment (including ACTIVE employees with open checklist items) and their completedItemIds. Pass optional ?status=all|active|onboarding|pending_invitation to filter. Accessible by BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
               },
               "response": []
             },
@@ -10547,6 +11251,102 @@
                 }
               ],
               "body": "{\n  \"success\": false,\n  \"message\": \"Invoice not found\",\n  \"error\": {\n    \"message\": \"Invoice not found\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Audit",
+      "item": [
+        {
+          "name": "List Organization Security Activity",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit?source=events&page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Lists paginated security and domain audit events for the current organization (defaults to source=events for AuditEvent; pass source=requests for raw HTTP AuditLog). Supports action, resource, actorId, from, and to filters. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/audit?page=1&limit=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "audit"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
+                },
+                "description": "Lists paginated security and mutation audit logs for the current organization. Supports optional action, resource, actorId, from, and to filters. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"data\": [\n    {\n      \"id\": \"log-1\",\n      \"action\": \"PATCH /organizations/current\",\n      \"resource\": \"organizations\",\n      \"resourceId\": \"org-1\",\n      \"actor\": {\n        \"id\": \"usr-1\",\n        \"name\": \"Ada Obi\",\n        \"email\": \"ada@acme.ng\"\n      },\n      \"payload\": {\n        \"address\": \"14 Adeola Odeku St\"\n      },\n      \"ipAddress\": \"127.0.0.1\",\n      \"createdAt\": \"2026-11-25T01:00:00.000Z\"\n    }\n  ],\n  \"meta\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 20,\n    \"totalPages\": 1\n  }\n}"
+            },
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/audit?page=1&limit=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "audit"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
+                },
+                "description": "Lists paginated security and mutation audit logs for the current organization. Supports optional action, resource, actorId, from, and to filters. Allowed roles: BUSINESS_OWNER, BUSINESS_ADMIN, HR_ADMIN."
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"statusCode\": 403,\n  \"message\": \"Forbidden resource\"\n}"
             }
           ]
         }

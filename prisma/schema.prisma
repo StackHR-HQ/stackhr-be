@@ -91,6 +91,8 @@ model Organization {
   logo                          String?
   industry                      String?
   companySize                   String?
+  address                       String?
+  rcNumber                      String?
   currency                      String                         @default("NGN")
   payrollFrequency              String                         @default("MONTHLY")
   payDate                       Int                            @default(25)
@@ -819,8 +821,9 @@ model WaitlistEntry {
   name          String
   position      String
   businessName  String
-  businessEmail String   @unique
-  createdAt     DateTime @default(now())
+  businessEmail     String    @unique
+  launchEmailSentAt DateTime?
+  createdAt         DateTime  @default(now())
   updatedAt     DateTime @updatedAt
 
   @@index([businessEmail])

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -23,6 +24,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { RevokeSessionsQueryDto } from './dto/revoke-sessions-query.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -171,6 +173,43 @@ export class AuthController {
   @Get('me')
   getCurrentUser(@Req() request: AuthenticatedRequest) {
     return { user: this.authService.toFrontendUser(request.user!) };
+  }
+
+  @UseGuards(AuthGuard)
+  @Get('sessions')
+  listSessions(@Req() request: AuthenticatedRequest) {
+    const currentToken = this.authService.getTokenFromRequest(request);
+    return this.authService.listUserSessions(request.user!.id, currentToken);
+  }
+
+  @UseGuards(AuthGuard)
+  @Delete('sessions/:id')
+  revokeSession(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') sessionId: string,
+  ) {
+    return this.authService.revokeUserSession(request.user!.id, sessionId);
+  }
+
+  @UseGuards(AuthGuard)
+  @Delete('sessions')
+  async revokeAllSessions(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: RevokeSessionsQueryDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const currentToken = this.authService.getTokenFromRequest(request);
+    const result = await this.authService.revokeAllUserSessions(
+      request.user!.id,
+      {
+        excludeCurrent: query.excludeCurrent,
+        currentToken,
+      },
+    );
+    if (!query.excludeCurrent) {
+      this.authService.clearSessionCookie(response);
+    }
+    return result;
   }
 
   @Throttle({ default: { ttl: 60000, limit: 3 } })

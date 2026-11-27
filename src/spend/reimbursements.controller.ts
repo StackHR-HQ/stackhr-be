@@ -14,6 +14,7 @@ import { USER_ROLES } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { SpendService } from './spend.service';
 import { CreateReimbursementDto } from './dto/create-reimbursement.dto';
+import { SettlePayoutDto } from './dto/settle-payout.dto';
 import { RequireEntitlement } from '../billing/require-entitlement.decorator';
 
 const ADMIN_ROLES = [
@@ -67,7 +68,8 @@ export class ReimbursementsController {
   payReimbursement(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
+    @Body() dto?: SettlePayoutDto,
   ) {
-    return this.spendService.payReimbursement(user, id);
+    return this.spendService.payReimbursement(user, id, dto);
   }
 }
